@@ -1,3 +1,6 @@
+-- CreateEnum
+CREATE TYPE "public"."OrganizerRole" AS ENUM ('organizer', 'superadmin');
+
 -- CreateTable
 CREATE TABLE "public"."Admin" (
     "id" TEXT NOT NULL,
@@ -5,10 +8,10 @@ CREATE TABLE "public"."Admin" (
     "last_name" VARCHAR(255) NOT NULL,
     "password" VARCHAR(255) NOT NULL,
     "email" VARCHAR(255) NOT NULL,
-    "type" VARCHAR(50) NOT NULL DEFAULT 'organizer',
+    "type" "public"."OrganizerRole" NOT NULL DEFAULT 'organizer',
     "active" BOOLEAN NOT NULL DEFAULT true,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Admin_pkey" PRIMARY KEY ("id")
 );
@@ -20,7 +23,7 @@ CREATE TABLE "public"."AdminPermission" (
     "permission_id" TEXT NOT NULL,
     "admin_id" TEXT NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "AdminPermission_pkey" PRIMARY KEY ("id")
 );
@@ -37,25 +40,25 @@ CREATE TABLE "public"."Permission" (
 -- CreateTable
 CREATE TABLE "public"."Event" (
     "id" TEXT NOT NULL,
-    "organizer_id" TEXT,
-    "register_form_id" TEXT,
     "name" VARCHAR(255) NOT NULL,
-    "description" TEXT,
+    "links" TEXT[],
+    "policy_links" TEXT[],
     "start_date" TIMESTAMP(3) NOT NULL,
     "end_date" TIMESTAMP(3) NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+    "participants_limit" INTEGER,
+    "verified_at" TIMESTAMP(3),
+    "is_private" BOOLEAN,
+    "description" TEXT,
     "primary_color" VARCHAR(12),
     "organizer" VARCHAR(255),
-    "participants_limit" INTEGER,
     "photo_url" VARCHAR(255),
-    "links" TEXT,
     "location" VARCHAR(255),
     "contact_email" VARCHAR(255),
-    "verified_at" TIMESTAMP(3),
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "slug" VARCHAR(255),
-    "is_private" BOOLEAN,
-    "policy_links" TEXT,
+    "organizer_id" TEXT,
+    "register_form_id" TEXT,
 
     CONSTRAINT "Event_pkey" PRIMARY KEY ("id")
 );
@@ -63,13 +66,13 @@ CREATE TABLE "public"."Event" (
 -- CreateTable
 CREATE TABLE "public"."Attribute" (
     "id" TEXT NOT NULL,
-    "name" VARCHAR(255),
     "event_id" TEXT NOT NULL,
-    "show_in_list" BOOLEAN NOT NULL DEFAULT true,
-    "options" TEXT,
     "type" VARCHAR(50) NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+    "show_in_list" BOOLEAN NOT NULL DEFAULT true,
+    "options" TEXT[],
+    "name" VARCHAR(255),
 
     CONSTRAINT "Attribute_pkey" PRIMARY KEY ("id")
 );
@@ -77,14 +80,14 @@ CREATE TABLE "public"."Attribute" (
 -- CreateTable
 CREATE TABLE "public"."Block" (
     "id" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+    "capacity" INTEGER,
+    "order" INTEGER,
     "name" VARCHAR(255),
     "description" TEXT,
-    "capacity" INTEGER,
     "parent_id" TEXT,
     "attribute_id" TEXT,
-    "order" INTEGER,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Block_pkey" PRIMARY KEY ("id")
 );
@@ -92,15 +95,15 @@ CREATE TABLE "public"."Block" (
 -- CreateTable
 CREATE TABLE "public"."Email" (
     "id" TEXT NOT NULL,
-    "event_id" TEXT,
     "name" VARCHAR(255) NOT NULL,
     "content" TEXT NOT NULL,
     "trigger" VARCHAR(255) NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
     "trigger_value" VARCHAR(255),
     "trigger_value_2" VARCHAR(255),
+    "event_id" TEXT,
     "form_id" TEXT,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Email_pkey" PRIMARY KEY ("id")
 );
@@ -109,12 +112,12 @@ CREATE TABLE "public"."Email" (
 CREATE TABLE "public"."Form" (
     "id" TEXT NOT NULL,
     "name" VARCHAR(255) NOT NULL,
-    "description" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
     "open_date" TIMESTAMP(3),
     "close_date" TIMESTAMP(3),
+    "description" TEXT,
     "event_id" TEXT,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "is_editable" BOOLEAN,
 
     CONSTRAINT "Form_pkey" PRIMARY KEY ("id")
@@ -123,12 +126,12 @@ CREATE TABLE "public"."Form" (
 -- CreateTable
 CREATE TABLE "public"."FormDefinition" (
     "id" TEXT NOT NULL,
+    "is_required" BOOLEAN NOT NULL DEFAULT true,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+    "order" INTEGER,
     "attribute_id" TEXT,
     "form_id" TEXT,
-    "is_required" BOOLEAN NOT NULL DEFAULT true,
-    "order" INTEGER,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "FormDefinition_pkey" PRIMARY KEY ("id")
 );
@@ -139,7 +142,7 @@ CREATE TABLE "public"."Participant" (
     "email" VARCHAR(255) NOT NULL,
     "event_id" TEXT NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Participant_pkey" PRIMARY KEY ("id")
 );
@@ -149,9 +152,9 @@ CREATE TABLE "public"."ParticipantAttribute" (
     "id" TEXT NOT NULL,
     "participant_id" TEXT NOT NULL,
     "attribute_id" TEXT NOT NULL,
-    "value" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+    "value" TEXT,
 
     CONSTRAINT "ParticipantAttribute_pkey" PRIMARY KEY ("id")
 );
@@ -159,13 +162,13 @@ CREATE TABLE "public"."ParticipantAttribute" (
 -- CreateTable
 CREATE TABLE "public"."ParticipantEmail" (
     "id" TEXT NOT NULL,
+    "status" VARCHAR(50) NOT NULL,
+    "send_at" TIMESTAMP(3) NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+    "send_by" VARCHAR(255),
     "participant_id" TEXT,
     "email_id" TEXT,
-    "send_at" TIMESTAMP(3) NOT NULL,
-    "send_by" VARCHAR(255),
-    "status" VARCHAR(50) NOT NULL,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "ParticipantEmail_pkey" PRIMARY KEY ("id")
 );
@@ -175,11 +178,11 @@ CREATE TABLE "public"."ParticipantForm" (
     "id" TEXT NOT NULL,
     "participant_id" TEXT NOT NULL,
     "form_id" TEXT NOT NULL,
-    "email_id" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
     "last_opened_at" TIMESTAMP(3),
     "last_submitted_at" TIMESTAMP(3),
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "email_id" TEXT,
 
     CONSTRAINT "ParticipantForm_pkey" PRIMARY KEY ("id")
 );
@@ -189,11 +192,11 @@ CREATE TABLE "public"."ParticipantAttributeLog" (
     "id" TEXT NOT NULL,
     "participant_id" TEXT NOT NULL,
     "triggered_by" VARCHAR(50) NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "triggered_id" TEXT,
     "attribute_id" TEXT,
     "before" TEXT,
     "after" TEXT,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "ParticipantAttributeLog_pkey" PRIMARY KEY ("id")
 );

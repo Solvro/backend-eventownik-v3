@@ -55,6 +55,8 @@ async function main() {
     data: {
       name: "Sample Event",
       description: "A test event lorem sigmum",
+      links: [] as string[],
+      policy_links: [] as string[],
       start_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // next week
       end_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 8),
       organizer_id: admin.id,
@@ -81,7 +83,7 @@ async function main() {
       name: "T-shirt size",
       event_id: event.id,
       type: "select",
-      options: "S,M,L,XL",
+      options: ["S", "M", "L", "XL"] as string[],
       show_in_list: true,
     },
   });
