@@ -11,6 +11,7 @@
     "format:check": "prettier --check .",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "prepare": "husky || true",
+    "seed:dev": "ts-node --transpile-only prisma/seed.development.ts",
     "start": "nest start",
     "start:debug": "nest start --debug --watch",
     "start:dev": "nest start --watch",
