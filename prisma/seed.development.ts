@@ -13,7 +13,8 @@ import type {
   ParticipantEmail,
   ParticipantForm,
   Permission,
-} from "../generated/prisma";
+} from "../generated/prisma/";
+import { OrganizerType } from "../generated/prisma/";
 
 const prisma = new PrismaClient();
 
@@ -33,13 +34,24 @@ async function main() {
   await prisma.permission.deleteMany();
   await prisma.admin.deleteMany();
 
+  await prisma.admin.create({
+    data: {
+      first_name: "SuperAdmin",
+      last_name: "Solvro",
+      password: "changeme",
+      email: "admin@solvro.pl",
+      type: OrganizerType.superadmin,
+      active: true,
+    },
+  });
+
   const admin: Admin = await prisma.admin.create({
     data: {
       first_name: "Admin",
       last_name: "User",
       password: "changeme",
       email: "admin@example.com",
-      type: "organizer",
+      type: OrganizerType.organizer,
       active: true,
     },
   });
