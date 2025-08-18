@@ -72,7 +72,7 @@ async function main() {
       start_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // next week
       end_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 8),
       organizer_id: admin.id,
-      organizer: "Test Org",
+      organizer_name: "Test Org",
       participants_limit: 100,
       photo_url: "https://placehold.co/200x200",
       location: "Test City",

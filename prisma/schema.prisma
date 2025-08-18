@@ -14,161 +14,161 @@ enum OrganizerType {
 }
 
 model Admin {
-  id          String           @id @default(uuid())
-  first_name  String           @db.VarChar(255)
-  last_name   String           @db.VarChar(255)
-  password    String           @db.VarChar(255)
-  email       String           @unique @db.VarChar(255)
-  type        OrganizerType    @default(organizer)
-  active      Boolean          @default(true)
-  created_at  DateTime         @default(now())
-  updated_at  DateTime         @updatedAt
+  id         String        @id @default(uuid()) @db.Uuid
+  first_name String        @db.VarChar(255)
+  last_name  String        @db.VarChar(255)
+  password   String        @db.VarChar(255)
+  email      String        @unique @db.VarChar(255)
+  type       OrganizerType @default(organizer)
+  active     Boolean       @default(true)
+  created_at DateTime      @default(now())
+  updated_at DateTime      @updatedAt
 
-  events      Event[]          @relation("Organizer")
+  events      Event[]           @relation("Organizer")
   permissions AdminPermission[]
 }
 
 model AdminPermission {
-  id            String     @id @default(uuid())
-  event_id      String
-  permission_id String
-  admin_id      String
-  created_at    DateTime   @default(now())
-  updated_at    DateTime   @updatedAt
+  id            String   @id @default(uuid()) @db.Uuid
+  event_id      String   @db.Uuid
+  permission_id String   @db.Uuid
+  admin_id      String   @db.Uuid
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
 
-  admin         Admin      @relation(fields: [admin_id], references: [id], onDelete: Cascade)
-  event         Event      @relation(fields: [event_id], references: [id], onDelete: Cascade)
-  permission    Permission @relation(fields: [permission_id], references: [id], onDelete: Cascade)
+  admin      Admin      @relation(fields: [admin_id], references: [id], onDelete: Cascade)
+  event      Event      @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permission_id], references: [id], onDelete: Cascade)
 }
 
 model Permission {
-  id                String            @id @default(uuid())
-  action            String            @db.VarChar(255)
-  subject           String            @db.VarChar(255)
+  id               String  @id @default(uuid()) @db.Uuid
+  organizer_id     String? @db.Uuid
+  register_form_id String? @db.Uuid
 
   admin_permissions AdminPermission[]
 }
 
 model Event {
-  id                 String            @id @default(uuid())
-  name               String            @db.VarChar(255)
-  links              String[]          @db.Text @default([])
-  policy_links       String[]          @db.Text @default([])
+  id                 String    @id @default(uuid()) @db.Uuid
+  name               String    @db.VarChar(255)
+  links              String[]  @default([])
+  policy_links       String[]  @default([])
   start_date         DateTime
   end_date           DateTime
-  created_at         DateTime          @default(now())
-  updated_at         DateTime          @updatedAt
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
   participants_limit Int?
   verified_at        DateTime?
-  is_private         Boolean?          
-  description        String?           @db.Text
-  primary_color      String?           @db.VarChar(12)
-  organizer_name     String?           @db.VarChar(255)
-  photo_url          String?           @db.VarChar(255)
-  location           String?           @db.VarChar(255)
-  contact_email      String?           @db.VarChar(255)
-  slug               String?           @db.VarChar(255)
-  organizer_id       String?
-  register_form_id   String?
+  is_private         Boolean?
+  description        String?
+  primary_color      String?   @db.VarChar(12)
+  organizer_name     String?   @db.VarChar(255)
+  photo_url          String?   @db.VarChar(255)
+  location           String?   @db.VarChar(255)
+  contact_email      String?   @db.VarChar(255)
+  slug               String?   @db.VarChar(255)
+  organizer_id       String?   @db.Uuid
+  register_form_id   String?   @db.Uuid
 
-  organizer_admin    Admin?            @relation("Organizer", fields: [organizer_id], references: [id], onDelete: Cascade)
-  register_form      Form?             @relation("RegisterForm", fields: [register_form_id], references: [id], onDelete: Cascade)
-  attributes         Attribute[]
-  emails             Email[]
-  forms              Form[]            @relation("EventForms")
-  admin_permissions  AdminPermission[]
-  participants       Participant[]
+  organizer_admin   Admin?            @relation("Organizer", fields: [organizer_id], references: [id], onDelete: Cascade)
+  register_form     Form?             @relation("RegisterForm", fields: [register_form_id], references: [id], onDelete: Cascade)
+  attributes        Attribute[]
+  emails            Email[]
+  forms             Form[]            @relation("EventForms")
+  admin_permissions AdminPermission[]
+  participants      Participant[]
 }
 
 model Attribute {
-  id                   String                  @id @default(uuid())
-  event_id             String
-  type                 String                  @db.VarChar(50)
-  created_at           DateTime                @default(now())
-  updated_at           DateTime                @updatedAt
-  show_in_list         Boolean                 @default(true)
-  options              String[]                @db.Text @default([])
-  name                 String?                 @db.VarChar(255)
+  id           String   @id @default(uuid()) @db.Uuid
+  event_id     String   @db.Uuid
+  type         String   @db.VarChar(50)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+  show_in_list Boolean  @default(true)
+  options      String[] @default([])
+  name         String?  @db.VarChar(255)
 
-  event                Event                   @relation(fields: [event_id], references: [id], onDelete: Cascade)
-  blocks               Block[]
-  form_definitions     FormDefinition[]
+  event                  Event                  @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  blocks                 Block[]
+  form_definitions       FormDefinition[]
   participant_attributes ParticipantAttribute[]
 }
 
 model Block {
-  id           String     @id @default(uuid())
-  created_at   DateTime   @default(now())
-  updated_at   DateTime   @updatedAt
+  id           String   @id @default(uuid()) @db.Uuid
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
   capacity     Int?
   order        Int?
-  name         String?    @db.VarChar(255)
-  description  String?    @db.Text
-  parent_id    String?
-  attribute_id String?
+  name         String?  @db.VarChar(255)
+  description  String?
+  parent_id    String?  @db.Uuid
+  attribute_id String?  @db.Uuid
 
-  parent       Block?     @relation("BlockToBlock", fields: [parent_id], references: [id], onDelete: Cascade)
-  children     Block[]    @relation("BlockToBlock")
-  attribute    Attribute? @relation(fields: [attribute_id], references: [id], onDelete: Cascade)
+  parent    Block?     @relation("BlockToBlock", fields: [parent_id], references: [id], onDelete: Cascade)
+  children  Block[]    @relation("BlockToBlock")
+  attribute Attribute? @relation(fields: [attribute_id], references: [id], onDelete: Cascade)
 }
 
 model Email {
-  id              String             @id @default(uuid())
-  name            String             @db.VarChar(255)
-  content         String             @db.Text
-  trigger         String             @db.VarChar(255)
-  created_at      DateTime           @default(now())
-  updated_at      DateTime           @updatedAt
-  trigger_value   String?            @db.VarChar(255)
-  trigger_value_2 String?            @db.VarChar(255)
-  event_id        String?
-  form_id         String?
+  id              String   @id @default(uuid()) @db.Uuid
+  name            String   @db.VarChar(255)
+  content         String
+  trigger         String   @db.VarChar(255)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  trigger_value   String?  @db.VarChar(255)
+  trigger_value_2 String?  @db.VarChar(255)
+  event_id        String?  @db.Uuid
+  form_id         String?  @db.Uuid
 
-  event           Event?             @relation(fields: [event_id], references: [id], onDelete: Cascade)
-  form            Form?              @relation(fields: [form_id], references: [id], onDelete: Cascade)
+  event              Event?             @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  form               Form?              @relation(fields: [form_id], references: [id], onDelete: Cascade)
   participant_emails ParticipantEmail[]
-  participant_forms ParticipantForm[]
+  participant_forms  ParticipantForm[]
 }
 
 model Form {
-  id               String            @id @default(uuid())
-  name             String            @db.VarChar(255)
-  created_at       DateTime          @default(now())
-  updated_at       DateTime          @updatedAt
-  open_date        DateTime?
-  close_date       DateTime?
-  description      String?           @db.Text
-  event_id         String?
-  is_editable      Boolean?
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @db.VarChar(255)
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  open_date   DateTime?
+  close_date  DateTime?
+  description String?
+  event_id    String?   @db.Uuid
+  is_editable Boolean?
 
-  event            Event?            @relation("EventForms", fields: [event_id], references: [id], onDelete: Cascade)
-  form_definitions FormDefinition[]
-  emails           Email[]
+  event             Event?            @relation("EventForms", fields: [event_id], references: [id], onDelete: Cascade)
+  form_definitions  FormDefinition[]
+  emails            Email[]
   participant_forms ParticipantForm[]
-  register_event   Event[]           @relation("RegisterForm")
+  register_event    Event[]           @relation("RegisterForm")
 }
 
 model FormDefinition {
-  id          String     @id @default(uuid())
-  is_required Boolean    @default(true)
-  created_at  DateTime   @default(now())
-  updated_at  DateTime   @updatedAt
-  order       Int?
-  attribute_id String?
-  form_id     String?
+  id           String   @id @default(uuid()) @db.Uuid
+  is_required  Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+  order        Int?
+  attribute_id String?  @db.Uuid
+  form_id      String?  @db.Uuid
 
-  attribute   Attribute? @relation(fields: [attribute_id], references: [id], onDelete: Cascade)
-  form        Form?      @relation(fields: [form_id], references: [id], onDelete: Cascade)
+  attribute Attribute? @relation(fields: [attribute_id], references: [id], onDelete: Cascade)
+  form      Form?      @relation(fields: [form_id], references: [id], onDelete: Cascade)
 }
 
 model Participant {
-  id             String                   @id @default(uuid())
-  email          String                   @db.VarChar(255)
-  event_id       String
-  created_at     DateTime                 @default(now())
-  updated_at     DateTime                 @updatedAt
+  id         String   @id @default(uuid()) @db.Uuid
+  email      String   @db.VarChar(255)
+  event_id   String   @db.Uuid
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
-  event          Event                    @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  event          Event                     @relation(fields: [event_id], references: [id], onDelete: Cascade)
   attributes     ParticipantAttribute[]
   emails         ParticipantEmail[]
   forms          ParticipantForm[]
@@ -176,55 +176,55 @@ model Participant {
 }
 
 model ParticipantAttribute {
-  id             String      @id @default(uuid())
-  participant_id String
-  attribute_id   String
-  created_at     DateTime    @default(now())
-  updated_at     DateTime    @updatedAt
-  value          String?     @db.Text
+  id             String   @id @default(uuid()) @db.Uuid
+  participant_id String   @db.Uuid
+  attribute_id   String   @db.Uuid
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+  value          String?
 
-  participant    Participant @relation(fields: [participant_id], references: [id], onDelete: Cascade)
-  attribute      Attribute   @relation(fields: [attribute_id], references: [id], onDelete: Cascade)
+  participant Participant @relation(fields: [participant_id], references: [id], onDelete: Cascade)
+  attribute   Attribute   @relation(fields: [attribute_id], references: [id], onDelete: Cascade)
 }
 
 model ParticipantEmail {
-  id             String        @id @default(uuid())
-  status         String        @db.VarChar(50)
+  id             String   @id @default(uuid()) @db.Uuid
+  status         String   @db.VarChar(50)
   send_at        DateTime
-  created_at     DateTime      @default(now())
-  updated_at     DateTime      @updatedAt
-  send_by        String?       @db.VarChar(255)
-  participant_id String?
-  email_id       String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+  send_by        String?  @db.VarChar(255)
+  participant_id String?  @db.Uuid
+  email_id       String?  @db.Uuid
 
-  participant    Participant?  @relation(fields: [participant_id], references: [id], onDelete: Cascade)
-  email          Email?        @relation(fields: [email_id], references: [id], onDelete: Cascade)
+  participant Participant? @relation(fields: [participant_id], references: [id], onDelete: Cascade)
+  email       Email?       @relation(fields: [email_id], references: [id], onDelete: Cascade)
 }
 
 model ParticipantForm {
-  id                String      @id @default(uuid())
-  participant_id    String
-  form_id           String
-  created_at        DateTime    @default(now())
-  updated_at        DateTime    @updatedAt
+  id                String    @id @default(uuid()) @db.Uuid
+  participant_id    String    @db.Uuid
+  form_id           String    @db.Uuid
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
   last_opened_at    DateTime?
   last_submitted_at DateTime?
-  email_id          String?
+  email_id          String?   @db.Uuid
 
-  participant       Participant @relation(fields: [participant_id], references: [id], onDelete: Cascade)
-  form              Form        @relation(fields: [form_id], references: [id], onDelete: Cascade)
-  email             Email?      @relation(fields: [email_id], references: [id], onDelete: Cascade)
+  participant Participant @relation(fields: [participant_id], references: [id], onDelete: Cascade)
+  form        Form        @relation(fields: [form_id], references: [id], onDelete: Cascade)
+  email       Email?      @relation(fields: [email_id], references: [id], onDelete: Cascade)
 }
 
 model ParticipantAttributeLog {
-  id             String      @id @default(uuid())
-  participant_id String
-  triggered_by   String      @db.VarChar(50)
-  created_at     DateTime    @default(now())
-  triggered_id   String?
-  attribute_id   String?
-  before         String?     @db.Text
-  after          String?     @db.Text
+  id             String   @id @default(uuid()) @db.Uuid
+  participant_id String   @db.Uuid
+  triggered_by   String   @db.VarChar(50)
+  created_at     DateTime @default(now())
+  triggered_id   String?  @db.Uuid
+  attribute_id   String?  @db.Uuid
+  before         String?
+  after          String?
 
-  participant    Participant @relation(fields: [participant_id], references: [id], onDelete: Cascade)
+  participant Participant @relation(fields: [participant_id], references: [id], onDelete: Cascade)
 }
