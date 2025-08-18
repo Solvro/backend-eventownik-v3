@@ -43,6 +43,8 @@ model AdminPermission {
 
 model Permission {
   id               String  @id @default(uuid()) @db.Uuid
+  action           String  @db.VarChar(255)
+  subject          String  @db.VarChar(255)
   organizer_id     String? @db.Uuid
   register_form_id String? @db.Uuid
 
