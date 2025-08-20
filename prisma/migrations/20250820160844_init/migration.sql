@@ -4,8 +4,8 @@ CREATE TYPE "public"."OrganizerType" AS ENUM ('organizer', 'superadmin');
 -- CreateTable
 CREATE TABLE "public"."Admin" (
     "id" UUID NOT NULL,
-    "first_name" VARCHAR(255) NOT NULL,
-    "last_name" VARCHAR(255) NOT NULL,
+    "firstName" VARCHAR(255) NOT NULL,
+    "lastName" VARCHAR(255) NOT NULL,
     "password" VARCHAR(255) NOT NULL,
     "email" VARCHAR(255) NOT NULL,
     "type" "public"."OrganizerType" NOT NULL DEFAULT 'organizer',
@@ -31,6 +31,8 @@ CREATE TABLE "public"."AdminPermission" (
 -- CreateTable
 CREATE TABLE "public"."Permission" (
     "id" UUID NOT NULL,
+    "action" VARCHAR(255) NOT NULL,
+    "subject" VARCHAR(255) NOT NULL,
     "organizer_id" UUID,
     "register_form_id" UUID,
 
@@ -49,7 +51,6 @@ CREATE TABLE "public"."Event" (
     "updated_at" TIMESTAMP(3) NOT NULL,
     "participants_limit" INTEGER,
     "verified_at" TIMESTAMP(3),
-    "is_private" BOOLEAN,
     "description" TEXT,
     "primary_color" VARCHAR(12),
     "organizer_name" VARCHAR(255),
@@ -203,6 +204,9 @@ CREATE TABLE "public"."ParticipantAttributeLog" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Admin_email_key" ON "public"."Admin"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Event_slug_key" ON "public"."Event"("slug");
 
 -- AddForeignKey
 ALTER TABLE "public"."AdminPermission" ADD CONSTRAINT "AdminPermission_admin_id_fkey" FOREIGN KEY ("admin_id") REFERENCES "public"."Admin"("id") ON DELETE CASCADE ON UPDATE CASCADE;

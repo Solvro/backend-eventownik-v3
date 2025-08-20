@@ -36,8 +36,8 @@ async function main() {
 
   await prisma.admin.create({
     data: {
-      first_name: "SuperAdmin",
-      last_name: "Solvro",
+      firstName: "SuperAdmin",
+      lastName: "Solvro",
       password: "changeme",
       email: "admin@solvro.pl",
       type: OrganizerType.superadmin,
@@ -47,56 +47,53 @@ async function main() {
 
   const admin: Admin = await prisma.admin.create({
     data: {
-      first_name: "Admin",
-      last_name: "User",
+      firstName: "Admin",
+      lastName: "User",
       password: "changeme",
       email: "admin@example.com",
       type: OrganizerType.organizer,
       active: true,
     },
   });
-
   const permission: Permission = await prisma.permission.create({
     data: {
       action: "manage",
       subject: "all",
     },
   });
-
   const event: Event = await prisma.event.create({
     data: {
       name: "Sample Event",
       description: "A test event lorem sigmum",
       links: [] as string[],
-      policy_links: [] as string[],
-      start_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // next week
-      end_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 8),
-      organizer_id: admin.id,
-      organizer_name: "Test Org",
-      participants_limit: 100,
-      photo_url: "https://placehold.co/200x200",
+      policyLinks: [] as string[],
+      startDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // next week
+      endDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 8),
+      organizerUuid: admin.uuid,
+      organizerName: "Test Org",
+      participantsLimit: 100,
+      photoUrl: "https://placehold.co/200x200",
       location: "Test City",
-      contact_email: "contact@example.com",
-      is_private: false,
+      contactEmail: "contact@example.com",
       slug: "sample-event",
     },
   });
 
   await prisma.adminPermission.create({
     data: {
-      admin_id: admin.id,
-      event_id: event.id,
-      permission_id: permission.id,
+      adminUuid: admin.uuid,
+      eventUuid: event.uuid,
+      permissionUuid: permission.uuid,
     },
   });
 
   const attribute: Attribute = await prisma.attribute.create({
     data: {
       name: "T-shirt size",
-      event_id: event.id,
+      eventUuid: event.uuid,
       type: "select",
       options: ["S", "M", "L", "XL"] as string[],
-      show_in_list: true,
+      showInList: true,
     },
   });
 
@@ -105,7 +102,7 @@ async function main() {
       name: "Main Building",
       description: "Main building",
       capacity: 200,
-      attribute_id: attribute.id,
+      attributeUuid: attribute.uuid,
       order: 1,
     },
   });
@@ -115,8 +112,8 @@ async function main() {
       name: "Room 101",
       description: "First floor room",
       capacity: 30,
-      parent_id: mainBlock.id,
-      attribute_id: attribute.id,
+      parentUuid: mainBlock.uuid,
+      attributeUuid: attribute.uuid,
       order: 2,
     },
   });
@@ -126,8 +123,8 @@ async function main() {
       name: "Bed A1",
       description: "Front-left bed",
       capacity: 1,
-      parent_id: classroomBlock.id,
-      attribute_id: attribute.id,
+      parentUuid: classroomBlock.uuid,
+      attributeUuid: attribute.uuid,
       order: 1,
     },
   });
@@ -136,63 +133,63 @@ async function main() {
     data: {
       name: "Registration",
       description: "Register for event",
-      event_id: event.id,
-      is_editable: true,
+      eventUuid: event.uuid,
+      isEditable: true,
     },
   });
 
   const formDefinition: FormDefinition = await prisma.formDefinition.create({
     data: {
-      attribute_id: attribute.id,
-      form_id: form.id,
-      is_required: true,
+      attributeUuid: attribute.uuid,
+      formUuid: form.uuid,
+      isRequired: true,
       order: 1,
     },
   });
 
   const email: Email = await prisma.email.create({
     data: {
-      event_id: event.id,
+      eventUuid: event.uuid,
       name: "Welcome",
       content: "Welcome to the event!",
-      trigger: "on_register",
-      form_id: form.id,
-      trigger_value: null,
-      trigger_value_2: null,
+      trigger: "onRegister",
+      formUuid: form.uuid,
+      triggerValue: null,
+      triggerValue_2: null,
     },
   });
 
   const participant: Participant = await prisma.participant.create({
     data: {
       email: "participant@example.com",
-      event_id: event.id,
+      eventUuid: event.uuid,
     },
   });
 
   const participantAttribute: ParticipantAttribute =
     await prisma.participantAttribute.create({
       data: {
-        participant_id: participant.id,
-        attribute_id: attribute.id,
+        participantUuid: participant.uuid,
+        attributeUuid: attribute.uuid,
         value: "M",
       },
     });
 
   const participantForm: ParticipantForm = await prisma.participantForm.create({
     data: {
-      participant_id: participant.id,
-      form_id: form.id,
-      email_id: email.id,
+      participantUuid: participant.uuid,
+      formUuid: form.uuid,
+      emailUuid: email.uuid,
     },
   });
 
   const participantEmail: ParticipantEmail =
     await prisma.participantEmail.create({
       data: {
-        participant_id: participant.id,
-        email_id: email.id,
-        send_at: new Date(),
-        send_by: "system",
+        participantUuid: participant.uuid,
+        emailUuid: email.uuid,
+        sendAt: new Date(),
+        sendBy: "system",
         status: "sent",
       },
     });
@@ -200,33 +197,33 @@ async function main() {
   const participantAttributeLog: ParticipantAttributeLog =
     await prisma.participantAttributeLog.create({
       data: {
-        participant_id: participant.id,
-        triggered_by: "system",
-        triggered_id: admin.id,
-        attribute_id: attribute.id,
+        participantUuid: participant.uuid,
+        triggeredBy: "system",
+        triggeredUuid: admin.uuid,
+        attributeUuid: attribute.uuid,
         before: null,
         after: "M",
       },
     });
 
   await prisma.event.update({
-    where: { id: event.id },
-    data: { register_form_id: form.id },
+    where: { uuid: event.uuid },
+    data: { registerFormUuid: form.uuid },
   });
 
   console.warn("Seed complete!", {
-    adminId: admin.id,
-    eventId: event.id,
-    formId: form.id,
-    formDefinitionId: formDefinition.id,
-    mainBlockId: mainBlock.id,
-    classroomBlockId: classroomBlock.id,
-    seatBlockId: seatBlock.id,
-    participantId: participant.id,
-    participantAttributeId: participantAttribute.id,
-    participantFormId: participantForm.id,
-    participantEmailId: participantEmail.id,
-    participantAttributeLogId: participantAttributeLog.id,
+    adminUuid: admin.uuid,
+    eventUuid: event.uuid,
+    formUuid: form.uuid,
+    formDefinitionUuid: formDefinition.uuid,
+    mainBlockUuid: mainBlock.uuid,
+    classroomBlockUuid: classroomBlock.uuid,
+    seatBlockUuid: seatBlock.uuid,
+    participantUuid: participant.uuid,
+    participantAttributeUuid: participantAttribute.uuid,
+    participantFormUuid: participantForm.uuid,
+    participantEmailUuid: participantEmail.uuid,
+    participantAttributeLogUuid: participantAttributeLog.uuid,
   });
 }
 
