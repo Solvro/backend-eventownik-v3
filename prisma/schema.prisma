@@ -45,8 +45,6 @@ model Permission {
   uuid             String  @id @default(uuid()) @db.Uuid
   action           String
   subject          String
-  organizerUuid    String? @db.Uuid
-  registerFormUuid String? @db.Uuid
 
   adminPermissions AdminPermission[]
 }
@@ -121,7 +119,7 @@ model Email {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   triggerValue   String?
-  triggerValue_2 String?
+  triggerValue2 String?
   eventUuid      String?  @db.Uuid
   formUuid       String?  @db.Uuid
 
@@ -134,13 +132,13 @@ model Email {
 model Form {
   uuid        String    @id @default(uuid()) @db.Uuid
   name        String
+  isEditable  Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   openDate    DateTime?
   closeDate   DateTime?
   description String?
   eventUuid   String?   @db.Uuid
-  isEditable  Boolean?
 
   event            Event?            @relation("EventForms", fields: [eventUuid], references: [uuid], onDelete: Cascade)
   formDefinitions  FormDefinition[]
