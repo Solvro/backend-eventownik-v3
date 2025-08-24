@@ -155,7 +155,7 @@ async function main() {
       trigger: "onRegister",
       formUuid: form.uuid,
       triggerValue: null,
-      triggerValue_2: null,
+      triggerValue2: null,
     },
   });
 
