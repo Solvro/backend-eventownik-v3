@@ -1,4 +1,4 @@
-import { PrismaClient } from "../generated/prisma";
+import { AttributeType, EmailStatus, PrismaClient } from "../generated/prisma";
 import type {
   Admin,
   Attribute,
@@ -91,7 +91,7 @@ async function main() {
     data: {
       name: "T-shirt size",
       eventUuid: event.uuid,
-      type: "select",
+      type: AttributeType.select,
       options: ["S", "M", "L", "XL"] as string[],
       showInList: true,
     },
@@ -190,7 +190,7 @@ async function main() {
         emailUuid: email.uuid,
         sendAt: new Date(),
         sendBy: "system",
-        status: "sent",
+        status: EmailStatus.sent,
       },
     });
 
