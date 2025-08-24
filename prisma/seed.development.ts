@@ -1,9 +1,3 @@
-import {
-  AttributeType,
-  EmailStatus,
-  EmailTrigger,
-  PrismaClient,
-} from "../generated/prisma";
 import type {
   Admin,
   Attribute,
@@ -18,8 +12,14 @@ import type {
   ParticipantEmail,
   ParticipantForm,
   Permission,
-} from "../generated/prisma/";
-import { OrganizerType } from "../generated/prisma/";
+} from "@prisma/client";
+import {
+  AttributeType,
+  EmailStatus,
+  EmailTrigger,
+  OrganizerType,
+  PrismaClient,
+} from "@prisma/client";
 
 const prisma = new PrismaClient();
 
