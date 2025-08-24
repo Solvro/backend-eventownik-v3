@@ -1,4 +1,9 @@
-import { AttributeType, EmailStatus, PrismaClient } from "../generated/prisma";
+import {
+  AttributeType,
+  EmailStatus,
+  EmailTrigger,
+  PrismaClient,
+} from "../generated/prisma";
 import type {
   Admin,
   Attribute,
@@ -152,7 +157,7 @@ async function main() {
       eventUuid: event.uuid,
       name: "Welcome",
       content: "Welcome to the event!",
-      trigger: "onRegister",
+      trigger: EmailTrigger.PARTICIPANT_REGISTERED,
       formUuid: form.uuid,
       triggerValue: null,
       triggerValue2: null,
