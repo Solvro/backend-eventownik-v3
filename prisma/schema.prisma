@@ -5,7 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASEURL")
+  url      = env("DATABASE_URL")
 }
 
 enum OrganizerType {
@@ -128,17 +128,25 @@ model Block {
   attribute Attribute? @relation(fields: [attributeUuid], references: [uuid], onDelete: Cascade)
 }
 
+enum EmailTrigger {
+  PARTICIPANT_REGISTERED
+  PARTICIPANT_DELETED
+  FORM_FILLED
+  ATTRIBUTE_CHANGED
+  MANUAL
+}
+
 model Email {
-  uuid          String   @id @default(uuid()) @db.Uuid
+  uuid          String       @id @default(uuid()) @db.Uuid
   name          String
   content       String
-  trigger       String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  trigger       EmailTrigger
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
   triggerValue  String?
   triggerValue2 String?
-  eventUuid     String?  @db.Uuid
-  formUuid      String?  @db.Uuid
+  eventUuid     String?      @db.Uuid
+  formUuid      String?      @db.Uuid
 
   event             Event?             @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
   form              Form?              @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
@@ -210,14 +218,14 @@ enum EmailStatus {
 }
 
 model ParticipantEmail {
-  uuid            String   @id @default(uuid()) @db.Uuid
+  uuid            String      @id @default(uuid()) @db.Uuid
   status          EmailStatus
   sendAt          DateTime
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
   sendBy          String?
-  participantUuid String?  @db.Uuid
-  emailUuid       String?  @db.Uuid
+  participantUuid String?     @db.Uuid
+  emailUuid       String?     @db.Uuid
 
   participant Participant? @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
   email       Email?       @relation(fields: [emailUuid], references: [uuid], onDelete: Cascade)
