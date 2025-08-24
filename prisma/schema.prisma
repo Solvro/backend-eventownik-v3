@@ -42,9 +42,9 @@ model AdminPermission {
 }
 
 model Permission {
-  uuid             String  @id @default(uuid()) @db.Uuid
-  action           String
-  subject          String
+  uuid    String @id @default(uuid()) @db.Uuid
+  action  String
+  subject String
 
   adminPermissions AdminPermission[]
 }
@@ -79,14 +79,31 @@ model Event {
   participants     Participant[]
 }
 
+enum AttributeType {
+  text
+  textArea
+  number
+  file
+  select
+  block
+  date
+  time
+  datetime
+  multiSelect
+  email
+  tel
+  color
+  checkbox
+}
+
 model Attribute {
-  uuid       String   @id @default(uuid()) @db.Uuid
-  eventUuid  String   @db.Uuid
-  type       String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  showInList Boolean  @default(true)
-  options    String[] @default([])
+  uuid       String        @id @default(uuid()) @db.Uuid
+  eventUuid  String        @db.Uuid
+  type       AttributeType
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  showInList Boolean       @default(true)
+  options    String[]      @default([])
   name       String?
 
   event                 Event                  @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
@@ -112,16 +129,16 @@ model Block {
 }
 
 model Email {
-  uuid           String   @id @default(uuid()) @db.Uuid
-  name           String
-  content        String
-  trigger        String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  triggerValue   String?
+  uuid          String   @id @default(uuid()) @db.Uuid
+  name          String
+  content       String
+  trigger       String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  triggerValue  String?
   triggerValue2 String?
-  eventUuid      String?  @db.Uuid
-  formUuid       String?  @db.Uuid
+  eventUuid     String?  @db.Uuid
+  formUuid      String?  @db.Uuid
 
   event             Event?             @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
   form              Form?              @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
@@ -188,7 +205,7 @@ model ParticipantAttribute {
 
 model ParticipantEmail {
   uuid            String   @id @default(uuid()) @db.Uuid
-  status          String   
+  status          String
   sendAt          DateTime
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
