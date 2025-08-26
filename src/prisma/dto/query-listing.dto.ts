@@ -72,57 +72,28 @@ export class QueryListingDto {
 
     for (const [key, value] of Object.entries(this.filter)) {
       const columns = key.split(",");
-
+      const operatorConditions: Record<string, unknown> = {};
       if (typeof value === "string") {
-        const values = value.split(",");
-
-        if (columns.length > 1) {
-          where.OR = columns.map((col) => ({
-            [col]: { in: values },
-          }));
-        } else {
-          where[key] = values.length > 1 ? { in: values } : value;
-        }
+        operatorConditions.in = value
+          .split(",")
+          .map((x) => (Number.isNaN(Number(x)) ? x : Number(x)));
       } else if (typeof value === "object") {
-        // Nested operators (gt, gte, lt, lte, not, like)
-        const operatorConditions: Record<string, unknown> = {};
-
+        // gt, gte, lt, lte, not, like...
         for (const [op, rawValue] of Object.entries(value)) {
-          let parsedValue: unknown = rawValue;
-
-          if (!Number.isNaN(Number(rawValue))) {
-            parsedValue = Number(rawValue);
-          } else if (!Number.isNaN(Date.parse(String(rawValue)))) {
-            parsedValue = new Date(String(rawValue));
-          }
-
-          switch (op) {
-            case "gt":
-            case "gte":
-            case "lt":
-            case "lte": {
-              operatorConditions[op] = parsedValue;
-              break;
-            }
-            case "not": {
-              operatorConditions.not = parsedValue;
-              break;
-            }
-            case "like": {
-              operatorConditions.contains = String(parsedValue);
-              break;
+          if (op === "like") {
+            operatorConditions.contains = rawValue;
+          } else {
+            if (!Number.isNaN(Number(rawValue))) {
+              operatorConditions[op] = Number(rawValue);
+            } else if (!Number.isNaN(Date.parse(String(rawValue)))) {
+              operatorConditions[op] = new Date(rawValue);
             }
           }
-        }
-
-        if (columns.length > 1) {
-          where.OR = columns.map((col) => ({
-            [col]: operatorConditions,
-          }));
-        } else {
-          where[key] = operatorConditions;
         }
       }
+      where.OR = columns.map((col) => ({
+        [col]: operatorConditions,
+      }));
     }
     return where;
   }
