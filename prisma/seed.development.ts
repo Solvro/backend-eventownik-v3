@@ -84,6 +84,42 @@ async function main() {
     },
   });
 
+  await prisma.event.create({
+    data: {
+      name: "Sample Event 2",
+      description: "A test event lorem sigmum",
+      links: [] as string[],
+      policyLinks: [] as string[],
+      startDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // next week
+      endDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 8),
+      organizerUuid: admin.uuid,
+      organizerName: "Test Org",
+      participantsLimit: 100,
+      photoUrl: "https://placehold.co/200x200",
+      location: "Test City",
+      contactEmail: "contact@example.com",
+      slug: "sample-event-2",
+    },
+  });
+
+  await prisma.event.create({
+    data: {
+      name: "Sample Event 3 abc",
+      description: "A test event lorem sigmum uuu",
+      links: [] as string[],
+      policyLinks: [] as string[],
+      startDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // next week
+      endDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 8),
+      organizerUuid: admin.uuid,
+      organizerName: "Test Org",
+      participantsLimit: 100,
+      photoUrl: "https://placehold.co/200x200",
+      location: "PWr",
+      contactEmail: "contact3@example.com",
+      slug: "sample-event-3",
+    },
+  });
+
   await prisma.adminPermission.create({
     data: {
       adminUuid: admin.uuid,
