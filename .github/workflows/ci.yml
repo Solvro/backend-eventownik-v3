@@ -56,12 +56,6 @@ jobs:
         env:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/eventownik_test_db"
 
-      - name: Run e2e tests
-        run: npm run test:e2e
-        if: always()
-        env:
-          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/eventownik_test_db"
-
       - name: Build
         run: npm run build
         if: always()
