@@ -62,6 +62,20 @@ export class EventsService {
     return event;
   }
 
+  async publicShow(slug: string) {
+    const event = await this.prismaService.event.findFirst({
+      where: { slug },
+      include: { registerForm: true },
+    });
+    if (event === null) {
+      throw new NotFoundException("Event not found");
+    }
+    if (event.registerForm === null) {
+      throw new NotFoundException("Event has no registration form");
+    }
+    return event.registerForm;
+  }
+
   async create(createEventDto: CreateEventDto) {
     // taki szpont, jak będzie auth to to się wywali
     const organizer_uuid: string = process.env.ADMIN_UUID ?? "";
