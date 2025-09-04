@@ -1,26 +1,63 @@
 import { Event } from "@prisma/client";
-import { QueryListingDto } from "src/prisma/dto/query-listing.dto";
-import { PrismaService } from "src/prisma/prisma.service";
 
-import { Controller, Get, Query } from "@nestjs/common";
 import {
-  ApiOperation,
-  ApiParam,
-  ApiQuery,
-  ApiResponse,
-  ApiTags,
-} from "@nestjs/swagger";
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+} from "@nestjs/common";
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
+
+import { QueryListingDto } from "../prisma/dto/query-listing.dto";
+import { CreateEventDto } from "./dtos/create-event.dto";
+import { UpdateEventDto } from "./dtos/update-event.dto";
+import { EventsService } from "./events.service";
 
 @Controller("events")
 @ApiTags("Events")
 export class EventsController {
-  constructor(private prisma: PrismaService) {}
+  constructor(private eventsService: EventsService) {}
 
   @Get()
   @ApiOperation({ summary: "Events Endpoint" })
   @ApiResponse({ status: 200, description: "List of events" })
   @ApiQuery({ type: QueryListingDto, required: false })
   async index(@Query() query: QueryListingDto): Promise<Event[]> {
-    return await this.prisma.event.findMany(query.toPrisma("Event"));
+    return await this.eventsService.index(query);
+  }
+
+  @Get(":uuid")
+  @ApiOperation({ summary: "Show Event Endpoint" })
+  @ApiResponse({ status: 200, description: "Show Event with provided ID" })
+  async show(@Param("uuid") uuid: string): Promise<Event> {
+    return await this.eventsService.show(uuid);
+  }
+
+  @Post()
+  @ApiOperation({ summary: "Create Event Endpoint" })
+  @ApiResponse({ status: 201, description: "Returns created event" })
+  async create(@Body() createEventDto: CreateEventDto) {
+    return await this.eventsService.create(createEventDto);
+  }
+
+  @Put(":uuid")
+  @ApiOperation({ summary: "Update Event Endpoint" })
+  @ApiResponse({ status: 200, description: "Returns updated event" })
+  async update(
+    @Param("uuid") uuid: string,
+    @Body() updateEventDto: UpdateEventDto,
+  ) {
+    return await this.eventsService.update(uuid, updateEventDto);
+  }
+
+  @Delete(":uuid")
+  @ApiOperation({ summary: "Delete Event Endpoint" })
+  @ApiResponse({ status: 204, description: "No content" })
+  async remove(@Param("uuid") uuid: string) {
+    return await this.eventsService.remove(uuid);
   }
 }
