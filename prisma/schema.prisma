@@ -102,6 +102,7 @@ model Attribute {
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
   showInList Boolean       @default(true)
+  order      Int
   options    String[]      @default([])
   name       String?
 
