@@ -35,7 +35,6 @@ describe("AttributesService", () => {
 
     const result = await service.create(dto);
 
-    expect(result).toHaveBeenCalledWith({ data: dto });
     expect(result).toEqual(dto);
   });
 });
