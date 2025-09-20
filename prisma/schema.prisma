@@ -23,8 +23,9 @@ model Admin {
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
-  events      Event[]           @relation("Organizer")
-  permissions AdminPermission[]
+  events          Event[]           @relation("Organizer")
+  permissions     AdminPermission[]
+  AuthAccessToken AuthAccessToken?
 
   @@map("Admins")
 }
@@ -285,4 +286,21 @@ model ParticipantAttributeLog {
   participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
 
   @@map("ParticipantsAttributesLogs")
+}
+
+model AuthAccessToken {
+  id          Int      @id @default(autoincrement())
+  tokenableId String   @unique @db.Uuid
+  type        String
+  name        String?
+  hash        String
+  abilities   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  lastUsedAt  DateTime
+  expiresAt   DateTime
+
+  admin Admin @relation(fields: [tokenableId], references: [uuid])
+
+  @@map("AuthAccessTokens")
 }
