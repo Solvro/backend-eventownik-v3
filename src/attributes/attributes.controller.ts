@@ -23,6 +23,8 @@ export class AttributesController {
   constructor(private attributesService: AttributesService) {}
 
   @Get("internal/attributes")
+  @ApiOperation({ summary: "Attributes Endpoint" })
+  @ApiResponse({ status: 200, description: "List of attributes" })
   async index(@Query() query: QueryListingDto): Promise<Attribute[]> {
     return await this.attributesService.findAll(query);
   }

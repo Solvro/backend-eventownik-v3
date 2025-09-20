@@ -1,7 +1,9 @@
-import { Test, TestingModule } from "@nestjs/testing";
+import type { TestingModule } from "@nestjs/testing";
+import { Test } from "@nestjs/testing";
 
 import { PrismaService } from "../prisma/prisma.service";
 import { AttributesService } from "./attributes.service";
+import type { CreateAttributeDto } from "./dto/create-attribute.dto";
 
 describe("AttributesService", () => {
   let service: AttributesService;
@@ -21,9 +23,9 @@ describe("AttributesService", () => {
   });
 
   it("should call prisma.attribute.create on create", async () => {
-    const dto = {
+    const dto: CreateAttributeDto = {
       eventUuid: "uuid-event",
-      type: "TEXT",
+      type: "text",
       showInList: true,
       options: ["A", "B"],
       name: "Shirt size",
@@ -31,9 +33,9 @@ describe("AttributesService", () => {
 
     prisma.attribute.create = jest.fn().mockResolvedValue(dto);
 
-    const result = await service.create(dto as any);
+    const result = await service.create(dto);
 
-    expect(prisma.attribute.create).toHaveBeenCalledWith({ data: dto });
+    expect(result).toHaveBeenCalledWith({ data: dto });
     expect(result).toEqual(dto);
   });
 });
