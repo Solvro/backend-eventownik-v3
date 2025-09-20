@@ -25,6 +25,8 @@ model Admin {
 
   events      Event[]           @relation("Organizer")
   permissions AdminPermission[]
+
+  @@map("Admins")
 }
 
 model AdminPermission {
@@ -38,6 +40,8 @@ model AdminPermission {
   admin      Admin      @relation(fields: [adminUuid], references: [uuid], onDelete: Cascade)
   event      Event      @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
   permission Permission @relation(fields: [permissionUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("AdminsPermissions")
 }
 
 model Permission {
@@ -46,6 +50,8 @@ model Permission {
   subject String
 
   adminPermissions AdminPermission[]
+
+  @@map("Permissions")
 }
 
 model Event {
@@ -76,6 +82,8 @@ model Event {
   forms            Form[]            @relation("EventForms")
   adminPermissions AdminPermission[]
   participants     Participant[]
+
+  @@map("Events")
 }
 
 enum AttributeType {
@@ -110,6 +118,8 @@ model Attribute {
   blocks                Block[]
   formDefinitions       FormDefinition[]
   participantAttributes ParticipantAttribute[]
+
+  @@map("Attributes")
 }
 
 model Block {
@@ -126,6 +136,8 @@ model Block {
   parent    Block?     @relation("BlockToBlock", fields: [parentUuid], references: [uuid], onDelete: Cascade)
   children  Block[]    @relation("BlockToBlock")
   attribute Attribute? @relation(fields: [attributeUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("Blocks")
 }
 
 enum EmailTrigger {
@@ -152,6 +164,8 @@ model Email {
   form              Form?              @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
   participantEmails ParticipantEmail[]
   participantForms  ParticipantForm[]
+
+  @@map("Emails")
 }
 
 model Form {
@@ -170,6 +184,8 @@ model Form {
   emails           Email[]
   participantForms ParticipantForm[]
   registerEvent    Event[]           @relation("RegisterForm")
+
+  @@map("Forms")
 }
 
 model FormDefinition {
@@ -183,6 +199,8 @@ model FormDefinition {
 
   attribute Attribute? @relation(fields: [attributeUuid], references: [uuid], onDelete: Cascade)
   form      Form?      @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("FormsDefinitions")
 }
 
 model Participant {
@@ -197,6 +215,8 @@ model Participant {
   emails        ParticipantEmail[]
   forms         ParticipantForm[]
   attributeLogs ParticipantAttributeLog[]
+
+  @@map("Participants")
 }
 
 model ParticipantAttribute {
@@ -209,6 +229,8 @@ model ParticipantAttribute {
 
   participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
   attribute   Attribute   @relation(fields: [attributeUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("ParticipantsAttributes")
 }
 
 enum EmailStatus {
@@ -229,6 +251,8 @@ model ParticipantEmail {
 
   participant Participant? @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
   email       Email?       @relation(fields: [emailUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("ParticipantsEmails")
 }
 
 model ParticipantForm {
@@ -244,6 +268,8 @@ model ParticipantForm {
   participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
   form        Form        @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
   email       Email?      @relation(fields: [emailUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("ParticipantsForms")
 }
 
 model ParticipantAttributeLog {
@@ -257,4 +283,6 @@ model ParticipantAttributeLog {
   after           String?
 
   participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("ParticipantsAttributesLogs")
 }
