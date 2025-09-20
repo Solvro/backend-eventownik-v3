@@ -42,6 +42,9 @@ jobs:
         run: npm run format:check
         if: always()
 
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
       - name: Run Lint
         run: npm run lint
         if: always()
@@ -50,10 +53,16 @@ jobs:
         run: npm run typecheck
         if: always()
 
+      - name: Apply Prisma migrations
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/eventownik_test_db"
+
       - name: Run tests
         run: npm test
         if: always()
         env:
+          NODE_ENV: test
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/eventownik_test_db"
 
       - name: Build
