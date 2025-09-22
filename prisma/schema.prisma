@@ -296,9 +296,9 @@ model AuthAccessToken {
   hash        String
   abilities   String
   createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @map("updated_at")
-  lastUsedAt  DateTime @map("last_used_at")
-  expiresAt   DateTime @map("expires_at")
+  updatedAt   DateTime @default(now()) @map("updated_at")
+  lastUsedAt  DateTime? @map("last_used_at")
+  expiresAt   DateTime? @map("expires_at")
 
   admin Admin @relation(fields: [tokenableId], references: [uuid])
 
