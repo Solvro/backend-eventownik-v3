@@ -99,6 +99,7 @@ async function main() {
       type: AttributeType.select,
       options: ["S", "M", "L", "XL"] as string[],
       showInList: true,
+      order: 1,
     },
   });
 
