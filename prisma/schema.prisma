@@ -300,7 +300,7 @@ model AuthAccessToken {
   lastUsedAt  DateTime @map("last_used_at")
   expiresAt   DateTime @map("expires_at")
 
-  admin Admin @relation(fields: [tokenableId], references: [uuid])
+  admin Admin @relation(fields: [tokenableId], references: [uuid], onDelete: Cascade)
 
   @@map("AuthAccessTokens")
 }
