@@ -1,15 +1,9 @@
-import { Event } from "@prisma/client";
+import { Event } from "src/generated/prisma/client";
 import { QueryListingDto } from "src/prisma/dto/query-listing.dto";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import { Controller, Get, Query } from "@nestjs/common";
-import {
-  ApiOperation,
-  ApiParam,
-  ApiQuery,
-  ApiResponse,
-  ApiTags,
-} from "@nestjs/swagger";
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 @Controller("events")
 @ApiTags("Events")
