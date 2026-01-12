@@ -1,3 +1,4 @@
+import { PrismaPg } from "@prisma/adapter-pg";
 import type {
   Admin,
   Attribute,
@@ -12,16 +13,19 @@ import type {
   ParticipantEmail,
   ParticipantForm,
   Permission,
-} from "@prisma/client";
+} from "src/generated/prisma/client";
 import {
   AttributeType,
   EmailStatus,
   EmailTrigger,
   OrganizerType,
   PrismaClient,
-} from "@prisma/client";
+} from "src/generated/prisma/client";
 
-const prisma = new PrismaClient();
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL,
+});
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   await prisma.participantAttributeLog.deleteMany();
@@ -99,6 +103,7 @@ async function main() {
       type: AttributeType.select,
       options: ["S", "M", "L", "XL"] as string[],
       showInList: true,
+      order: 1,
     },
   });
 
