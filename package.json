@@ -37,7 +37,13 @@
       "json",
       "ts"
     ],
+    "moduleNameMapper": {
+      "^src/(.*)$": "<rootDir>/$1"
+    },
     "rootDir": "src",
+    "setupFiles": [
+      "../jest.setup.ts"
+    ],
     "testEnvironment": "node",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {

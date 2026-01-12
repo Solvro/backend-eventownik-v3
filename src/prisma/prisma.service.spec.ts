@@ -12,7 +12,6 @@ describe("PrismaService", () => {
     }).compile();
 
     prisma = module.get<PrismaService>(PrismaService);
-    await prisma.onModuleInit();
   });
 
   afterAll(async () => {
