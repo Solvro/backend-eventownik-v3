@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import { Transform } from "class-transformer";
 import {
   IsArray,
@@ -8,6 +7,7 @@ import {
   IsPositive,
   IsString,
 } from "class-validator";
+import { Prisma } from "src/generated/prisma/client";
 
 export class QueryListingDto {
   @IsOptional()
