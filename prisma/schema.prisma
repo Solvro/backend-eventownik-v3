@@ -76,8 +76,8 @@ model Event {
   organizerUuid     String?   @db.Uuid
   registerFormUuid  String?   @db.Uuid
 
-  organizerAdmin   Admin?            @relation("Organizer", fields: [organizerUuid], references: [uuid], onDelete: Cascade)
-  registerForm     Form?             @relation("RegisterForm", fields: [registerFormUuid], references: [uuid], onDelete: Cascade)
+  organizerAdmin   Admin?            @relation("Organizer", fields: [organizerUuid], references: [uuid], onDelete: SetNull)
+  registerForm     Form?             @relation("RegisterForm", fields: [registerFormUuid], references: [uuid], onDelete: SetNull)
   attributes       Attribute[]
   emails           Email[]
   forms            Form[]            @relation("EventForms")
@@ -217,6 +217,7 @@ model Participant {
   forms         ParticipantForm[]
   attributeLogs ParticipantAttributeLog[]
 
+  @@unique([email, eventUuid])
   @@map("Participants")
 }
 
@@ -268,7 +269,7 @@ model ParticipantForm {
 
   participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
   form        Form        @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
-  email       Email?      @relation(fields: [emailUuid], references: [uuid], onDelete: Cascade)
+  email       Email?      @relation(fields: [emailUuid], references: [uuid], onDelete: SetNull)
 
   @@map("ParticipantsForms")
 }
@@ -300,7 +301,7 @@ model AuthAccessToken {
   lastUsedAt  DateTime @map("last_used_at")
   expiresAt   DateTime @map("expires_at")
 
-  admin Admin @relation(fields: [tokenableId], references: [uuid])
+  admin Admin @relation(fields: [tokenableId], references: [uuid], onDelete: Cascade)
 
   @@map("AuthAccessTokens")
 }
