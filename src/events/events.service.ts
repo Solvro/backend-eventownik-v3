@@ -4,13 +4,25 @@ import { parseSortInput } from "src/common/utils/prisma.utility";
 import { Prisma } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 
 import { EventListingDto } from "./dto/event-listing.dto";
 
 @Injectable()
 export class EventsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async findOne(uuid: string) {
+    const event = await this.prisma.event.findUnique({
+      where: { uuid },
+    });
+
+    if (!event) {
+      throw new NotFoundException(`Event with UUID ${uuid} not found`);
+    }
+
+    return event;
+  }
 
   async findAll(query: EventListingDto) {
     const { skip, take, name, location, sort } = query;
