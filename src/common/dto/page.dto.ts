@@ -1,4 +1,6 @@
-import { IsArray } from "class-validator";
+/* eslint-disable @darraghor/nestjs-typed/validated-non-primitive-property-needs-type-decorator */
+import { Type } from "class-transformer";
+import { IsArray, IsDefined, ValidateNested } from "class-validator";
 
 import { ApiProperty } from "@nestjs/swagger";
 
@@ -10,6 +12,9 @@ export class PageDto<T> {
   readonly data: T[];
 
   @ApiProperty({ type: () => PageMetaDto, description: "Pagination metadata" })
+  @ValidateNested()
+  @IsDefined()
+  @Type(() => PageMetaDto)
   readonly meta: PageMetaDto;
 
   constructor(data: T[], meta: PageMetaDto) {

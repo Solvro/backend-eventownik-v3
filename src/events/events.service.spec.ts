@@ -1,7 +1,8 @@
-import { Test, TestingModule } from "@nestjs/testing";
+import type { TestingModule } from "@nestjs/testing";
+import { Test } from "@nestjs/testing";
 
 import { PrismaService } from "../prisma/prisma.service";
-import { EventListingDto } from "./dto/event-listing.dto";
+import type { EventListingDto } from "./dto/event-listing.dto";
 import { EventsService } from "./events.service";
 
 describe("EventsService", () => {
@@ -41,11 +42,11 @@ describe("EventsService", () => {
 
   describe("findAll", () => {
     it("should return paginated events with default sort", async () => {
-      const query: EventListingDto = {
+      const query = {
         page: 1,
         take: 10,
         skip: 0,
-      } as any;
+      } as unknown as EventListingDto;
 
       const mockCount = 1;
       const mockEvents = [{ id: 1, name: "Test Event", createdAt: new Date() }];
@@ -59,7 +60,9 @@ describe("EventsService", () => {
 
       const result = await service.findAll(query);
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.event.count).toHaveBeenCalledWith({ where: {} });
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.event.findMany).toHaveBeenCalledWith({
         where: {},
         skip: 0,
@@ -71,16 +74,16 @@ describe("EventsService", () => {
     });
 
     it("should filter by name and location", async () => {
-      const query: EventListingDto = {
+      const query = {
         page: 1,
         take: 10,
         skip: 0,
         name: "Meeting",
         location: "Room A",
-      } as any;
+      } as unknown as EventListingDto;
 
       const mockCount = 0;
-      const mockEvents = [];
+      const mockEvents: unknown[] = [];
 
       (prisma.$transaction as jest.Mock).mockResolvedValue([
         mockCount,
@@ -94,7 +97,9 @@ describe("EventsService", () => {
         location: { contains: "Room A", mode: "insensitive" },
       };
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.event.count).toHaveBeenCalledWith({ where: expectedWhere });
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.event.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expectedWhere,
@@ -103,15 +108,15 @@ describe("EventsService", () => {
     });
 
     it("should sort by provided field", async () => {
-      const query: EventListingDto = {
+      const query = {
         page: 1,
         take: 10,
         skip: 0,
         sort: "name:asc",
-      } as any;
+      } as unknown as EventListingDto;
 
       const mockCount = 0;
-      const mockEvents = [];
+      const mockEvents: unknown[] = [];
 
       (prisma.$transaction as jest.Mock).mockResolvedValue([
         mockCount,
@@ -120,6 +125,7 @@ describe("EventsService", () => {
 
       await service.findAll(query);
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.event.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           orderBy: [{ name: "asc" }],

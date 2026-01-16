@@ -1,6 +1,6 @@
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
-import { parseSortInput } from "src/common/utils/prisma.util";
+import { parseSortInput } from "src/common/utils/prisma.utility";
 import { Prisma } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -16,10 +16,12 @@ export class EventsService {
     const { skip, take, name, location, sort } = query;
 
     const where: Prisma.EventWhereInput = {
-      ...(name ? { name: { contains: name, mode: "insensitive" } } : {}),
-      ...(location
-        ? { location: { contains: location, mode: "insensitive" } }
-        : {}),
+      ...(name === undefined
+        ? {}
+        : { name: { contains: name, mode: "insensitive" } }),
+      ...(location === undefined
+        ? {}
+        : { location: { contains: location, mode: "insensitive" } }),
       // TODO: add more for every filtering options
     };
 
