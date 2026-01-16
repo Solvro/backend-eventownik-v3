@@ -6,10 +6,10 @@ import { PageMetaDto } from "./page-meta.dto";
 
 export class PageDto<T> {
   @IsArray()
-  @ApiProperty({ isArray: true })
+  @ApiProperty({ isArray: true, description: "Array of items" })
   readonly data: T[];
 
-  @ApiProperty({ type: () => PageMetaDto })
+  @ApiProperty({ type: () => PageMetaDto, description: "Pagination metadata" })
   readonly meta: PageMetaDto;
 
   constructor(data: T[], meta: PageMetaDto) {

@@ -8,12 +8,23 @@ export interface PageMetaDtoParameters {
 }
 
 export class PageMetaDto {
-  @ApiProperty() readonly page: number;
-  @ApiProperty() readonly take: number;
-  @ApiProperty() readonly itemCount: number;
-  @ApiProperty() readonly pageCount: number;
-  @ApiProperty() readonly hasPreviousPage: boolean;
-  @ApiProperty() readonly hasNextPage: boolean;
+  @ApiProperty({ description: "Current page number" })
+  readonly page: number;
+
+  @ApiProperty({ description: "Number of items per page" })
+  readonly take: number;
+
+  @ApiProperty({ description: "Total number of items" })
+  readonly itemCount: number;
+
+  @ApiProperty({ description: "Total number of pages" })
+  readonly pageCount: number;
+
+  @ApiProperty({ description: "Has previous page" })
+  readonly hasPreviousPage: boolean;
+
+  @ApiProperty({ description: "Has next page" })
+  readonly hasNextPage: boolean;
 
   constructor({ pageOptionsDto, itemCount }: PageMetaDtoParameters) {
     this.page = pageOptionsDto.page || 1;
