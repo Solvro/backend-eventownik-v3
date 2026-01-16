@@ -2,7 +2,7 @@ import type * as express from "express";
 import * as qs from "qs";
 import { swaggerConfig } from "src/config/swagger";
 
-import { ValidationPipe } from "@nestjs/common";
+import { ValidationPipe, VersioningType } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { SwaggerModule } from "@nestjs/swagger";
 
@@ -10,6 +10,13 @@ import { AppModule } from "./app.module";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  app.setGlobalPrefix("api");
+  app.enableVersioning({
+    type: VersioningType.URI,
+    defaultVersion: "3",
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
@@ -23,8 +30,7 @@ async function bootstrap() {
 
   const documentFactory = () =>
     SwaggerModule.createDocument(app, swaggerConfig);
-
-  SwaggerModule.setup("docs", app, documentFactory);
+  SwaggerModule.setup("api/docs", app, documentFactory);
 
   await app.listen(process.env.PORT ?? 3000);
 }
