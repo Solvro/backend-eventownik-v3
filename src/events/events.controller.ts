@@ -1,13 +1,7 @@
 import { PageDto } from "src/common/dto/page.dto";
 
 import { Controller, Get, Param, ParseUUIDPipe, Query } from "@nestjs/common";
-import {
-  ApiOkResponse,
-  ApiOperation,
-  ApiParam,
-  ApiResponse,
-  ApiTags,
-} from "@nestjs/swagger";
+import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { EventListingDto } from "./dto/event-listing.dto";
 import { Event } from "./entities/event.entity";

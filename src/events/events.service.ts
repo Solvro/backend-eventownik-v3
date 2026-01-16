@@ -17,7 +17,7 @@ export class EventsService {
       where: { uuid },
     });
 
-    if (!event) {
+    if (event == null) {
       throw new NotFoundException(`Event with UUID ${uuid} not found`);
     }
 
