@@ -1,6 +1,6 @@
 import type * as express from "express";
 import * as qs from "qs";
-import { swaggerConfig } from "src/config/swagger";
+import { swaggerConfig } from "src/config/swagger.config";
 
 import { ValidationPipe, VersioningType } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
