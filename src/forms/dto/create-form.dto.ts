@@ -2,7 +2,7 @@ import { Type } from "class-transformer";
 import {
   IsArray,
   IsBoolean,
-  IsDateString,
+  IsDate,
   IsOptional,
   IsString,
   ValidateNested,
@@ -22,14 +22,14 @@ export class CreateFormDto {
   @IsOptional()
   isEditable?: boolean;
 
-  @IsDateString()
   @Type(() => Date)
+  @IsDate()
   @ApiPropertyOptional()
   @IsOptional()
   openDate?: Date;
 
-  @IsDateString()
   @Type(() => Date)
+  @IsDate()
   @ApiPropertyOptional()
   @IsOptional()
   closeDate?: Date;
