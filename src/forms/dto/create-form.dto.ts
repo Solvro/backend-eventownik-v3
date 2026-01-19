@@ -40,7 +40,10 @@ export class CreateFormDto {
   description?: string;
 
   @IsBoolean()
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description:
+      "Indicates if this form is the first form (registration form) for the event",
+  })
   @IsOptional()
   isFirstForm?: boolean;
 

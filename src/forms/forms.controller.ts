@@ -12,7 +12,7 @@ import {
   Post,
   Query,
 } from "@nestjs/common";
-import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { CreateFormDto } from "./dto/create-form.dto";
 import { UpdateFormDto } from "./dto/update-form.dto";
@@ -38,17 +38,20 @@ export class FormsController {
   ) {
     return this.formsService.create(eventId, createFormDto);
   }
+
   @Get()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Get all forms for an event" })
   @ApiResponse({ status: 200, description: "Forms retrieved successfully." })
   @ApiResponse({ status: 404, description: "Event not found." })
+  @ApiQuery({ type: QueryListingDto, required: false })
   async findAll(
     @Param("eventId") eventId: string,
     @Query() query: QueryListingDto,
   ) {
     return this.formsService.findAll(eventId, query);
   }
+
   @Get(":id")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Get a form by id for an event" })
@@ -60,6 +63,7 @@ export class FormsController {
   ) {
     return this.formsService.findOne(formId, eventId);
   }
+
   @Patch(":id")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Update a form for an event" })
