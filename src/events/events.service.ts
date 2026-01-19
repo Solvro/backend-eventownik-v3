@@ -1,0 +1,59 @@
+import { PageMetaDto } from "src/common/dto/page-meta.dto";
+import { PageDto } from "src/common/dto/page.dto";
+import { parseSortInput } from "src/common/utils/prisma.utility";
+import { Prisma } from "src/generated/prisma/client";
+import { PrismaService } from "src/prisma/prisma.service";
+
+import { Injectable, NotFoundException } from "@nestjs/common";
+
+import { EventListingDto } from "./dto/event-listing.dto";
+
+@Injectable()
+export class EventsService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async findOne(uuid: string) {
+    const event = await this.prisma.event.findUnique({
+      where: { uuid },
+    });
+
+    if (event == null) {
+      throw new NotFoundException(`Event with UUID ${uuid} not found`);
+    }
+
+    return event;
+  }
+
+  async findAll(query: EventListingDto) {
+    const { skip, take, name, location, sort } = query;
+
+    const where: Prisma.EventWhereInput = {
+      ...(name === undefined
+        ? {}
+        : { name: { contains: name, mode: "insensitive" } }),
+      ...(location === undefined
+        ? {}
+        : { location: { contains: location, mode: "insensitive" } }),
+      // TODO: add more for every filtering options
+    };
+
+    const orderBy = parseSortInput(sort, ["name", "location", "createdAt"]);
+
+    if (orderBy.length === 0) {
+      orderBy.push({ createdAt: "desc" });
+    }
+
+    const [itemCount, events] = await this.prisma.$transaction([
+      this.prisma.event.count({ where }),
+      this.prisma.event.findMany({
+        where,
+        skip,
+        take,
+        orderBy,
+      }),
+    ]);
+
+    const pageMetaDto = new PageMetaDto({ itemCount, pageOptionsDto: query });
+    return new PageDto(events, pageMetaDto);
+  }
+}
