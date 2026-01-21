@@ -21,9 +21,10 @@ describe("FormsService", () => {
     },
     attribute: {
       findFirst: jest.fn(),
+      count: jest.fn(),
     },
     event: {
-      findFirst: jest.fn(),
+      findUnique: jest.fn(),
       update: jest.fn(),
     },
     formDefinition: {
@@ -51,8 +52,8 @@ describe("FormsService", () => {
     const dto: CreateFormDto = {
       name: "Test Form",
       isEditable: true,
-      openDate: new Date(),
-      closeDate: new Date(),
+      openDate: new Date(Date.now() - 1000),
+      closeDate: new Date(Date.now() + 1000),
       description: "A test form",
       isFirstForm: true,
       attributes: [
@@ -70,11 +71,8 @@ describe("FormsService", () => {
       eventUuid,
     };
     mockPrismaService.form.create.mockResolvedValue(mockForm);
-    mockPrismaService.attribute.findFirst.mockResolvedValue({
-      uuid: "some-uuid",
-    });
-
-    mockPrismaService.event.findFirst.mockResolvedValue({
+    mockPrismaService.attribute.count.mockResolvedValue(2);
+    mockPrismaService.event.findUnique.mockResolvedValue({
       uuid: eventUuid,
       registerFormUuid: null,
     });
@@ -101,7 +99,7 @@ describe("FormsService", () => {
         eventUuid,
       },
     });
-    expect(mockPrismaService.attribute.findFirst).toHaveBeenCalledTimes(2);
+    expect(mockPrismaService.attribute.count).toHaveBeenCalledTimes(1);
     expect(mockPrismaService.formDefinition.createMany).toHaveBeenCalledWith({
       data: [
         {
@@ -125,12 +123,12 @@ describe("FormsService", () => {
     const dto: CreateFormDto = {
       name: "Test Form",
       isEditable: true,
-      openDate: new Date(),
-      closeDate: new Date(),
+      openDate: new Date(Date.now() - 1000),
+      closeDate: new Date(Date.now() + 1000),
       description: "A test form",
       attributes: [],
     };
-    mockPrismaService.event.findFirst.mockResolvedValue(null);
+    mockPrismaService.event.findUnique.mockResolvedValue(null);
     await expect(service.create(eventUuid, dto)).rejects.toThrow(
       `Event with id: ${eventUuid} not found`,
     );
@@ -143,7 +141,7 @@ describe("FormsService", () => {
       { eventUuid, name: "Form 2" },
     ];
 
-    mockPrismaService.event.findFirst.mockResolvedValue({ uuid: eventUuid });
+    mockPrismaService.event.findUnique.mockResolvedValue({ uuid: eventUuid });
     mockPrismaService.$transaction.mockResolvedValue([
       mockForms.length,
       mockForms,
@@ -162,7 +160,7 @@ describe("FormsService", () => {
   it("should throw NotFoundException if event not found when fetching forms", async () => {
     const eventUuid = "non-existent-event-uuid";
     const query = new FormListingDto();
-    mockPrismaService.event.findFirst.mockResolvedValue(null);
+    mockPrismaService.event.findUnique.mockResolvedValue(null);
     await expect(service.findAll(eventUuid, query)).rejects.toThrow(
       `Event with id: ${eventUuid} not found`,
     );
@@ -172,10 +170,10 @@ describe("FormsService", () => {
     const formUuid = "form-uuid-123";
     const eventUuid = "event-uuid-123";
     const mockForm = { uuid: formUuid, name: "Form 1" };
-    mockPrismaService.form.findFirst.mockResolvedValue(mockForm);
+    mockPrismaService.form.findUnique.mockResolvedValue(mockForm);
     const form = await service.findOne(formUuid, eventUuid);
     expect(form).toEqual(mockForm);
-    expect(mockPrismaService.form.findFirst).toHaveBeenCalledWith({
+    expect(mockPrismaService.form.findUnique).toHaveBeenCalledWith({
       where: { uuid: formUuid, eventUuid },
       include: {
         formDefinitions: {
@@ -187,11 +185,11 @@ describe("FormsService", () => {
   it("should throw NotFoundException if form not found by uuid", async () => {
     const formUuid = "non-existent-form-uuid";
     const eventUuid = "event-uuid-123";
-    mockPrismaService.form.findFirst.mockResolvedValue(null);
+    mockPrismaService.form.findUnique.mockResolvedValue(null);
     await expect(service.findOne(formUuid, eventUuid)).rejects.toThrow(
       `Form with id: ${formUuid} not found`,
     );
-    expect(mockPrismaService.form.findFirst).toHaveBeenCalledWith({
+    expect(mockPrismaService.form.findUnique).toHaveBeenCalledWith({
       where: { uuid: formUuid, eventUuid },
       include: {
         formDefinitions: {
@@ -207,8 +205,8 @@ describe("FormsService", () => {
     const updateFormDto = {
       name: "Updated Form",
       isEditable: false,
-      openDate: new Date(),
-      closeDate: new Date(),
+      openDate: new Date(Date.now() - 1000),
+      closeDate: new Date(Date.now() + 1000),
       description: "An updated test form",
       isFirstForm: true,
     };
@@ -221,7 +219,7 @@ describe("FormsService", () => {
       description: updateFormDto.description,
       eventUuid,
     };
-    mockPrismaService.event.findFirst.mockResolvedValue({
+    mockPrismaService.event.findUnique.mockResolvedValue({
       uuid: eventUuid,
       registerFormUuid: null,
     });
@@ -259,11 +257,11 @@ describe("FormsService", () => {
     const updateFormDto = {
       name: "Updated Form",
       isEditable: false,
-      openDate: new Date(),
-      closeDate: new Date(),
+      openDate: new Date(Date.now() - 1000),
+      closeDate: new Date(Date.now() + 1000),
       description: "An updated test form",
     };
-    mockPrismaService.event.findFirst.mockResolvedValue(null);
+    mockPrismaService.event.findUnique.mockResolvedValue(null);
     await expect(
       service.update(formUuid, eventUuid, updateFormDto),
     ).rejects.toThrow(`Event with id: ${eventUuid} not found`);
@@ -277,8 +275,8 @@ describe("FormsService", () => {
       name: "Form to be deleted",
       eventUuid,
     };
-    mockPrismaService.event.findFirst.mockResolvedValue({ uuid: eventUuid });
-    mockPrismaService.form.findFirst.mockResolvedValue(mockForm);
+    mockPrismaService.event.findUnique.mockResolvedValue({ uuid: eventUuid });
+    mockPrismaService.form.findUnique.mockResolvedValue(mockForm);
     mockPrismaService.form.deleteMany.mockResolvedValue({ mockForm });
     const deletedForm = await service.remove(formUuid, eventUuid);
     expect(deletedForm).toEqual({ mockForm });
@@ -290,7 +288,7 @@ describe("FormsService", () => {
   it("should throw NotFoundException if form not found when deleting", async () => {
     const formUuid = "non-existent-form-uuid";
     const eventUuid = "event-uuid-123";
-    mockPrismaService.event.findFirst.mockResolvedValue({ uuid: eventUuid });
+    mockPrismaService.event.findUnique.mockResolvedValue({ uuid: eventUuid });
     mockPrismaService.form.deleteMany.mockResolvedValue({ count: 0 });
     await expect(service.remove(formUuid, eventUuid)).rejects.toThrow(
       `Form with id: ${formUuid} not found`,

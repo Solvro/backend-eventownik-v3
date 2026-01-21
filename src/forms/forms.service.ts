@@ -19,14 +19,23 @@ export class FormsService {
   constructor(private prisma: PrismaService) {}
 
   async create(eventUuid: string, createFormDto: CreateFormDto) {
-    const event = await this.prisma.event.findFirst({
-      where: { uuid: eventUuid },
-    });
-    if (event == null) {
-      throw new NotFoundException(`Event with id: ${eventUuid} not found`);
+    if (
+      createFormDto.openDate != null &&
+      createFormDto.closeDate != null &&
+      createFormDto.openDate >= createFormDto.closeDate
+    ) {
+      throw new BadRequestException(
+        "Open date must be earlier than close date",
+      );
     }
 
     return await this.prisma.$transaction(async (prisma) => {
+      const event = await prisma.event.findUnique({
+        where: { uuid: eventUuid },
+      });
+      if (event == null) {
+        throw new NotFoundException(`Event with id: ${eventUuid} not found`);
+      }
       const form = await prisma.form.create({
         data: {
           name: createFormDto.name,
@@ -48,16 +57,23 @@ export class FormsService {
           data: { registerFormUuid: form.uuid },
         });
       }
+      const attributeUuids = createFormDto.attributes.map(
+        (attribute) => attribute.attributeUuid,
+      );
+      const attributeUuidsSet = new Set(attributeUuids);
+      if (attributeUuids.length !== attributeUuidsSet.size) {
+        throw new BadRequestException(
+          "Duplicate attribute UUIDs found in form attributes",
+        );
+      }
 
-      for (const attribute of createFormDto.attributes) {
-        const attributesExists = await prisma.attribute.findFirst({
-          where: { uuid: attribute.attributeUuid },
-        });
-        if (attributesExists == null) {
-          throw new NotFoundException(
-            `Attribute with id: ${attribute.attributeUuid} not found`,
-          );
-        }
+      const existingAttributes = await prisma.attribute.count({
+        where: { uuid: { in: attributeUuids }, eventUuid: event.uuid },
+      });
+      if (existingAttributes !== attributeUuids.length) {
+        throw new NotFoundException(
+          `One or more attributes not found for the provided attribute and event UUIDs`,
+        );
       }
 
       const formAttributesData = createFormDto.attributes.map((attribute) => ({
@@ -76,7 +92,7 @@ export class FormsService {
   }
 
   async findAll(eventUuid: string, query: FormListingDto) {
-    const event = await this.prisma.event.findFirst({
+    const event = await this.prisma.event.findUnique({
       where: { uuid: eventUuid },
     });
     if (event == null) {
@@ -108,7 +124,7 @@ export class FormsService {
   }
 
   async findOne(formUuid: string, eventUuid: string) {
-    const form = await this.prisma.form.findFirst({
+    const form = await this.prisma.form.findUnique({
       where: { uuid: formUuid, eventUuid },
       include: {
         formDefinitions: {
@@ -127,13 +143,23 @@ export class FormsService {
     eventUuid: string,
     updateFormDto: UpdateFormDto,
   ) {
-    const event = await this.prisma.event.findFirst({
-      where: { uuid: eventUuid },
-    });
-    if (event == null) {
-      throw new NotFoundException(`Event with id: ${eventUuid} not found`);
+    if (
+      updateFormDto.openDate != null &&
+      updateFormDto.closeDate != null &&
+      updateFormDto.openDate >= updateFormDto.closeDate
+    ) {
+      throw new BadRequestException(
+        "Open date must be earlier than close date",
+      );
     }
+
     return await this.prisma.$transaction(async (prisma) => {
+      const event = await prisma.event.findUnique({
+        where: { uuid: eventUuid },
+      });
+      if (event == null) {
+        throw new NotFoundException(`Event with id: ${eventUuid} not found`);
+      }
       if (updateFormDto.isFirstForm ?? false) {
         if (
           event.registerFormUuid !== null &&
@@ -158,15 +184,27 @@ export class FormsService {
         updateFormDto.attributes != null &&
         updateFormDto.attributes.length > 0
       ) {
-        for (const attribute of updateFormDto.attributes) {
-          const attributesExists = await prisma.attribute.findFirst({
-            where: { uuid: attribute.attributeUuid },
-          });
-          if (attributesExists == null) {
-            throw new NotFoundException(
-              `Attribute with id: ${attribute.attributeUuid} not found`,
-            );
-          }
+        const attributeUuids = updateFormDto.attributes.map(
+          (attribute) => attribute.attributeUuid,
+        );
+        const attributeUuidsSet = new Set(attributeUuids);
+        if (attributeUuids.length !== attributeUuidsSet.size) {
+          throw new BadRequestException(
+            "Duplicate attribute UUIDs found in form attributes",
+          );
+        }
+        const existingAttributes = await prisma.attribute.count({
+          where: {
+            uuid: {
+              in: attributeUuids,
+            },
+            eventUuid: event.uuid,
+          },
+        });
+        if (existingAttributes !== attributeUuids.length) {
+          throw new NotFoundException(
+            `One or more attributes not found for the provided attribute and event UUIDs`,
+          );
         }
         await prisma.formDefinition.deleteMany({
           where: { formUuid },
@@ -199,13 +237,13 @@ export class FormsService {
   }
 
   async remove(formUuid: string, eventUuid: string) {
-    const event = await this.prisma.event.findFirst({
-      where: { uuid: eventUuid },
-    });
-    if (event == null) {
-      throw new NotFoundException(`Event with id: ${eventUuid} not found`);
-    }
     return await this.prisma.$transaction(async (prisma) => {
+      const event = await prisma.event.findUnique({
+        where: { uuid: eventUuid },
+      });
+      if (event == null) {
+        throw new NotFoundException(`Event with id: ${eventUuid} not found`);
+      }
       if (event.registerFormUuid === formUuid) {
         await prisma.event.update({
           where: { uuid: eventUuid },

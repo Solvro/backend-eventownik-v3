@@ -23,9 +23,10 @@ describe("Forms Integration", () => {
     },
     attribute: {
       findFirst: jest.fn(),
+      count: jest.fn(),
     },
     event: {
-      findFirst: jest.fn(),
+      findUnique: jest.fn(),
       update: jest.fn(),
     },
     formDefinition: {
@@ -53,8 +54,8 @@ describe("Forms Integration", () => {
     const dto = {
       name: "Integration Test Form",
       isEditable: true,
-      openDate: new Date(),
-      closeDate: new Date(),
+      openDate: new Date(Date.now() - 1000),
+      closeDate: new Date(Date.now() + 1000),
       description: "An integration test form",
       isFirstForm: false,
       attributes: [
@@ -74,15 +75,10 @@ describe("Forms Integration", () => {
       closeDate: dto.closeDate,
       description: dto.description,
     });
-    mockPrismaService.event.findFirst.mockResolvedValue({
+    mockPrismaService.event.findUnique.mockResolvedValue({
       uuid: "event-uuid-123",
     });
-    mockPrismaService.attribute.findFirst.mockResolvedValue({
-      uuid: "attr-uuid-1",
-    });
-    mockPrismaService.attribute.findFirst.mockResolvedValue({
-      uuid: "attr-uuid-2",
-    });
+    mockPrismaService.attribute.count.mockResolvedValue(2);
     mockPrismaService.formDefinition.createMany.mockResolvedValue({});
 
     mockPrismaService.formDefinition.createMany.mockResolvedValue({});
@@ -113,7 +109,7 @@ describe("Forms Integration", () => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
       callback(mockPrismaService),
     );
-    mockPrismaService.event.findFirst.mockResolvedValue({
+    mockPrismaService.event.findUnique.mockResolvedValue({
       uuid: "event-uuid-123",
     });
     mockPrismaService.attribute.findFirst.mockResolvedValue(null);
@@ -138,7 +134,7 @@ describe("Forms Integration", () => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
       callback(mockPrismaService),
     );
-    mockPrismaService.event.findFirst.mockResolvedValue({
+    mockPrismaService.event.findUnique.mockResolvedValue({
       uuid: "event-uuid-123",
       registerFormUuid: "some-existing-form-uuid",
     });
@@ -166,7 +162,7 @@ describe("Forms Integration", () => {
       },
     ];
     const query = new FormListingDto();
-    mockPrismaService.event.findFirst.mockResolvedValue({ uuid: eventUuid });
+    mockPrismaService.event.findUnique.mockResolvedValue({ uuid: eventUuid });
     mockPrismaService.$transaction.mockResolvedValue([
       mockForms.length,
       mockForms,
@@ -186,7 +182,7 @@ describe("Forms Integration", () => {
       closeDate: new Date(),
       description: "First form",
     };
-    mockPrismaService.form.findFirst.mockResolvedValue(mockForm);
+    mockPrismaService.form.findUnique.mockResolvedValue(mockForm);
     const result = await formsController.findOne(
       "event-uuid-123",
       "form-uuid-1",
@@ -195,7 +191,7 @@ describe("Forms Integration", () => {
   });
 
   it("should throw NotFoundException if form not found by id for an event", async () => {
-    mockPrismaService.form.findFirst.mockResolvedValue(null);
+    mockPrismaService.form.findUnique.mockResolvedValue(null);
     await expect(
       formsController.findOne("event-uuid-123", "non-existent-form-uuid"),
     ).rejects.toThrow();
@@ -205,8 +201,8 @@ describe("Forms Integration", () => {
     const dto = {
       name: "Updated Form Name",
       isEditable: false,
-      openDate: new Date(),
-      closeDate: new Date(),
+      openDate: new Date(Date.now() - 1000),
+      closeDate: new Date(Date.now() + 1000),
       description: "Updated description",
       isFirstForm: false,
       attributes: [
@@ -218,7 +214,7 @@ describe("Forms Integration", () => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
       callback(mockPrismaService),
     );
-    mockPrismaService.event.findFirst.mockResolvedValue({
+    mockPrismaService.event.findUnique.mockResolvedValue({
       uuid: "event-uuid-123",
       registerFormUuid: null,
     });
@@ -230,12 +226,7 @@ describe("Forms Integration", () => {
       closeDate: dto.closeDate,
       description: dto.description,
     });
-    mockPrismaService.attribute.findFirst.mockResolvedValue({
-      uuid: "attr-uuid-1",
-    });
-    mockPrismaService.attribute.findFirst.mockResolvedValue({
-      uuid: "attr-uuid-2",
-    });
+    mockPrismaService.attribute.count.mockResolvedValue(2);
     mockPrismaService.formDefinition.deleteMany.mockResolvedValue({ count: 2 });
     mockPrismaService.formDefinition.createMany.mockResolvedValue({});
     const result = await formsController.update(
@@ -254,7 +245,7 @@ describe("Forms Integration", () => {
   });
 
   it("should delete a form for an event and update the event's registerFormUuid if necessary", async () => {
-    mockPrismaService.event.findFirst.mockResolvedValue({
+    mockPrismaService.event.findUnique.mockResolvedValue({
       uuid: "event-uuid-123",
       registerFormUuid: "form-uuid-1",
     });
@@ -275,7 +266,7 @@ describe("Forms Integration", () => {
   });
 
   it("should throw NotFoundException when deleting a non-existent form for an event", async () => {
-    mockPrismaService.event.findFirst.mockResolvedValue({
+    mockPrismaService.event.findUnique.mockResolvedValue({
       uuid: "event-uuid-123",
       registerFormUuid: null,
     });
