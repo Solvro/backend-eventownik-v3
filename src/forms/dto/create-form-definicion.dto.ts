@@ -1,10 +1,17 @@
-import { IsBoolean, IsNumber, IsOptional, IsString } from "class-validator";
+import {
+  IsBoolean,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from "class-validator";
 
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class CreateFormDefinicionDto {
   @ApiProperty()
   @IsString()
+  @IsUUID()
   attributeUuid: string;
 
   @ApiPropertyOptional()

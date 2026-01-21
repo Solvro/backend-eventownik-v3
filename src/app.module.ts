@@ -13,6 +13,7 @@ import { PrismaModule } from "./prisma/prisma.module";
   imports: [
     PrismaModule,
     EventsModule,
+    FormsModule,
     ConfigModule.forRoot({
       validationSchema: Joi.object({
         DATABASE_URL: Joi.string().required(),

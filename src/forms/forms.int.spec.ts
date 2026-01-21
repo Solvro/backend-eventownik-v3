@@ -1,9 +1,9 @@
-import { QueryListingDto } from "src/prisma/dto/query-listing.dto";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
+import { FormListingDto } from "./dto/form-listing.dto";
 import { FormsController } from "./forms.controller";
 import { FormsModule } from "./forms.module";
 
@@ -19,6 +19,7 @@ describe("Forms Integration", () => {
       update: jest.fn(),
       delete: jest.fn(),
       deleteMany: jest.fn(),
+      count: jest.fn(),
     },
     attribute: {
       findFirst: jest.fn(),
@@ -147,6 +148,7 @@ describe("Forms Integration", () => {
   });
 
   it("should get all forms for an event", async () => {
+    const eventUuid = "event-uuid-123";
     const mockForms = [
       {
         uuid: "form-uuid-1",
@@ -163,11 +165,19 @@ describe("Forms Integration", () => {
         description: "Second form",
       },
     ];
-    const query = new QueryListingDto();
-    mockPrismaService.form.findMany.mockResolvedValue(mockForms);
-    const result = await formsController.findAll("event-uuid-123", query);
-    expect(result).toEqual(mockForms);
+    const query = new FormListingDto();
+    mockPrismaService.event.findFirst.mockResolvedValue({ uuid: eventUuid });
+    mockPrismaService.$transaction.mockResolvedValue([
+      mockForms.length,
+      mockForms,
+    ]);
+    const result = await formsController.findAll(eventUuid, query);
+    expect(result.data).toEqual(mockForms);
+    expect(result.meta.itemCount).toBe(mockForms.length);
+
+    expect(mockPrismaService.$transaction).toHaveBeenCalled();
   });
+
   it("should get a form by id for an event", async () => {
     const mockForm = {
       uuid: "form-uuid-1",

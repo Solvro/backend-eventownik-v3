@@ -1,5 +1,3 @@
-import { QueryListingDto } from "src/prisma/dto/query-listing.dto";
-
 import {
   Body,
   Controller,
@@ -8,13 +6,15 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
 } from "@nestjs/common";
-import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { CreateFormDto } from "./dto/create-form.dto";
+import { FormListingDto } from "./dto/form-listing.dto";
 import { UpdateFormDto } from "./dto/update-form.dto";
 import { FormsService } from "./forms.service";
 
@@ -33,7 +33,7 @@ export class FormsController {
     description: "Given event has already a firstform assigned.",
   })
   async create(
-    @Param("eventId") eventId: string,
+    @Param("eventId", ParseUUIDPipe) eventId: string,
     @Body() createFormDto: CreateFormDto,
   ) {
     return this.formsService.create(eventId, createFormDto);
@@ -44,10 +44,9 @@ export class FormsController {
   @ApiOperation({ summary: "Get all forms for an event" })
   @ApiResponse({ status: 200, description: "Forms retrieved successfully." })
   @ApiResponse({ status: 404, description: "Event not found." })
-  @ApiQuery({ type: QueryListingDto, required: false })
   async findAll(
-    @Param("eventId") eventId: string,
-    @Query() query: QueryListingDto,
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @Query() query: FormListingDto,
   ) {
     return this.formsService.findAll(eventId, query);
   }
@@ -58,8 +57,8 @@ export class FormsController {
   @ApiResponse({ status: 200, description: "Form retrieved successfully." })
   @ApiResponse({ status: 404, description: "Event or Form not found." })
   async findOne(
-    @Param("eventId") eventId: string,
-    @Param("id") formId: string,
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @Param("id", ParseUUIDPipe) formId: string,
   ) {
     return this.formsService.findOne(formId, eventId);
   }
@@ -77,8 +76,8 @@ export class FormsController {
     description: "Given event has already a firstform assigned.",
   })
   async update(
-    @Param("eventId") eventId: string,
-    @Param("id") formId: string,
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @Param("id", ParseUUIDPipe) formId: string,
     @Body() updateFormDto: UpdateFormDto,
   ) {
     return this.formsService.update(formId, eventId, updateFormDto);
@@ -89,7 +88,10 @@ export class FormsController {
   @ApiOperation({ summary: "Delete a form for an event" })
   @ApiResponse({ status: 204, description: "Form deleted successfully." })
   @ApiResponse({ status: 404, description: "Event or Form not found." })
-  async remove(@Param("eventId") eventId: string, @Param("id") formId: string) {
+  async remove(
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @Param("id", ParseUUIDPipe) formId: string,
+  ) {
     return this.formsService.remove(formId, eventId);
   }
 }

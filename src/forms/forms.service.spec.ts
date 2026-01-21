@@ -1,9 +1,9 @@
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
-import { QueryListingDto } from "../prisma/dto/query-listing.dto";
 import { PrismaService } from "../prisma/prisma.service";
 import type { CreateFormDto } from "./dto/create-form.dto";
+import { FormListingDto } from "./dto/form-listing.dto";
 import { FormsService } from "./forms.service";
 
 describe("FormsService", () => {
@@ -12,6 +12,7 @@ describe("FormsService", () => {
     form: {
       create: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
       findUnique: jest.fn(),
       findFirst: jest.fn(),
       update: jest.fn(),
@@ -141,17 +142,26 @@ describe("FormsService", () => {
       { eventUuid, name: "Form 1" },
       { eventUuid, name: "Form 2" },
     ];
-    mockPrismaService.form.findMany.mockResolvedValue(mockForms);
+
     mockPrismaService.event.findFirst.mockResolvedValue({ uuid: eventUuid });
-    const query = new QueryListingDto();
-    const forms = await service.findAll(eventUuid, query);
-    expect(forms).toEqual(mockForms);
-    expect(mockPrismaService.form.findMany).toHaveBeenCalled();
+    mockPrismaService.$transaction.mockResolvedValue([
+      mockForms.length,
+      mockForms,
+    ]);
+
+    const query = new FormListingDto();
+
+    const result = await service.findAll(eventUuid, query);
+
+    expect(result.data).toEqual(mockForms);
+    expect(result.meta.itemCount).toBe(mockForms.length);
+
+    expect(mockPrismaService.$transaction).toHaveBeenCalled();
   });
 
   it("should throw NotFoundException if event not found when fetching forms", async () => {
     const eventUuid = "non-existent-event-uuid";
-    const query = new QueryListingDto();
+    const query = new FormListingDto();
     mockPrismaService.event.findFirst.mockResolvedValue(null);
     await expect(service.findAll(eventUuid, query)).rejects.toThrow(
       `Event with id: ${eventUuid} not found`,

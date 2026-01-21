@@ -1,12 +1,17 @@
+import { PageMetaDto } from "src/common/dto/page-meta.dto";
+import { PageDto } from "src/common/dto/page.dto";
+import { parseSortInput } from "src/common/utils/prisma.utility";
+import { Prisma } from "src/generated/prisma/browser";
+
 import {
   BadRequestException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
 
-import { QueryListingDto } from "../prisma/dto/query-listing.dto";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateFormDto } from "./dto/create-form.dto";
+import { FormListingDto } from "./dto/form-listing.dto";
 import { UpdateFormDto } from "./dto/update-form.dto";
 
 @Injectable()
@@ -70,24 +75,36 @@ export class FormsService {
     });
   }
 
-  async findAll(eventUuid: string, query: QueryListingDto) {
-    const prismaQuery = query.toPrisma("Form");
+  async findAll(eventUuid: string, query: FormListingDto) {
     const event = await this.prisma.event.findFirst({
       where: { uuid: eventUuid },
     });
     if (event == null) {
       throw new NotFoundException(`Event with id: ${eventUuid} not found`);
     }
-
-    return this.prisma.form.findMany({
-      ...prismaQuery,
-      where: { ...prismaQuery.where, event: { uuid: eventUuid } },
-      include: {
-        formDefinitions: {
-          include: { attribute: true },
-        },
-      },
-    });
+    const { skip, take, name, isEditable, sort } = query;
+    const where: Prisma.FormWhereInput = {
+      eventUuid: event.uuid,
+      ...(name === undefined
+        ? {}
+        : { name: { contains: name, mode: "insensitive" } }),
+      ...(isEditable === undefined ? {} : { isEditable }),
+    };
+    const orderBy = parseSortInput(sort, ["name", "createdAt", "openDate"]);
+    if (orderBy.length === 0) {
+      orderBy.push({ createdAt: "desc" });
+    }
+    const [itemCount, forms] = await this.prisma.$transaction([
+      this.prisma.form.count({ where }),
+      this.prisma.form.findMany({
+        where,
+        skip,
+        take,
+        orderBy,
+      }),
+    ]);
+    const pageMetaDto = new PageMetaDto({ itemCount, pageOptionsDto: query });
+    return new PageDto(forms, pageMetaDto);
   }
 
   async findOne(formUuid: string, eventUuid: string) {
