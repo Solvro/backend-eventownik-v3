@@ -5,7 +5,7 @@ import { Test } from "@nestjs/testing";
 
 import { FormListingDto } from "./dto/form-listing.dto";
 import { FormsController } from "./forms.controller";
-import { FormsModule } from "./forms.module";
+import { FormsService } from "./forms.service";
 
 describe("Forms Integration", () => {
   let formsController: FormsController;
@@ -38,12 +38,15 @@ describe("Forms Integration", () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      imports: [FormsModule],
-      providers: [PrismaService],
-    })
-      .overrideProvider(PrismaService)
-      .useValue(mockPrismaService)
-      .compile();
+      providers: [
+        FormsService,
+        FormsController,
+        {
+          provide: PrismaService,
+          useValue: mockPrismaService,
+        },
+      ],
+    }).compile();
     formsController = module.get<FormsController>(FormsController);
   });
 
