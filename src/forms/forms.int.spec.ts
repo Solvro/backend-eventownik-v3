@@ -139,7 +139,7 @@ describe("Forms Integration", () => {
       registerFormUuid: "some-existing-form-uuid",
     });
     await expect(
-      formsController.create("non-existing-event-uuid", dto),
+      formsController.create("event-uuid-123", dto),
     ).rejects.toThrow();
   });
 

@@ -10,7 +10,7 @@ import {
 
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
-import { CreateFormDefinicionDto } from "./create-form-definicion.dto";
+import { CreateFormDefinitionDto } from "./create-form-definition.dto";
 
 export class CreateFormDto {
   @IsString()
@@ -50,6 +50,6 @@ export class CreateFormDto {
   @ApiProperty({ isArray: true })
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => CreateFormDefinicionDto)
-  attributes: CreateFormDefinicionDto[];
+  @Type(() => CreateFormDefinitionDto)
+  attributes: CreateFormDefinitionDto[];
 }

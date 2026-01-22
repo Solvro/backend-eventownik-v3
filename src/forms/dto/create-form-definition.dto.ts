@@ -8,7 +8,7 @@ import {
 
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
-export class CreateFormDefinicionDto {
+export class CreateFormDefinitionDto {
   @ApiProperty()
   @IsString()
   @IsUUID()

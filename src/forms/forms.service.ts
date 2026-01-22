@@ -255,7 +255,7 @@ export class FormsService {
       });
       if (deletedForms.count === 0) {
         throw new NotFoundException(
-          `Form with id: ${formUuid} not found or doesnt belong to event ${eventUuid}`,
+          `Form with id: ${formUuid} not found or does not belong to event ${eventUuid}`,
         );
       }
       return deletedForms;
