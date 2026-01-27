@@ -82,8 +82,7 @@ export class EventsService {
 
   async create(eventDto: Prisma.EventCreateInput) {
     // TODO: zmienić później pozyskiwanie organizerUUID
-    // const temporaryUUID = "xxxxxxxx-xxxx-xxxx-xxxx-c4eaaf5ca7f9";
-    const temporaryUUID = "1b96eb17-b125-4022-8fe3-c4eaaf5ca7f9";
+    const temporaryUUID = "xxxxxxxx-xxxx-xxxx-xxxx-c4eaaf5ca7f9";
     const admin = await this.prisma.admin.findFirst({
       where: { uuid: temporaryUUID },
     });

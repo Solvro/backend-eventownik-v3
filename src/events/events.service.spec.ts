@@ -321,7 +321,7 @@ describe("EventsService", () => {
       (prisma.admin.findFirst as jest.Mock).mockResolvedValue(null);
 
       await expect(service.create(createDto)).rejects.toThrow(
-        `Admin with UUID 1b96eb17-b125-4022-8fe3-c4eaaf5ca7f9 not found`,
+        `Admin with UUID xxxxxxxx-xxxx-xxxx-xxxx-c4eaaf5ca7f9 not found`,
       );
 
       // eslint-disable-next-line @typescript-eslint/unbound-method
