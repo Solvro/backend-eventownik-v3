@@ -64,6 +64,7 @@ export class EventCreateDto {
     type: Boolean,
     example: true,
   })
+  @Type(() => Boolean)
   @IsBoolean()
   isPublic: boolean;
 
@@ -73,6 +74,7 @@ export class EventCreateDto {
     example: 100,
   })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   participantsLimit?: number | null;
 

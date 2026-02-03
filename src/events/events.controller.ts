@@ -1,3 +1,5 @@
+import { diskStorage } from "multer";
+import { extname } from "node:path/win32";
 import { PageDto } from "src/common/dto/page.dto";
 
 import {
@@ -11,7 +13,10 @@ import {
   Post,
   Put,
   Query,
+  UploadedFile,
+  UseInterceptors,
 } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { EventCreateDto } from "./dto/event-create.dto";
@@ -42,11 +47,33 @@ export class EventsController {
     return this.eventsService.findAllPublic(dto);
   }
 
-  //TODO: photo service
+  //TODO: lepsza walidacja pliku, max rozmiar, typy, itp.
   @Post()
+  @UseInterceptors(
+    FileInterceptor("photo", {
+      storage: diskStorage({
+        destination: "./uploads/events",
+        filename: (_request, file, callback) => {
+          const now = Date.now().toString();
+          const random = Math.round(Math.random() * 1e9).toString();
+          const uniqueSuffix = `${now}-${random}`;
+          const extension = extname(file.originalname);
+          callback(null, `${uniqueSuffix}${extension}`);
+        },
+      }),
+    }),
+  )
   @ApiOperation({ summary: "Create a new event" })
   @ApiOkResponse({ description: "The created event", type: Event })
-  async create(@Body() eventDto: EventCreateDto): Promise<Event> {
+  async create(
+    @UploadedFile() photo: Express.Multer.File | undefined,
+    @Body() eventDto: EventCreateDto,
+  ): Promise<Event> {
+    let photoUrl: string | null = null;
+    if (photo !== undefined) {
+      photoUrl = `/uploads/events/${photo.filename}`;
+    }
+    eventDto.photoUrl = photoUrl;
     return this.eventsService.create(eventDto);
   }
 
@@ -69,12 +96,32 @@ export class EventsController {
   }
 
   @Put(":eventUUID")
+  @UseInterceptors(
+    FileInterceptor("photo", {
+      storage: diskStorage({
+        destination: "./uploads/events",
+        filename: (_request, file, callback) => {
+          const now = Date.now().toString();
+          const random = Math.round(Math.random() * 1e9).toString();
+          const uniqueSuffix = `${now}-${random}`;
+          const extension = extname(file.originalname);
+          callback(null, `${uniqueSuffix}${extension}`);
+        },
+      }),
+    }),
+  )
   @ApiOperation({ summary: "Update event by UUID" })
   @ApiOkResponse({ description: "The updated event", type: Event })
   async update(
     @Param("eventUUID", ParseUUIDPipe) eventUUID: string,
+    @UploadedFile() photo: Express.Multer.File | undefined,
     @Body() eventDto: EventUpdateDto,
   ): Promise<Event> {
+    let photoUrl: string | null = null;
+    if (photo !== undefined) {
+      photoUrl = `/uploads/events/${photo.filename}`;
+    }
+    eventDto.photoUrl = photoUrl;
     return this.eventsService.update(eventUUID, eventDto);
   }
 
