@@ -288,12 +288,14 @@ describe("EventsService", () => {
         name: "New Event",
         startDate: new Date(),
         endDate: new Date(),
+        slug: "new-event",
       };
 
       const mockCreatedEvent = { uuid: "MOCK-UUID", ...createDto };
       const mockAdmin = { uuid: temporaryAdminUUID };
 
       (prisma.admin.findFirst as jest.Mock).mockResolvedValue(mockAdmin);
+      (prisma.event.findUnique as jest.Mock).mockResolvedValue(null);
       (prisma.event.create as jest.Mock).mockResolvedValue(mockCreatedEvent);
 
       const result = await service.create(createDto);
@@ -316,12 +318,38 @@ describe("EventsService", () => {
         name: "New Event",
         startDate: new Date(),
         endDate: new Date(),
+        slug: "new-event",
       };
 
       (prisma.admin.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.event.findUnique as jest.Mock).mockResolvedValue(null);
 
       await expect(service.create(createDto)).rejects.toThrow(
         `Admin with UUID xxxxxxxx-xxxx-xxxx-xxxx-c4eaaf5ca7f9 not found`,
+      );
+
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(prisma.event.create).not.toHaveBeenCalled();
+    });
+
+    it("should throw ConflictException if event with the same slug exists", async () => {
+      const createDto = {
+        name: "New Event",
+        startDate: new Date(),
+        endDate: new Date(),
+        slug: "existing-slug",
+      };
+
+      const mockAdmin = { uuid: "some-admin-uuid" };
+      const mockExistingEvent = { uuid: "existing-event-uuid" };
+
+      (prisma.admin.findFirst as jest.Mock).mockResolvedValue(mockAdmin);
+      (prisma.event.findUnique as jest.Mock).mockResolvedValue(
+        mockExistingEvent,
+      );
+
+      await expect(service.create(createDto)).rejects.toThrow(
+        `Event with slug ${createDto.slug} already exists`,
       );
 
       // eslint-disable-next-line @typescript-eslint/unbound-method

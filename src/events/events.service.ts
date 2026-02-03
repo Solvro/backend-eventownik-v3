@@ -4,8 +4,13 @@ import { parseSortInput } from "src/common/utils/prisma.utility";
 import { Prisma } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 
+import { EventCreateDto } from "./dto/event-create.dto";
 import { EventListingDto } from "./dto/event-listing.dto";
 
 @Injectable()
@@ -80,7 +85,7 @@ export class EventsService {
     return new PageDto(events, pageMetaDto);
   }
 
-  async create(eventDto: Prisma.EventCreateInput) {
+  async create(eventDto: EventCreateDto) {
     // TODO: zmienić później pozyskiwanie organizerUUID
     const temporaryUUID = "xxxxxxxx-xxxx-xxxx-xxxx-c4eaaf5ca7f9";
     const admin = await this.prisma.admin.findFirst({
@@ -91,9 +96,19 @@ export class EventsService {
       throw new NotFoundException(`Admin with UUID ${temporaryUUID} not found`);
     }
 
+    if (
+      (await this.prisma.event.findUnique({
+        where: { slug: eventDto.slug },
+      })) !== null
+    ) {
+      throw new ConflictException(
+        `Event with slug ${eventDto.slug} already exists`,
+      );
+    }
+
     const event = await this.prisma.event.create({
       data: {
-        ...eventDto,
+        ...(eventDto as Prisma.EventCreateInput),
         organizerAdmin: {
           connect: { uuid: admin.uuid },
         },

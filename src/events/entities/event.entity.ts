@@ -27,6 +27,9 @@ export class Event implements PrismaEvent {
   @ApiProperty()
   updatedAt: Date;
 
+  @ApiProperty()
+  slug: string;
+
   @ApiProperty({ nullable: true, required: false })
   participantsLimit: number | null;
 
@@ -50,9 +53,6 @@ export class Event implements PrismaEvent {
 
   @ApiProperty({ nullable: true, required: false })
   contactEmail: string | null;
-
-  @ApiProperty({ nullable: true, required: false })
-  slug: string | null;
 
   @ApiProperty({ nullable: true, required: false })
   organizerUuid: string | null;

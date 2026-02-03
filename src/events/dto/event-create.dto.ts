@@ -6,6 +6,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  MinLength,
 } from "class-validator";
 
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
@@ -121,12 +122,12 @@ export class EventCreateDto {
   @IsEmail()
   contactEmail?: string | null;
 
-  @ApiPropertyOptional({
-    description: "Slug for the event",
+  @ApiProperty({
+    description: "Unique slug for the event",
     type: String,
     example: "tech-conference-2023",
   })
-  @IsOptional()
   @IsString()
-  slug?: string | null;
+  @MinLength(3)
+  slug: string;
 }

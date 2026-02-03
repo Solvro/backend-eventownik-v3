@@ -64,6 +64,7 @@ model Event {
   endDate           DateTime
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+  slug              String   @unique
   participantsLimit Int?
   verifiedAt        DateTime?
   description       String?
@@ -72,7 +73,6 @@ model Event {
   photoUrl          String?
   location          String?
   contactEmail      String?
-  slug              String?   @unique
   organizerUuid     String?   @db.Uuid
   registerFormUuid  String?   @db.Uuid
 
