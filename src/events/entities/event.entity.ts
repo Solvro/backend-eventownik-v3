@@ -30,6 +30,9 @@ export class Event implements PrismaEvent {
   @ApiProperty()
   slug: string;
 
+  @ApiProperty()
+  isPublic: boolean;
+
   @ApiProperty({ nullable: true, required: false })
   participantsLimit: number | null;
 

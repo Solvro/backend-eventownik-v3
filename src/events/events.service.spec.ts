@@ -173,6 +173,7 @@ describe("EventsService", () => {
       const expectedWhere = {
         // TODO: is_public = true and verifiedAt not null
         verifiedAt: { not: null },
+        isPublic: true,
       };
 
       // eslint-disable-next-line @typescript-eslint/unbound-method
@@ -232,49 +233,51 @@ describe("EventsService", () => {
 
   describe("find one public", () => {
     it("should throw NotFoundException if event does not exist", async () => {
-      const uuid = "non-existent-uuid";
+      const slug = "non-existent-slug";
 
       (prisma.event.findUnique as jest.Mock).mockResolvedValue(null);
 
-      await expect(service.findOnePublic(uuid)).rejects.toThrow(
-        `Event with UUID ${uuid} not found`,
+      await expect(service.findOnePublic(slug)).rejects.toThrow(
+        `Event with slug ${slug} not found`,
       );
     });
     it("should throw NotFoundException if event is not verified", async () => {
-      const uuid = "unverified-uuid";
-
+      const slug = "unverified-slug";
       (prisma.event.findUnique as jest.Mock).mockResolvedValue(null);
 
-      await expect(service.findOnePublic(uuid)).rejects.toThrow(
-        `Event with UUID ${uuid} not found`,
+      await expect(service.findOnePublic(slug)).rejects.toThrow(
+        `Event with slug ${slug} not found`,
       );
 
       // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.event.findUnique).toHaveBeenCalledWith({
         where: {
-          uuid,
+          slug,
+          isPublic: true,
           verifiedAt: { not: null },
         },
       });
     });
     it("should return the event if it exists and is verified", async () => {
-      const uuid = "verified-uuid";
+      const slug = "verified-slug";
       const mockEvent = {
         id: 1,
-        uuid,
+        slug,
         name: "Verified Event",
         verifiedAt: new Date(),
+        isPublic: true,
       };
 
       (prisma.event.findUnique as jest.Mock).mockResolvedValue(mockEvent);
 
-      const result = await service.findOnePublic(uuid);
+      const result = await service.findOnePublic(slug);
 
       // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.event.findUnique).toHaveBeenCalledWith({
         where: {
-          uuid,
+          slug,
           verifiedAt: { not: null },
+          isPublic: true,
         },
       });
       expect(result).toEqual(mockEvent);
@@ -289,6 +292,7 @@ describe("EventsService", () => {
         startDate: new Date(),
         endDate: new Date(),
         slug: "new-event",
+        isPublic: true,
       };
 
       const mockCreatedEvent = { uuid: "MOCK-UUID", ...createDto };
@@ -319,6 +323,7 @@ describe("EventsService", () => {
         startDate: new Date(),
         endDate: new Date(),
         slug: "new-event",
+        isPublic: true,
       };
 
       (prisma.admin.findFirst as jest.Mock).mockResolvedValue(null);
@@ -338,6 +343,7 @@ describe("EventsService", () => {
         startDate: new Date(),
         endDate: new Date(),
         slug: "existing-slug",
+        isPublic: true,
       };
 
       const mockAdmin = { uuid: "some-admin-uuid" };

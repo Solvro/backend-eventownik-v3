@@ -1,6 +1,7 @@
 import { Type } from "class-transformer";
 import {
   IsArray,
+  IsBoolean,
   IsDate,
   IsEmail,
   IsNumber,
@@ -57,6 +58,14 @@ export class EventCreateDto {
   @Type(() => Date)
   @IsDate()
   endDate: Date;
+
+  @ApiProperty({
+    description: "Is the event public, defaults to false",
+    type: Boolean,
+    example: true,
+  })
+  @IsBoolean()
+  isPublic: boolean;
 
   @ApiPropertyOptional({
     description: "Participants limit for the event",

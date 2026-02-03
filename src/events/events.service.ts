@@ -56,6 +56,7 @@ export class EventsService {
     const { skip, take, name, location, sort } = query;
 
     const where: Prisma.EventWhereInput = {
+      isPublic: true,
       verifiedAt: { not: null },
       ...(name === undefined
         ? {}
@@ -131,17 +132,17 @@ export class EventsService {
     return event;
   }
 
-  async findOnePublic(uuid: string) {
+  async findOnePublic(slug: string) {
     const event = await this.prisma.event.findUnique({
       where: {
-        uuid,
-        // raczej tu dorzucamy jeszcze is_public
+        slug,
         verifiedAt: { not: null },
+        isPublic: true,
       },
     });
 
     if (event == null) {
-      throw new NotFoundException(`Event with UUID ${uuid} not found`);
+      throw new NotFoundException(`Event with slug ${slug} not found`);
     }
 
     return event;
