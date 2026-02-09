@@ -14,6 +14,7 @@ describe("Organizers integration tests", () => {
     admin: {
       findMany: jest.fn(),
       count: jest.fn(),
+      findFirst: jest.fn(),
     },
     event: {
       findUnique: jest.fn(),
@@ -111,5 +112,52 @@ describe("Organizers integration tests", () => {
         }),
       }),
     );
+  });
+  describe("Find organizer by event and admin id", () => {
+    it("Should return admin when event and admin exists", async () => {
+      const eventUuid = "event-test-123";
+      const organizerUuid = "admin-test-123";
+
+      const mockOrganizer = {
+        firstName: "abc",
+        uuid: organizerUuid,
+        eventUuid,
+      };
+
+      mockPrismaService.admin.findFirst.mockResolvedValue(mockOrganizer);
+
+      const result = await organizersController.findOne(
+        eventUuid,
+        organizerUuid,
+      );
+
+      expect(result).toEqual(mockOrganizer);
+
+      expect(mockPrismaService.admin.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          where: expect.objectContaining({
+            uuid: organizerUuid,
+            permissions: {
+              some: {
+                eventUuid,
+              },
+            },
+          }),
+        }),
+      );
+    });
+    it("Should return 404 if admin/event does not exist, or admin isnt an organizer of an event", async () => {
+      const eventUuid = "bad-event-123";
+      const organizerUuid = "bad-organizer-123";
+
+      mockPrismaService.admin.findFirst.mockResolvedValue(null);
+
+      await expect(
+        organizersController.findOne(eventUuid, organizerUuid),
+      ).rejects.toThrow(
+        `organizer or event does not exist, or the organizer isnt assigned to event: ${eventUuid}`,
+      );
+    });
   });
 });

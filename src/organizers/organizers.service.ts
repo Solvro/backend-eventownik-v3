@@ -72,8 +72,35 @@ export class OrganizersService {
     return new PageDto(organizers, pageMetaDto);
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} organizer`;
+  async findOne(eventUuid: string, organizerUuid: string) {
+    const organizer = await this.prisma.admin.findFirst({
+      where: {
+        uuid: organizerUuid,
+        permissions: {
+          some: {
+            eventUuid,
+          },
+        },
+      },
+      select: {
+        uuid: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        type: true,
+        active: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (organizer == null) {
+      throw new NotFoundException(
+        `organizer or event does not exist, or the organizer isnt assigned to event: ${eventUuid}`,
+      );
+    }
+
+    return organizer;
   }
 
   update(id: number, updateOrganizerDto: UpdateOrganizerDto) {

@@ -17,6 +17,7 @@ describe("OrganizersService", () => {
       create: jest.fn(),
       delete: jest.fn(),
       count: jest.fn(),
+      findFirst: jest.fn(),
     },
     event: {
       findUnique: jest.fn(),
@@ -70,7 +71,25 @@ describe("OrganizersService", () => {
       );
     });
   });
-  describe("Find organizer by event and adminUuid", () => {
-    it("Should return an organizer", async () => {});
+  describe("Find organizer by event and admin id", () => {
+    it("Should return admin when event and admin exists", async () => {
+      const eventUuid = "event-test-123";
+      const organizerUuid = "admin-test-123";
+
+      const mockOrganizer = {
+        firstName: "abc",
+        uuid: organizerUuid,
+        eventUuid,
+      };
+
+      mockPrismaService.admin.findFirst.mockResolvedValue(mockOrganizer);
+
+      const result = await service.findOne(eventUuid, organizerUuid);
+
+      expect(result).toEqual(mockOrganizer);
+    });
+  });
+  describe("Assing an organizer to an event", () => {
+    it("Should assing an organizer to an event", async () => {});
   });
 });

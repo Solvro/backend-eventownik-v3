@@ -11,10 +11,16 @@ import {
   Post,
   Query,
 } from "@nestjs/common";
-import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import {
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+  getSchemaPath,
+} from "@nestjs/swagger";
 
 import { CreateOrganizerDto } from "./dto/create-organizer.dto";
 import { OrganizerListingDto } from "./dto/organizer-listing.dto";
+import { OrganizerResponseDto } from "./dto/organizer-response.dto";
 import { UpdateOrganizerDto } from "./dto/update-organizer.dto";
 import { OrganizersService } from "./organizers.service";
 
@@ -33,11 +39,23 @@ export class OrganizersController {
   @ApiResponse({
     status: 200,
     description: "Organizers retrieved successfully",
-    type: PageDto,
+    schema: {
+      allOf: [
+        { $ref: getSchemaPath(PageDto) },
+        {
+          properties: {
+            data: {
+              type: "array",
+              items: { $ref: getSchemaPath(OrganizerResponseDto) },
+            },
+          },
+        },
+      ],
+    },
   })
   @ApiResponse({
     status: 404,
-    description: "Event with this id was not found",
+    description: "Event with this uuid was not found",
   })
   async findAll(
     @Param("eventId", ParseUUIDPipe) eventId: string,
@@ -46,9 +64,23 @@ export class OrganizersController {
     return this.organizersService.findAll(eventId, query);
   }
 
-  @Get(":id")
-  findOne(@Param("id") id: string) {
-    return this.organizersService.findOne(+id);
+  @Get(":organizerId")
+  @ApiOperation({ summary: "Get organizer by event id and organizer id" })
+  @ApiResponse({
+    status: 200,
+    description: "Organizer retrieved successfully",
+    type: OrganizerResponseDto,
+  })
+  @ApiResponse({
+    status: 404,
+    description:
+      "organizer or event does not exist, or the organizer isnt assigned to this event",
+  })
+  async findOne(
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @Param("organizerId", ParseUUIDPipe) organizerId: string,
+  ) {
+    return this.organizersService.findOne(eventId, organizerId);
   }
 
   @Patch(":id")
