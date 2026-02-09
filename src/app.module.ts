@@ -7,6 +7,7 @@ import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { EventsModule } from "./events/events.module";
 import { FormsModule } from "./forms/forms.module";
+import { OrganizersModule } from "./organizers/organizers.module";
 import { PrismaModule } from "./prisma/prisma.module";
 
 @Module({
@@ -21,6 +22,7 @@ import { PrismaModule } from "./prisma/prisma.module";
       }),
       isGlobal: true,
     }),
+    OrganizersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
