@@ -13,8 +13,40 @@ import { UpdateOrganizerDto } from "./dto/update-organizer.dto";
 @Injectable()
 export class OrganizersService {
   constructor(private readonly prisma: PrismaService) {}
-  create(createOrganizerDto: CreateOrganizerDto) {
-    return "This action adds a new organizer";
+  async create(eventUuid: string, createOrganizerDto: CreateOrganizerDto) {
+    const { email, permissionIds } = createOrganizerDto;
+
+    const admin = await this.prisma.admin.findFirst({
+      where: { email },
+    });
+
+    if (admin == null) {
+      throw new NotFoundException("admin, event or permission not found");
+    }
+
+    return await this.prisma.$transaction(async (prisma) => {
+      try {
+        const creationPromises = permissionIds.map(async (permissionUuid) =>
+          prisma.adminPermission.create({
+            data: {
+              eventUuid,
+              adminUuid: admin.uuid,
+              permissionUuid,
+            },
+          }),
+        );
+
+        return await Promise.all(creationPromises);
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2003" // P2003 - foregin key constraint failed
+        ) {
+          throw new NotFoundException("admin, event or permission not found");
+        }
+        throw error;
+      }
+    });
   }
 
   async findAll(eventUuid: string, query: OrganizerListingDto) {

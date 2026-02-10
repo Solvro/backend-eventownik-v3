@@ -30,8 +30,20 @@ export class OrganizersController {
   constructor(private readonly organizersService: OrganizersService) {}
 
   @Post()
-  create(@Body() createOrganizerDto: CreateOrganizerDto) {
-    return this.organizersService.create(createOrganizerDto);
+  @ApiOperation({ summary: "Add an organizer to event" })
+  @ApiResponse({
+    status: 201,
+    description: "Organizer added successfully",
+  })
+  @ApiResponse({
+    status: 404,
+    description: "admin, event or permission not found",
+  })
+  async create(
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @Body() createOrganizerDto: CreateOrganizerDto,
+  ) {
+    return await this.organizersService.create(eventId, createOrganizerDto);
   }
 
   @Get()

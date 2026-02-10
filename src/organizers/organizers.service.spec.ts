@@ -3,6 +3,7 @@ import { PrismaService } from "src/prisma/prisma.service";
 import { Test } from "@nestjs/testing";
 import type { TestingModule } from "@nestjs/testing";
 
+import type { CreateOrganizerDto } from "./dto/create-organizer.dto";
 import { OrganizerListingDto } from "./dto/organizer-listing.dto";
 import { OrganizersService } from "./organizers.service";
 
@@ -21,6 +22,11 @@ describe("OrganizersService", () => {
     },
     event: {
       findUnique: jest.fn(),
+    },
+    adminPermission: {
+      create: jest.fn(),
+      createMany: jest.fn(),
+      delete: jest.fn(),
     },
   };
 
@@ -89,7 +95,69 @@ describe("OrganizersService", () => {
       expect(result).toEqual(mockOrganizer);
     });
   });
-  describe("Assing an organizer to an event", () => {
-    it("Should assing an organizer to an event", async () => {});
+  describe("Adding an organizer to an event", () => {
+    it("Should assing an organizer to an event", async () => {
+      const eventUuid = "test-event-123";
+      const existingAdminUuid = "admin-uuid-123";
+
+      const dto: CreateOrganizerDto = {
+        email: "organizer@example.com",
+        firstName: "John",
+        lastName: "Doe",
+        permissionIds: ["perm-1", "perm-2"],
+      };
+
+      mockPrismaService.$transaction.mockImplementation((callback) =>
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+        callback(mockPrismaService),
+      );
+
+      mockPrismaService.admin.findFirst.mockResolvedValue({
+        uuid: existingAdminUuid,
+        email: dto.email,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      mockPrismaService.adminPermission.create.mockImplementation(
+        (arguments_: {
+          data: {
+            eventUuid: string;
+            adminUuid: string;
+            permissionUuid: string;
+          };
+        }) => {
+          const data = arguments_.data;
+          return {
+            uuid: "new-record-uuid",
+            eventUuid: data.eventUuid,
+            adminUuid: data.adminUuid,
+            permissionUuid: data.permissionUuid,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+        },
+      );
+
+      const result = await service.create(eventUuid, dto);
+
+      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(2);
+
+      expect(result[0]).toMatchObject({
+        eventUuid,
+        adminUuid: existingAdminUuid,
+        permissionUuid: dto.permissionIds[0],
+      });
+
+      expect(result[1]).toMatchObject({
+        eventUuid,
+        adminUuid: existingAdminUuid,
+        permissionUuid: dto.permissionIds[1],
+      });
+    });
   });
 });

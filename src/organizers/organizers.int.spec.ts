@@ -20,6 +20,9 @@ describe("Organizers integration tests", () => {
       findUnique: jest.fn(),
     },
     $transaction: jest.fn(),
+    adminPermission: {
+      create: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
@@ -157,6 +160,91 @@ describe("Organizers integration tests", () => {
         organizersController.findOne(eventUuid, organizerUuid),
       ).rejects.toThrow(
         `organizer or event does not exist, or the organizer isnt assigned to event: ${eventUuid}`,
+      );
+    });
+  });
+  describe("Assign (create) organizer", () => {
+    it("should add an organizer and return created permissions", async () => {
+      const eventUuid = "event-uuid-123";
+      const existingAdminUuid = "admin-uuid-123";
+
+      const dto = {
+        email: "organizer@example.com",
+        firstName: "John",
+        lastName: "Doe",
+        permissionIds: ["perm-1", "perm-2"],
+      };
+
+      mockPrismaService.$transaction.mockImplementation((callback) =>
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+        callback(mockPrismaService),
+      );
+
+      mockPrismaService.admin.findFirst.mockResolvedValue({
+        uuid: existingAdminUuid,
+        email: dto.email,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+      });
+
+      mockPrismaService.adminPermission.create.mockImplementation(
+        (arguments_: {
+          data: {
+            eventUuid: string;
+            adminUuid: string;
+            permissionUuid: string;
+          };
+        }) => {
+          const data = arguments_.data;
+          return {
+            uuid: "new-record-uuid",
+            eventUuid: data.eventUuid,
+            adminUuid: data.adminUuid,
+            permissionUuid: data.permissionUuid,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+        },
+      );
+
+      const result = await organizersController.create(eventUuid, dto);
+
+      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(2);
+
+      expect(result[0]).toMatchObject({
+        eventUuid,
+        adminUuid: existingAdminUuid,
+        permissionUuid: dto.permissionIds[0],
+      });
+
+      expect(result[1]).toMatchObject({
+        eventUuid,
+        adminUuid: existingAdminUuid,
+        permissionUuid: dto.permissionIds[1],
+      });
+
+      expect(mockPrismaService.admin.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { email: dto.email },
+        }),
+      );
+    });
+
+    it("should throw 404 if admin, event or permission does not exist", async () => {
+      const eventUuid = "event-123";
+      const dto = {
+        email: "organizer@example.com",
+        firstName: "John",
+        lastName: "Doe",
+        permissionIds: ["perm-1"],
+      };
+
+      mockPrismaService.admin.findFirst.mockResolvedValue(null);
+
+      await expect(organizersController.create(eventUuid, dto)).rejects.toThrow(
+        "admin, event or permission not found",
       );
     });
   });

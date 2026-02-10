@@ -1,13 +1,22 @@
-import { IsUUID } from "class-validator";
+import { IsArray, IsEmail, IsString, IsUUID } from "class-validator";
 
 import { ApiProperty } from "@nestjs/swagger";
 
 export class CreateOrganizerDto {
-  @ApiProperty()
-  @IsUUID()
-  permissionUuid: string;
+  @ApiProperty({ isArray: true })
+  @IsUUID("4", { each: true })
+  @IsArray()
+  permissionIds: string[];
 
   @ApiProperty()
-  @IsUUID()
-  adminUuid: string;
+  @IsEmail()
+  email: string;
+
+  @ApiProperty()
+  @IsString()
+  firstName: string;
+
+  @ApiProperty()
+  @IsString()
+  lastName: string;
 }
