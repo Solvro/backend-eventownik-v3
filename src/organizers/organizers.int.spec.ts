@@ -15,6 +15,7 @@ describe("Organizers integration tests", () => {
       findMany: jest.fn(),
       count: jest.fn(),
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
     },
     event: {
       findUnique: jest.fn(),
@@ -22,6 +23,7 @@ describe("Organizers integration tests", () => {
     $transaction: jest.fn(),
     adminPermission: {
       create: jest.fn(),
+      deleteMany: jest.fn(),
     },
   };
 
@@ -246,6 +248,94 @@ describe("Organizers integration tests", () => {
       await expect(organizersController.create(eventUuid, dto)).rejects.toThrow(
         "admin, event or permission not found",
       );
+    });
+  });
+  describe("Update organizer permissions", () => {
+    it("should update permissions and return updated organizer", async () => {
+      const eventUuid = "event-uuid-123";
+      const organizerUuid = "admin-uuid-123";
+      const dto = {
+        permissionIds: ["new-perm-1", "new-perm-2"],
+      };
+
+      const expectedOrganizer = {
+        uuid: organizerUuid,
+        email: "test@example.com",
+        firstName: "John",
+        lastName: "Doe",
+        permissions: [
+          { permissionUuid: "new-perm-1", eventUuid },
+          { permissionUuid: "new-perm-2", eventUuid },
+        ],
+      };
+
+      mockPrismaService.$transaction.mockImplementation((callback) =>
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+        callback(mockPrismaService),
+      );
+
+      mockPrismaService.admin.findFirst.mockResolvedValue({
+        uuid: organizerUuid,
+      });
+
+      mockPrismaService.adminPermission.deleteMany.mockResolvedValue({
+        count: 5,
+      });
+
+      mockPrismaService.adminPermission.create.mockImplementation(
+        async (arguments_: {
+          data: {
+            eventUuid: string;
+            adminUuid: string;
+            permissionUuid: string;
+          };
+        }) => {
+          const data = arguments_.data;
+          return await Promise.resolve({
+            uuid: "new-record-uuid",
+            eventUuid: data.eventUuid,
+            adminUuid: data.adminUuid,
+            permissionUuid: data.permissionUuid,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        },
+      );
+
+      mockPrismaService.admin.findUnique.mockResolvedValue(expectedOrganizer);
+
+      const result = await organizersController.update(
+        eventUuid,
+        organizerUuid,
+        dto,
+      );
+
+      expect(result).toEqual(expectedOrganizer);
+
+      expect(mockPrismaService.adminPermission.deleteMany).toHaveBeenCalledWith(
+        {
+          where: {
+            eventUuid,
+            adminUuid: organizerUuid,
+          },
+        },
+      );
+
+      expect(mockPrismaService.adminPermission.create).toHaveBeenCalledTimes(2);
+    });
+
+    it("should throw 404 if organizer does not exist", async () => {
+      const eventUuid = "event-uuid-123";
+      const organizerUuid = "admin-uuid-123";
+      const dto = {
+        permissionIds: ["perm-1"],
+      };
+
+      mockPrismaService.admin.findFirst.mockResolvedValue(null);
+
+      await expect(
+        organizersController.update(eventUuid, organizerUuid, dto),
+      ).rejects.toThrow("admin, event or permission not found");
     });
   });
 });

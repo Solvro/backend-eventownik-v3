@@ -135,8 +135,72 @@ export class OrganizersService {
     return organizer;
   }
 
-  update(id: number, updateOrganizerDto: UpdateOrganizerDto) {
-    return `This action updates a #${id} organizer`;
+  async update(
+    eventUuid: string,
+    organizerUuid: string,
+    updateOrganizerDto: UpdateOrganizerDto,
+  ) {
+    const { permissionIds } = updateOrganizerDto;
+
+    return await this.prisma.$transaction(async (prisma) => {
+      const admin = await prisma.admin.findFirst({
+        where: {
+          uuid: organizerUuid,
+          permissions: {
+            some: {
+              eventUuid,
+            },
+          },
+        },
+      });
+
+      if (admin == null) {
+        throw new NotFoundException("admin, event or permission not found");
+      }
+
+      await prisma.adminPermission.deleteMany({
+        where: {
+          eventUuid,
+          adminUuid: organizerUuid,
+        },
+      });
+
+      try {
+        const creationPromises = permissionIds.map(async (permissionUuid) =>
+          prisma.adminPermission.create({
+            data: {
+              eventUuid,
+              adminUuid: organizerUuid,
+              permissionUuid,
+            },
+          }),
+        );
+
+        await Promise.all(creationPromises);
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2003" // P2003 - foregin key constraint failed
+        ) {
+          throw new NotFoundException("admin, event or permission not found");
+        }
+        throw error;
+      }
+
+      return await prisma.admin.findUnique({
+        where: { uuid: organizerUuid },
+        include: {
+          permissions: {
+            where: {
+              eventUuid,
+            },
+          },
+        },
+        omit: {
+          password: true,
+        },
+      });
+    });
   }
 
   remove(id: number) {

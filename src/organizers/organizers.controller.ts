@@ -95,12 +95,27 @@ export class OrganizersController {
     return this.organizersService.findOne(eventId, organizerId);
   }
 
-  @Patch(":id")
-  update(
-    @Param("id") id: string,
+  @Patch(":organizerId")
+  @ApiOperation({ summary: "Update organizer permissions" })
+  @ApiResponse({
+    status: 200,
+    description: "Organizer updated successfully",
+    type: OrganizerResponseDto,
+  })
+  @ApiResponse({
+    status: 404,
+    description: "admin, event or permission not found",
+  })
+  async update(
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @Param("organizerId", ParseUUIDPipe) organizerId: string,
     @Body() updateOrganizerDto: UpdateOrganizerDto,
   ) {
-    return this.organizersService.update(+id, updateOrganizerDto);
+    return await this.organizersService.update(
+      eventId,
+      organizerId,
+      updateOrganizerDto,
+    );
   }
 
   @Delete(":id")

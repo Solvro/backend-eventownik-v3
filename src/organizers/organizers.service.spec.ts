@@ -27,10 +27,12 @@ describe("OrganizersService", () => {
       create: jest.fn(),
       createMany: jest.fn(),
       delete: jest.fn(),
+      deleteMany: jest.fn(),
     },
   };
 
   beforeEach(async () => {
+    jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
       providers: [OrganizersService, PrismaService],
     })
@@ -158,6 +160,89 @@ describe("OrganizersService", () => {
         adminUuid: existingAdminUuid,
         permissionUuid: dto.permissionIds[1],
       });
+    });
+  });
+  describe("Update organizer permissions", () => {
+    it("Should update organizer permissions and return updated organizer", async () => {
+      const eventUuid = "event-123";
+      const organizerUuid = "admin-123";
+      const dto = {
+        permissionIds: ["new-perm-1", "new-perm-2"],
+      };
+
+      const expectedOrganizer = {
+        uuid: organizerUuid,
+        email: "test@example.com",
+        firstName: "John",
+        lastName: "Doe",
+        permissions: [
+          { permissionUuid: "new-perm-1", eventUuid },
+          { permissionUuid: "new-perm-2", eventUuid },
+        ],
+      };
+
+      mockPrismaService.$transaction.mockImplementation((callback) =>
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+        callback(mockPrismaService),
+      );
+
+      mockPrismaService.admin.findFirst.mockResolvedValue({
+        uuid: organizerUuid,
+      });
+
+      mockPrismaService.adminPermission.deleteMany.mockResolvedValue({
+        count: 5,
+      });
+
+      mockPrismaService.adminPermission.create.mockImplementation(
+        async (arguments_: {
+          data: {
+            eventUuid: string;
+            adminUuid: string;
+            permissionUuid: string;
+          };
+        }) => {
+          const data = arguments_.data;
+          return await Promise.resolve({
+            uuid: "new-record-uuid",
+            eventUuid: data.eventUuid,
+            adminUuid: data.adminUuid,
+            permissionUuid: data.permissionUuid,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        },
+      );
+
+      mockPrismaService.admin.findUnique.mockResolvedValue(expectedOrganizer);
+
+      const result = await service.update(eventUuid, organizerUuid, dto);
+
+      expect(result).toEqual(expectedOrganizer);
+
+      expect(mockPrismaService.admin.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            uuid: organizerUuid,
+            permissions: {
+              some: {
+                eventUuid,
+              },
+            },
+          },
+        }),
+      );
+
+      expect(mockPrismaService.adminPermission.deleteMany).toHaveBeenCalledWith(
+        {
+          where: {
+            eventUuid,
+            adminUuid: organizerUuid,
+          },
+        },
+      );
+
+      expect(mockPrismaService.adminPermission.create).toHaveBeenCalledTimes(2);
     });
   });
 });
