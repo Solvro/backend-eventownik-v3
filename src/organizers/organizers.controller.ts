@@ -5,6 +5,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -118,8 +119,25 @@ export class OrganizersController {
     );
   }
 
-  @Delete(":id")
-  remove(@Param("id") id: string) {
-    return this.organizersService.remove(+id);
+  @Delete(":organizerId")
+  @HttpCode(204)
+  @ApiOperation({ summary: "Delete organizer" })
+  @ApiResponse({
+    status: 204,
+    description: "Organizer deleted successfully",
+  })
+  @ApiResponse({
+    status: 404,
+    description: "Admin or event not found",
+  })
+  @ApiResponse({
+    status: 403,
+    description: "Cannot remove the last organizer",
+  })
+  async remove(
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @Param("organizerId", ParseUUIDPipe) organizerId: string,
+  ) {
+    return this.organizersService.remove(eventId, organizerId);
   }
 }

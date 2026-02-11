@@ -28,6 +28,7 @@ describe("OrganizersService", () => {
       createMany: jest.fn(),
       delete: jest.fn(),
       deleteMany: jest.fn(),
+      groupBy: jest.fn(),
     },
   };
 
@@ -243,6 +244,40 @@ describe("OrganizersService", () => {
       );
 
       expect(mockPrismaService.adminPermission.create).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("Remove organizer", () => {
+    it("Should remove organizer if there are more than 1 organizers assigned", async () => {
+      const eventUuid = "event-123";
+      const organizerUuid = "admin-to-remove";
+
+      mockPrismaService.adminPermission.groupBy.mockResolvedValue([
+        { adminUuid: "other-admin-1", _count: { _all: 5 } },
+        { adminUuid: organizerUuid, _count: { _all: 5 } },
+      ]);
+
+      mockPrismaService.adminPermission.deleteMany.mockResolvedValue({
+        count: 5,
+      });
+
+      await service.remove(eventUuid, organizerUuid);
+
+      expect(mockPrismaService.adminPermission.groupBy).toHaveBeenCalledWith({
+        by: ["adminUuid"],
+        where: {
+          eventUuid,
+        },
+      });
+
+      expect(mockPrismaService.adminPermission.deleteMany).toHaveBeenCalledWith(
+        {
+          where: {
+            eventUuid,
+            adminUuid: organizerUuid,
+          },
+        },
+      );
     });
   });
 });

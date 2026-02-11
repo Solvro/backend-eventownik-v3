@@ -24,6 +24,7 @@ describe("Organizers integration tests", () => {
     adminPermission: {
       create: jest.fn(),
       deleteMany: jest.fn(),
+      groupBy: jest.fn(),
     },
   };
 
@@ -336,6 +337,76 @@ describe("Organizers integration tests", () => {
       await expect(
         organizersController.update(eventUuid, organizerUuid, dto),
       ).rejects.toThrow("admin, event or permission not found");
+    });
+  });
+  describe("Remove organizer", () => {
+    it("should remove organizer if there are more than 1 organizers assigned", async () => {
+      const eventUuid = "event-uuid-123";
+      const organizerUuid = "admin-uuid-123";
+
+      mockPrismaService.adminPermission.groupBy.mockResolvedValue([
+        { adminUuid: "other-admin-uuid", count: { all: 5 } },
+        { adminUuid: organizerUuid, count: { all: 5 } },
+      ]);
+
+      mockPrismaService.adminPermission.deleteMany.mockResolvedValue({
+        count: 1,
+      });
+
+      await organizersController.remove(eventUuid, organizerUuid);
+
+      expect(mockPrismaService.adminPermission.groupBy).toHaveBeenCalledWith({
+        by: ["adminUuid"],
+        where: { eventUuid },
+      });
+
+      expect(mockPrismaService.adminPermission.deleteMany).toHaveBeenCalledWith(
+        {
+          where: {
+            eventUuid,
+            adminUuid: organizerUuid,
+          },
+        },
+      );
+    });
+
+    it("should throw 404 if organizer was not assigned to this event or does not exist", async () => {
+      const eventUuid = "event-uuid-123";
+      const organizerUuid = "non-existent-admin";
+
+      mockPrismaService.adminPermission.groupBy.mockResolvedValue([
+        { count: { all: 5 } },
+      ]);
+
+      mockPrismaService.adminPermission.deleteMany.mockResolvedValue({
+        count: 0,
+      });
+
+      await expect(
+        organizersController.remove(eventUuid, organizerUuid),
+      ).rejects.toThrow(
+        "Organizer was not assigned to this event or does not exist",
+      );
+    });
+
+    it("should throw 403 Forbidden if trying to remove the last organizer", async () => {
+      const eventUuid = "event-uuid-123";
+      const organizerUuid = "last-admin-uuid";
+
+      mockPrismaService.adminPermission.groupBy.mockResolvedValue([
+        {
+          adminUuid: organizerUuid,
+          count: { all: 1 },
+        },
+      ]);
+
+      await expect(
+        organizersController.remove(eventUuid, organizerUuid),
+      ).rejects.toThrow("Unable to remove the last organizer from the event");
+
+      expect(
+        mockPrismaService.adminPermission.deleteMany,
+      ).not.toHaveBeenCalled();
     });
   });
 });

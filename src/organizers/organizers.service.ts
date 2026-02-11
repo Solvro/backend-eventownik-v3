@@ -4,7 +4,11 @@ import { parseSortInput } from "src/common/utils/prisma.utility";
 import { Prisma } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 
 import { CreateOrganizerDto } from "./dto/create-organizer.dto";
 import { OrganizerListingDto } from "./dto/organizer-listing.dto";
@@ -203,7 +207,31 @@ export class OrganizersService {
     });
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} organizer`;
+  async remove(eventUuid: string, organizerUuid: string) {
+    const organizers = await this.prisma.adminPermission.groupBy({
+      by: ["adminUuid"],
+      where: {
+        eventUuid,
+      },
+    });
+
+    if (!organizers.some((org) => org.adminUuid === organizerUuid)) {
+      throw new NotFoundException(
+        "Organizer was not assigned to this event or does not exist",
+      );
+    }
+
+    if (organizers.length === 1) {
+      throw new ForbiddenException(
+        "Unable to remove the last organizer from the event.",
+      );
+    }
+
+    await this.prisma.adminPermission.deleteMany({
+      where: {
+        adminUuid: organizerUuid,
+        eventUuid,
+      },
+    });
   }
 }
