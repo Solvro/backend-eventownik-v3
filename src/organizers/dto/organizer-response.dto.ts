@@ -2,6 +2,17 @@ import { OrganizerType } from "src/generated/prisma/enums";
 
 import { ApiProperty } from "@nestjs/swagger";
 
+export class OrganizerPermissionResponseDto {
+  @ApiProperty()
+  permissionUuid: string;
+
+  @ApiProperty()
+  action: string;
+
+  @ApiProperty()
+  subject: string;
+}
+
 export class OrganizerResponseDto {
   @ApiProperty()
   uuid: string;
@@ -26,4 +37,7 @@ export class OrganizerResponseDto {
 
   @ApiProperty()
   updatedAt: Date;
+
+  @ApiProperty({ type: [OrganizerPermissionResponseDto], isArray: true })
+  permissions: OrganizerPermissionResponseDto[];
 }

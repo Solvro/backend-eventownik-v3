@@ -100,6 +100,7 @@ export class OrganizersService {
           active: true,
           createdAt: true,
           updatedAt: true,
+          permissions: {},
         },
       }),
     ]);
@@ -127,6 +128,7 @@ export class OrganizersService {
         active: true,
         createdAt: true,
         updatedAt: true,
+        permissions: {},
       },
     });
 
