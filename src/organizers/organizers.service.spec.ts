@@ -105,8 +105,6 @@ describe("OrganizersService", () => {
 
       const dto: CreateOrganizerDto = {
         email: "organizer@example.com",
-        firstName: "John",
-        lastName: "Doe",
         permissionIds: ["perm-1", "perm-2"],
       };
 
@@ -118,8 +116,6 @@ describe("OrganizersService", () => {
       mockPrismaService.admin.findFirst.mockResolvedValue({
         uuid: existingAdminUuid,
         email: dto.email,
-        firstName: dto.firstName,
-        lastName: dto.lastName,
         createdAt: new Date(),
         updatedAt: new Date(),
       });

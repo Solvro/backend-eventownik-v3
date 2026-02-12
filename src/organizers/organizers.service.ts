@@ -100,7 +100,11 @@ export class OrganizersService {
           active: true,
           createdAt: true,
           updatedAt: true,
-          permissions: {},
+          permissions: {
+            where: {
+              eventUuid,
+            },
+          },
         },
       }),
     ]);
@@ -128,7 +132,11 @@ export class OrganizersService {
         active: true,
         createdAt: true,
         updatedAt: true,
-        permissions: {},
+        permissions: {
+          where: {
+            eventUuid,
+          },
+        },
       },
     });
 
