@@ -20,18 +20,26 @@ export class OrganizersService {
   async create(eventUuid: string, createOrganizerDto: CreateOrganizerDto) {
     const { email, permissionIds } = createOrganizerDto;
 
-    const admin = await this.prisma.admin.findFirst({
-      where: { email },
-    });
+    return await this.prisma.$transaction(async (tx) => {
+      const admin = await tx.admin.findFirst({
+        where: { email },
+      });
 
-    if (admin == null) {
-      throw new NotFoundException("admin, event or permission not found");
-    }
+      if (admin == null) {
+        throw new NotFoundException(`Admin with email: ${email} not found`);
+      }
 
-    return await this.prisma.$transaction(async (prisma) => {
+      const event = await tx.event.findUnique({
+        where: { uuid: eventUuid },
+      });
+
+      if (event == null) {
+        throw new NotFoundException(`Event with uuid: ${eventUuid} not found`);
+      }
+
       try {
         const creationPromises = permissionIds.map(async (permissionUuid) =>
-          prisma.adminPermission.create({
+          tx.adminPermission.create({
             data: {
               eventUuid,
               adminUuid: admin.uuid,
@@ -44,9 +52,11 @@ export class OrganizersService {
       } catch (error) {
         if (
           error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === "P2003" // P2003 - foregin key constraint failed
+          error.code === "P2003" // Foreign key constraint failed
         ) {
-          throw new NotFoundException("admin, event or permission not found");
+          throw new NotFoundException(
+            "One or more Permission IDs are invalid or do not exist",
+          );
         }
         throw error;
       }
@@ -142,7 +152,7 @@ export class OrganizersService {
 
     if (organizer == null) {
       throw new NotFoundException(
-        `organizer or event does not exist, or the organizer isnt assigned to event: ${eventUuid}`,
+        `organizer or event does not exist, or the organizer is not assigned to event: ${eventUuid}`,
       );
     }
 
@@ -156,23 +166,39 @@ export class OrganizersService {
   ) {
     const { permissionIds } = updateOrganizerDto;
 
-    return await this.prisma.$transaction(async (prisma) => {
-      const admin = await prisma.admin.findFirst({
-        where: {
-          uuid: organizerUuid,
-          permissions: {
-            some: {
-              eventUuid,
-            },
-          },
-        },
+    return await this.prisma.$transaction(async (tx) => {
+      const event = await tx.event.findUnique({
+        where: { uuid: eventUuid },
+      });
+
+      if (event == null) {
+        throw new NotFoundException(`Event with uuid: ${eventUuid} not found`);
+      }
+
+      const admin = await tx.admin.findUnique({
+        where: { uuid: organizerUuid },
       });
 
       if (admin == null) {
-        throw new NotFoundException("admin, event or permission not found");
+        throw new NotFoundException(
+          `Organizer with uuid: ${organizerUuid} not found`,
+        );
       }
 
-      await prisma.adminPermission.deleteMany({
+      const isAssigned = await tx.adminPermission.findFirst({
+        where: {
+          eventUuid,
+          adminUuid: organizerUuid,
+        },
+      });
+
+      if (isAssigned == null) {
+        throw new NotFoundException(
+          `Organizer with uuid: ${organizerUuid} is not assigned to event: ${eventUuid}`,
+        );
+      }
+
+      await tx.adminPermission.deleteMany({
         where: {
           eventUuid,
           adminUuid: organizerUuid,
@@ -180,28 +206,26 @@ export class OrganizersService {
       });
 
       try {
-        const creationPromises = permissionIds.map(async (permissionUuid) =>
-          prisma.adminPermission.create({
-            data: {
-              eventUuid,
-              adminUuid: organizerUuid,
-              permissionUuid,
-            },
-          }),
-        );
-
-        await Promise.all(creationPromises);
+        await tx.adminPermission.createMany({
+          data: permissionIds.map((permissionUuid) => ({
+            eventUuid,
+            adminUuid: organizerUuid,
+            permissionUuid,
+          })),
+        });
       } catch (error) {
         if (
           error instanceof Prisma.PrismaClientKnownRequestError &&
           error.code === "P2003" // P2003 - foregin key constraint failed
         ) {
-          throw new NotFoundException("admin, event or permission not found");
+          throw new NotFoundException(
+            "One or more Permission IDs are invalid or do not exist",
+          );
         }
         throw error;
       }
 
-      return await prisma.admin.findUnique({
+      return await tx.admin.findUnique({
         where: { uuid: organizerUuid },
         include: {
           permissions: {

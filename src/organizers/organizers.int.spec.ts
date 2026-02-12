@@ -23,13 +23,20 @@ describe("Organizers integration tests", () => {
     $transaction: jest.fn(),
     adminPermission: {
       create: jest.fn(),
+      createMany: jest.fn(),
       deleteMany: jest.fn(),
       groupBy: jest.fn(),
+      findFirst: jest.fn(),
     },
   };
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    jest.resetAllMocks();
+    mockPrismaService.$transaction.mockImplementation((callback) =>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+      callback(mockPrismaService),
+    );
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrganizersService,
@@ -108,6 +115,12 @@ describe("Organizers integration tests", () => {
     ];
     mockPrismaService.admin.findMany.mockResolvedValue(mockOrganizers);
     mockPrismaService.event.findUnique.mockResolvedValue("event");
+
+    mockPrismaService.$transaction.mockResolvedValue([
+      mockOrganizers.length,
+      mockOrganizers,
+    ]);
+
     await organizersController.findAll(eventUuid, query);
 
     expect(mockPrismaService.admin.findMany).toHaveBeenCalledWith(
@@ -153,7 +166,7 @@ describe("Organizers integration tests", () => {
         }),
       );
     });
-    it("Should return 404 if admin/event does not exist, or admin isnt an organizer of an event", async () => {
+    it("Should return 404 if admin/event does not exist, or admin is not an organizer of an event", async () => {
       const eventUuid = "bad-event-123";
       const organizerUuid = "bad-organizer-123";
 
@@ -162,7 +175,7 @@ describe("Organizers integration tests", () => {
       await expect(
         organizersController.findOne(eventUuid, organizerUuid),
       ).rejects.toThrow(
-        `organizer or event does not exist, or the organizer isnt assigned to event: ${eventUuid}`,
+        `organizer or event does not exist, or the organizer is not assigned to event: ${eventUuid}`,
       );
     });
   });
@@ -178,16 +191,15 @@ describe("Organizers integration tests", () => {
         permissionIds: ["perm-1", "perm-2"],
       };
 
-      mockPrismaService.$transaction.mockImplementation((callback) =>
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
-        callback(mockPrismaService),
-      );
-
       mockPrismaService.admin.findFirst.mockResolvedValue({
         uuid: existingAdminUuid,
         email: dto.email,
         firstName: dto.firstName,
         lastName: dto.lastName,
+      });
+
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
       });
 
       mockPrismaService.adminPermission.create.mockImplementation(
@@ -235,7 +247,7 @@ describe("Organizers integration tests", () => {
       );
     });
 
-    it("should throw 404 if admin, event or permission does not exist", async () => {
+    it("should throw 404 if admin, does not exist", async () => {
       const eventUuid = "event-123";
       const dto = {
         email: "organizer@example.com",
@@ -247,7 +259,7 @@ describe("Organizers integration tests", () => {
       mockPrismaService.admin.findFirst.mockResolvedValue(null);
 
       await expect(organizersController.create(eventUuid, dto)).rejects.toThrow(
-        "admin, event or permission not found",
+        `Admin with email: ${dto.email} not found`,
       );
     });
   });
@@ -270,13 +282,18 @@ describe("Organizers integration tests", () => {
         ],
       };
 
-      mockPrismaService.$transaction.mockImplementation((callback) =>
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
-        callback(mockPrismaService),
-      );
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        eventUuid,
+      });
 
-      mockPrismaService.admin.findFirst.mockResolvedValue({
+      mockPrismaService.admin.findUnique.mockResolvedValue({
         uuid: organizerUuid,
+      });
+
+      mockPrismaService.adminPermission.findFirst.mockResolvedValue({
+        uuid: "existing-link-uuid",
+        adminUuid: organizerUuid,
+        eventUuid,
       });
 
       mockPrismaService.adminPermission.deleteMany.mockResolvedValue({
@@ -322,7 +339,9 @@ describe("Organizers integration tests", () => {
         },
       );
 
-      expect(mockPrismaService.adminPermission.create).toHaveBeenCalledTimes(2);
+      expect(
+        mockPrismaService.adminPermission.createMany,
+      ).toHaveBeenCalledTimes(1);
     });
 
     it("should throw 404 if organizer does not exist", async () => {
@@ -332,11 +351,13 @@ describe("Organizers integration tests", () => {
         permissionIds: ["perm-1"],
       };
 
-      mockPrismaService.admin.findFirst.mockResolvedValue(null);
+      mockPrismaService.event.findUnique.mockResolvedValue(eventUuid);
+
+      mockPrismaService.admin.findUnique.mockResolvedValue(null);
 
       await expect(
         organizersController.update(eventUuid, organizerUuid, dto),
-      ).rejects.toThrow("admin, event or permission not found");
+      ).rejects.toThrow(`Organizer with uuid: ${organizerUuid} not found`);
     });
   });
   describe("Remove organizer", () => {

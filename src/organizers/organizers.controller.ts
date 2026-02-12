@@ -40,6 +40,10 @@ export class OrganizersController {
     status: 404,
     description: "admin, event or permission not found",
   })
+  @ApiResponse({
+    status: 400,
+    description: "All permissionIds's elements must be unique",
+  })
   async create(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Body() createOrganizerDto: CreateOrganizerDto,
@@ -87,7 +91,7 @@ export class OrganizersController {
   @ApiResponse({
     status: 404,
     description:
-      "organizer or event does not exist, or the organizer isnt assigned to this event",
+      "organizer or event does not exist, or the organizer is not assigned to this event",
   })
   async findOne(
     @Param("eventId", ParseUUIDPipe) eventId: string,
@@ -106,6 +110,10 @@ export class OrganizersController {
   @ApiResponse({
     status: 404,
     description: "admin, event or permission not found",
+  })
+  @ApiResponse({
+    status: 400,
+    description: "All permissionIds's elements must be unique",
   })
   async update(
     @Param("eventId", ParseUUIDPipe) eventId: string,
