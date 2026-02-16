@@ -102,7 +102,7 @@ model Event {
   organizerAdmin   Admin?            @relation("Organizer", fields: [organizerUuid], references: [uuid], onDelete: SetNull)
   registerForm     Form?             @relation("RegisterForm", fields: [registerFormUuid], references: [uuid], onDelete: SetNull)
   attributes       Attribute[]
-  emails           Email[]
+  emails           EmailTemplate[]
   forms            Form[]            @relation("EventForms")
   adminPermissions EventPermission[]
   oldAdminPermissions AdminPermission[]
@@ -173,7 +173,7 @@ enum EmailTrigger {
   MANUAL
 }
 
-model Email {
+model EmailTemplate {
   uuid          String       @id @default(uuid()) @db.Uuid
   name          String
   content       String
@@ -187,10 +187,10 @@ model Email {
 
   event             Event?             @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
   form              Form?              @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
-  participantEmails ParticipantEmail[]
-  participantForms  ParticipantForm[]
+  participantEmails ParticipantEmailStatus[]
+  participantForms  ParticipantFormLog[]
 
-  @@map("Emails")
+  @@map("EmailTemplates")
 }
 
 model Form {
@@ -206,8 +206,8 @@ model Form {
 
   event            Event?            @relation("EventForms", fields: [eventUuid], references: [uuid], onDelete: Cascade)
   formDefinitions  FormDefinition[]
-  emails           Email[]
-  participantForms ParticipantForm[]
+  emails           EmailTemplate[]
+  participantForms ParticipantFormLog[]
   registerEvent    Event[]           @relation("RegisterForm")
 
   @@map("Forms")
@@ -237,8 +237,8 @@ model Participant {
 
   event         Event                     @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
   attributes    ParticipantAttribute[]
-  emails        ParticipantEmail[]
-  forms         ParticipantForm[]
+  emails        ParticipantEmailStatus[]
+  forms         ParticipantFormLog[]
   attributeLogs ParticipantAttributeLog[]
 
   @@unique([email, eventUuid])
@@ -265,7 +265,7 @@ enum EmailStatus {
   failed
 }
 
-model ParticipantEmail {
+model ParticipantEmailStatus {
   uuid            String      @id @default(uuid()) @db.Uuid
   status          EmailStatus
   sendAt          DateTime
@@ -276,12 +276,12 @@ model ParticipantEmail {
   emailUuid       String?     @db.Uuid
 
   participant Participant? @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
-  email       Email?       @relation(fields: [emailUuid], references: [uuid], onDelete: Cascade)
+  email       EmailTemplate?       @relation(fields: [emailUuid], references: [uuid], onDelete: Cascade)
 
-  @@map("ParticipantsEmails")
+  @@map("ParticipantsEmailStatuses")
 }
 
-model ParticipantForm {
+model ParticipantFormLog {
   uuid            String    @id @default(uuid()) @db.Uuid
   participantUuid String    @db.Uuid
   formUuid        String    @db.Uuid
@@ -293,9 +293,9 @@ model ParticipantForm {
 
   participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
   form        Form        @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
-  email       Email?      @relation(fields: [emailUuid], references: [uuid], onDelete: SetNull)
+  email       EmailTemplate?      @relation(fields: [emailUuid], references: [uuid], onDelete: SetNull)
 
-  @@map("ParticipantsForms")
+  @@map("ParticipantsFormLogs")
 }
 
 model ParticipantAttributeLog {
