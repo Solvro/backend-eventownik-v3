@@ -26,7 +26,6 @@ export class EventsService {
 
   async findAll(query: EventListingDto) {
     const { skip, take, name, location, sort } = query;
-
     const where: Prisma.EventWhereInput = {
       ...(name === undefined
         ? {}
