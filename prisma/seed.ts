@@ -3,15 +3,15 @@ import type {
   Admin,
   Attribute,
   Block,
-  Email,
+  EmailTemplate,
   Event,
   Form,
   FormDefinition,
   Participant,
   ParticipantAttribute,
   ParticipantAttributeLog,
-  ParticipantEmail,
-  ParticipantForm,
+  ParticipantEmailStatus,
+  ParticipantFormLog,
   Permission,
 } from "src/generated/prisma/client";
 import {
@@ -31,11 +31,11 @@ async function main() {
   await prisma.participantAttributeLog.deleteMany();
   await prisma.adminPermission.deleteMany();
   await prisma.participantAttribute.deleteMany();
-  await prisma.participantEmail.deleteMany();
-  await prisma.participantForm.deleteMany();
+  await prisma.participantEmailStatus.deleteMany();
+  await prisma.participantFormLog.deleteMany();
   await prisma.formDefinition.deleteMany();
   await prisma.block.deleteMany();
-  await prisma.email.deleteMany();
+  await prisma.emailTemplate.deleteMany();
   await prisma.form.deleteMany();
   await prisma.attribute.deleteMany();
   await prisma.participant.deleteMany();
@@ -157,7 +157,7 @@ async function main() {
     },
   });
 
-  const email: Email = await prisma.email.create({
+  const email: EmailTemplate = await prisma.emailTemplate.create({
     data: {
       eventUuid: event.uuid,
       name: "Welcome",
@@ -185,16 +185,17 @@ async function main() {
       },
     });
 
-  const participantForm: ParticipantForm = await prisma.participantForm.create({
-    data: {
-      participantUuid: participant.uuid,
-      formUuid: form.uuid,
-      emailUuid: email.uuid,
-    },
-  });
+  const participantForm: ParticipantFormLog =
+    await prisma.participantFormLog.create({
+      data: {
+        participantUuid: participant.uuid,
+        formUuid: form.uuid,
+        emailUuid: email.uuid,
+      },
+    });
 
-  const participantEmail: ParticipantEmail =
-    await prisma.participantEmail.create({
+  const participantEmail: ParticipantEmailStatus =
+    await prisma.participantEmailStatus.create({
       data: {
         participantUuid: participant.uuid,
         emailUuid: email.uuid,
