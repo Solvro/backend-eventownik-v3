@@ -1,8 +1,10 @@
 import { diskStorage } from "multer";
+import { existsSync, mkdirSync } from "node:fs";
 import { extname } from "node:path/win32";
 import { PageDto } from "src/common/dto/page.dto";
 
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -47,12 +49,18 @@ export class EventsController {
     return this.eventsService.findAllPublic(dto);
   }
 
-  //TODO: lepsza walidacja pliku, max rozmiar, typy, itp.
+  // TODO: usuwanie zdjęcia z serwera przy aktualizacji, usuwaniu eventu i gdy nie przejdzie walidacji, to samo dla PUT
   @Post()
   @UseInterceptors(
     FileInterceptor("photo", {
       storage: diskStorage({
-        destination: "./uploads/events",
+        destination: (_request, _file, callback) => {
+          const uploadPath = "./uploads/events";
+          if (!existsSync(uploadPath)) {
+            mkdirSync(uploadPath, { recursive: true });
+          }
+          callback(null, uploadPath);
+        },
         filename: (_request, file, callback) => {
           const now = Date.now().toString();
           const random = Math.round(Math.random() * 1e9).toString();
@@ -61,12 +69,27 @@ export class EventsController {
           callback(null, `${uniqueSuffix}${extension}`);
         },
       }),
+      limits: { fileSize: 10 * 1024 * 1024 },
+      fileFilter: (_request, file, callback) => {
+        const allowedTypes = ["image/png", "image/jpeg", "image/jpg"];
+        if (allowedTypes.includes(file.mimetype)) {
+          callback(null, true);
+        } else {
+          callback(
+            new BadRequestException(
+              "Invalid file type. Only PNG and JPEG are allowed.",
+            ),
+            false,
+          );
+        }
+      },
     }),
   )
   @ApiOperation({ summary: "Create a new event" })
   @ApiOkResponse({ description: "The created event", type: Event })
   async create(
-    @UploadedFile() photo: Express.Multer.File | undefined,
+    @UploadedFile()
+    photo: Express.Multer.File | undefined,
     @Body() eventDto: EventCreateDto,
   ): Promise<Event> {
     let photoUrl: string | null = null;
@@ -99,7 +122,13 @@ export class EventsController {
   @UseInterceptors(
     FileInterceptor("photo", {
       storage: diskStorage({
-        destination: "./uploads/events",
+        destination: (_request, _file, callback) => {
+          const uploadPath = "./uploads/events";
+          if (!existsSync(uploadPath)) {
+            mkdirSync(uploadPath, { recursive: true });
+          }
+          callback(null, uploadPath);
+        },
         filename: (_request, file, callback) => {
           const now = Date.now().toString();
           const random = Math.round(Math.random() * 1e9).toString();
@@ -108,13 +137,28 @@ export class EventsController {
           callback(null, `${uniqueSuffix}${extension}`);
         },
       }),
+      limits: { fileSize: 10 * 1024 * 1024 },
+      fileFilter: (_request, file, callback) => {
+        const allowedTypes = ["image/png", "image/jpeg", "image/jpg"];
+        if (allowedTypes.includes(file.mimetype)) {
+          callback(null, true);
+        } else {
+          callback(
+            new BadRequestException(
+              "Invalid file type. Only PNG and JPEG are allowed.",
+            ),
+            false,
+          );
+        }
+      },
     }),
   )
   @ApiOperation({ summary: "Update event by UUID" })
   @ApiOkResponse({ description: "The updated event", type: Event })
   async update(
     @Param("eventUUID", ParseUUIDPipe) eventUUID: string,
-    @UploadedFile() photo: Express.Multer.File | undefined,
+    @UploadedFile()
+    photo: Express.Multer.File | undefined,
     @Body() eventDto: EventUpdateDto,
   ): Promise<Event> {
     let photoUrl: string | null = null;
