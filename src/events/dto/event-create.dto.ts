@@ -1,6 +1,5 @@
 import { Type } from "class-transformer";
 import {
-  IsArray,
   IsBoolean,
   IsDate,
   IsEmail,
@@ -8,9 +7,12 @@ import {
   IsOptional,
   IsString,
   MinLength,
+  ValidateNested,
 } from "class-validator";
 
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+
+import { EventLinkCreateDto } from "./event-link-create.dto";
 
 export class EventCreateDto {
   @ApiProperty({
@@ -20,26 +22,6 @@ export class EventCreateDto {
   })
   @IsString()
   readonly name: string;
-
-  @ApiPropertyOptional({
-    description: "Array of links related to the event",
-    isArray: true,
-    type: String,
-    example: ["https://event-website.com", "https://tickets.com"],
-  })
-  @IsOptional()
-  @IsArray()
-  links?: string[];
-
-  @ApiPropertyOptional({
-    description: "Array of policy links related to the event",
-    isArray: true,
-    type: String,
-    example: ["https://event-privacy.com", "https://event-terms.com"],
-  })
-  @IsOptional()
-  @IsArray()
-  policyLinks?: string[];
 
   @ApiProperty({
     description: "Start date of the event",
@@ -141,4 +123,9 @@ export class EventCreateDto {
   @IsString()
   @MinLength(3)
   slug: string;
+
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => EventLinkCreateDto)
+  linksData?: EventLinkCreateDto[];
 }

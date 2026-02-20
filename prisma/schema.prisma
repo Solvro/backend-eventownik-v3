@@ -58,8 +58,6 @@ model Permission {
 model Event {
   uuid              String    @id @default(uuid()) @db.Uuid
   name              String
-  links             String[]  @default([])
-  policyLinks       String[]  @default([])
   startDate         DateTime
   endDate           DateTime
   createdAt         DateTime  @default(now())
@@ -84,8 +82,28 @@ model Event {
   forms            Form[]            @relation("EventForms")
   adminPermissions AdminPermission[]
   participants     Participant[]
+  linksData       EventLink[]
 
   @@map("Events")
+}
+
+enum EventLinkType {
+  general
+  policy
+}
+
+model EventLink {
+  uuid      String   @id @default(uuid()) @db.Uuid
+  eventUuid String   @db.Uuid
+  url       String
+  type      EventLinkType
+  label    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  event Event @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("EventsLinks")
 }
 
 enum AttributeType {

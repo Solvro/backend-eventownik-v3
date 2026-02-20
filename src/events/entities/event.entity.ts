@@ -9,12 +9,6 @@ export class Event implements PrismaEvent {
   @ApiProperty()
   uuid: string;
 
-  @ApiProperty({ isArray: true, type: String })
-  links: string[];
-
-  @ApiProperty({ isArray: true, type: String })
-  policyLinks: string[];
-
   @ApiProperty()
   startDate: Date;
 
