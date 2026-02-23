@@ -11,8 +11,6 @@ import { AuthService } from "./auth.service";
 
 describe("AuthService", () => {
   let service: AuthService;
-  let prisma: PrismaService;
-  let jwtService: JwtService;
 
   const mockAdmin: Admin = {
     uuid: "user-uuid",
@@ -52,8 +50,6 @@ describe("AuthService", () => {
     }).compile();
 
     service = module.get<AuthService>(AuthService);
-    prisma = module.get<PrismaService>(PrismaService);
-    jwtService = module.get<JwtService>(JwtService);
   });
 
   afterEach(() => {
@@ -69,7 +65,7 @@ describe("AuthService", () => {
         lastName: "User",
       };
       const hashedPassword = "hashedPassword123";
-      jest.spyOn(bcrypt, "hash").mockImplementation(async () => hashedPassword);
+      jest.spyOn(bcrypt, "hash").mockImplementation(() => hashedPassword);
       mockPrisma.admin.create.mockResolvedValue({
         ...mockAdmin,
         email: registerData.email,
@@ -78,7 +74,7 @@ describe("AuthService", () => {
       const result = await service.register(registerData);
 
       expect(bcrypt.hash).toHaveBeenCalledWith(registerData.password, 10);
-      expect(prisma.admin.create).toHaveBeenCalledWith({
+      expect(mockPrisma.admin.create).toHaveBeenCalledWith({
         data: {
           ...registerData,
           password: hashedPassword,
@@ -91,7 +87,7 @@ describe("AuthService", () => {
   describe("validateUser", () => {
     it("should return user if password matches", async () => {
       mockPrisma.admin.findUnique.mockResolvedValue(mockAdmin);
-      jest.spyOn(bcrypt, "compare").mockImplementation(async () => true);
+      jest.spyOn(bcrypt, "compare").mockImplementation(() => true);
 
       const result = await service.validateUser(
         "test@example.com",
@@ -107,7 +103,7 @@ describe("AuthService", () => {
 
     it("should return null if password does not match", async () => {
       mockPrisma.admin.findUnique.mockResolvedValue(mockAdmin);
-      jest.spyOn(bcrypt, "compare").mockImplementation(async () => false);
+      jest.spyOn(bcrypt, "compare").mockImplementation(() => false);
 
       const result = await service.validateUser(
         "test@example.com",
@@ -128,13 +124,13 @@ describe("AuthService", () => {
 
   describe("login", () => {
     it("should return access and refresh tokens", async () => {
-      jest.spyOn(bcrypt, "hash").mockImplementation(async () => "refresh-hash");
+      jest.spyOn(bcrypt, "hash").mockImplementation(() => "refresh-hash");
       mockPrisma.authAccessToken.create.mockResolvedValue({ id: 1 });
 
       const result = await service.login(mockAdmin);
 
-      expect(jwtService.sign).toHaveBeenCalled();
-      expect(prisma.authAccessToken.create).toHaveBeenCalled();
+      expect(mockJwtService.sign).toHaveBeenCalled();
+      expect(mockPrisma.authAccessToken.create).toHaveBeenCalled();
       expect(result).toHaveProperty("access_token");
       expect(result).toHaveProperty("refresh_token");
     });
@@ -150,19 +146,17 @@ describe("AuthService", () => {
       };
       mockPrisma.authAccessToken.findUnique.mockResolvedValue(storedToken);
       mockPrisma.authAccessToken.delete.mockResolvedValue(storedToken);
-      jest
-        .spyOn(service, "login")
-        .mockResolvedValue({
-          access_token: "new",
-          refresh_token: "new-refresh",
-        });
+      const loginSpy = jest.spyOn(service, "login").mockResolvedValue({
+        access_token: "new",
+        refresh_token: "new-refresh",
+      });
 
       const result = await service.refreshTokens("valid-token");
 
-      expect(prisma.authAccessToken.delete).toHaveBeenCalledWith({
+      expect(mockPrisma.authAccessToken.delete).toHaveBeenCalledWith({
         where: { id: 1 },
       });
-      expect(service.login).toHaveBeenCalledWith(mockAdmin);
+      expect(loginSpy).toHaveBeenCalledWith(mockAdmin);
       expect(result).toEqual({
         access_token: "new",
         refresh_token: "new-refresh",
@@ -188,7 +182,7 @@ describe("AuthService", () => {
       await expect(service.refreshTokens("expired-token")).rejects.toThrow(
         UnauthorizedException,
       );
-      expect(prisma.authAccessToken.delete).toHaveBeenCalledWith({
+      expect(mockPrisma.authAccessToken.delete).toHaveBeenCalledWith({
         where: { id: 1 },
       });
     });

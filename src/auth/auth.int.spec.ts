@@ -10,7 +10,6 @@ import { AuthService } from "./auth.service";
 
 describe("AuthController integration tests", () => {
   let controller: AuthController;
-  let service: AuthService;
 
   const mockAdmin: Admin = {
     uuid: "user-uuid",
@@ -41,7 +40,6 @@ describe("AuthController integration tests", () => {
     }).compile();
 
     controller = module.get<AuthController>(AuthController);
-    service = module.get<AuthService>(AuthService);
   });
 
   afterEach(() => {
@@ -60,7 +58,7 @@ describe("AuthController integration tests", () => {
 
       const result = await controller.register(dto);
 
-      expect(service.register).toHaveBeenCalledWith(dto);
+      expect(mockAuthService.register).toHaveBeenCalledWith(dto);
       expect(result).toEqual(mockAdmin);
     });
   });
@@ -76,11 +74,11 @@ describe("AuthController integration tests", () => {
 
       const result = await controller.login(dto);
 
-      expect(service.validateUser).toHaveBeenCalledWith(
+      expect(mockAuthService.validateUser).toHaveBeenCalledWith(
         dto.email,
         dto.password,
       );
-      expect(service.login).toHaveBeenCalledWith(mockAdmin);
+      expect(mockAuthService.login).toHaveBeenCalledWith(mockAdmin);
       expect(result).toEqual({ access_token: "at", refresh_token: "rt" });
     });
 
@@ -104,7 +102,9 @@ describe("AuthController integration tests", () => {
 
       const result = await controller.refresh(body);
 
-      expect(service.refreshTokens).toHaveBeenCalledWith(body.refresh_token);
+      expect(mockAuthService.refreshTokens).toHaveBeenCalledWith(
+        body.refresh_token,
+      );
       expect(result).toEqual({
         access_token: "new-at",
         refresh_token: "new-rt",
