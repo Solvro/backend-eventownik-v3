@@ -1,7 +1,12 @@
 import * as bcrypt from "bcrypt";
+import { createHash, randomBytes } from "node:crypto";
 import { Admin } from "src/generated/prisma/client";
 
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 
 import { PrismaService } from "../prisma/prisma.service";
@@ -18,14 +23,29 @@ export class AuthService {
     password: string;
     firstName: string;
     lastName: string;
-  }): Promise<Admin> {
-    const hashedPassword = await bcrypt.hash(data.password, 10);
-    return this.prisma.admin.create({
-      data: {
-        ...data,
-        password: hashedPassword,
-      },
-    });
+  }): Promise<Omit<Admin, "password">> {
+    const hashedPassword = await bcrypt.hash(data.password, 12);
+    try {
+      const user = await this.prisma.admin.create({
+        data: {
+          ...data,
+          password: hashedPassword,
+        },
+      });
+
+      const { password, ...result } = user;
+      return result;
+    } catch (error) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        error.code === "P2002"
+      ) {
+        throw new ConflictException("Email already in use");
+      }
+      throw error;
+    }
   }
 
   async validateUser(email: string, pass: string): Promise<Admin | null> {
@@ -48,7 +68,9 @@ export class AuthService {
   }
 
   private async generateRefreshToken(adminUuid: string): Promise<string> {
-    const refreshToken = await bcrypt.hash(Math.random().toString(36), 10);
+    const refreshToken = randomBytes(64).toString("hex");
+    const hashedToken = createHash("sha256").update(refreshToken).digest("hex");
+
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
 
@@ -56,7 +78,7 @@ export class AuthService {
       data: {
         tokenableId: adminUuid,
         type: "refresh_token",
-        token: refreshToken,
+        token: hashedToken,
         abilities: "*",
         updatedAt: new Date(),
         expiresAt,
@@ -67,8 +89,9 @@ export class AuthService {
   }
 
   async refreshTokens(token: string) {
+    const hashedToken = createHash("sha256").update(token).digest("hex");
     const storedToken = await this.prisma.authAccessToken.findUnique({
-      where: { token },
+      where: { token: hashedToken },
       include: { admin: true },
     });
 

@@ -1,7 +1,8 @@
 import * as bcrypt from "bcrypt";
+import { createHash } from "node:crypto";
 import type { Admin } from "src/generated/prisma/client";
 
-import { UnauthorizedException } from "@nestjs/common";
+import { ConflictException, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
@@ -57,7 +58,7 @@ describe("AuthService", () => {
   });
 
   describe("register", () => {
-    it("should hash password and create user", async () => {
+    it("should hash password and create user and omit password in response", async () => {
       const registerData = {
         email: "new@example.com",
         password: "password123",
@@ -65,15 +66,16 @@ describe("AuthService", () => {
         lastName: "User",
       };
       const hashedPassword = "hashedPassword123";
-      jest.spyOn(bcrypt, "hash").mockImplementation(() => hashedPassword);
+      jest.spyOn(bcrypt, "hash").mockImplementation(async () => hashedPassword);
       mockPrisma.admin.create.mockResolvedValue({
         ...mockAdmin,
         email: registerData.email,
+        password: hashedPassword,
       });
 
       const result = await service.register(registerData);
 
-      expect(bcrypt.hash).toHaveBeenCalledWith(registerData.password, 10);
+      expect(bcrypt.hash).toHaveBeenCalledWith(registerData.password, 12);
       expect(mockPrisma.admin.create).toHaveBeenCalledWith({
         data: {
           ...registerData,
@@ -81,6 +83,22 @@ describe("AuthService", () => {
         },
       });
       expect(result.email).toBe(registerData.email);
+      expect(result).not.toHaveProperty("password");
+    });
+
+    it("should throw ConflictException if email already exists", async () => {
+      const registerData = {
+        email: "existing@example.com",
+        password: "password123",
+        firstName: "New",
+        lastName: "User",
+      };
+      jest.spyOn(bcrypt, "hash").mockImplementation(async () => "hash");
+      mockPrisma.admin.create.mockRejectedValue({ code: "P2002" });
+
+      await expect(service.register(registerData)).rejects.toThrow(
+        ConflictException,
+      );
     });
   });
 
@@ -123,24 +141,37 @@ describe("AuthService", () => {
   });
 
   describe("login", () => {
-    it("should return access and refresh tokens", async () => {
-      jest.spyOn(bcrypt, "hash").mockImplementation(() => "refresh-hash");
+    it("should return access and refresh tokens (securely)", async () => {
       mockPrisma.authAccessToken.create.mockResolvedValue({ id: 1 });
 
       const result = await service.login(mockAdmin);
 
       expect(mockJwtService.sign).toHaveBeenCalled();
-      expect(mockPrisma.authAccessToken.create).toHaveBeenCalled();
+      expect(mockPrisma.authAccessToken.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          token: expect.any(String), // This should be the hash
+          type: "refresh_token",
+        }),
+      });
       expect(result).toHaveProperty("access_token");
       expect(result).toHaveProperty("refresh_token");
+      // Verify that the stored token is a SHA-256 hash of the returned token
+      const storedToken = mockPrisma.authAccessToken.create.mock.calls[0][0]
+        .data.token as string;
+      const expectedHash = createHash("sha256")
+        .update(result.refresh_token)
+        .digest("hex");
+      expect(storedToken).toBe(expectedHash);
     });
   });
 
   describe("refreshTokens", () => {
     it("should rotate tokens if refresh token is valid", async () => {
+      const plainToken = "valid-token";
+      const hashedToken = createHash("sha256").update(plainToken).digest("hex");
       const storedToken = {
         id: 1,
-        token: "valid-token",
+        token: hashedToken,
         expiresAt: new Date(Date.now() + 10_000),
         admin: mockAdmin,
       };
@@ -151,8 +182,12 @@ describe("AuthService", () => {
         refresh_token: "new-refresh",
       });
 
-      const result = await service.refreshTokens("valid-token");
+      const result = await service.refreshTokens(plainToken);
 
+      expect(mockPrisma.authAccessToken.findUnique).toHaveBeenCalledWith({
+        where: { token: hashedToken },
+        include: { admin: true },
+      });
       expect(mockPrisma.authAccessToken.delete).toHaveBeenCalledWith({
         where: { id: 1 },
       });
