@@ -54,12 +54,15 @@ describe("AuthController integration tests", () => {
         firstName: "New",
         lastName: "User",
       };
-      mockAuthService.register.mockResolvedValue(mockAdmin);
+
+      const { password, ...strippedMock } = mockAdmin;
+      mockAuthService.register.mockResolvedValue(strippedMock);
 
       const result = await controller.register(dto);
 
       expect(mockAuthService.register).toHaveBeenCalledWith(dto);
-      expect(result).toEqual(mockAdmin);
+      expect(result).toEqual(strippedMock);
+      expect(result).not.toHaveProperty("password");
     });
   });
 
