@@ -12,6 +12,14 @@ enum OrganizerType {
   superadmin
 }
 
+enum PermissionType {
+  MANAGE_ALL
+  MANAGE_EVENT
+  MANAGE_FORM
+  MANAGE_PARTICIPANT
+  MANAGE_EMAIL
+}
+
 model Admin {
   uuid      String        @id @default(uuid()) @db.Uuid
   firstName String
@@ -24,10 +32,25 @@ model Admin {
   updatedAt DateTime      @updatedAt
 
   events          Event[]           @relation("Organizer")
-  permissions     AdminPermission[]
+  permissions     EventPermission[]
+  adminPermissions AdminPermission[]
   AuthAccessToken AuthAccessToken?
 
   @@map("Admins")
+}
+
+model EventPermission {
+  uuid           String         @id @default(uuid()) @db.Uuid
+  eventUuid      String         @db.Uuid
+  adminUuid      String         @db.Uuid
+  
+  permission     PermissionType 
+
+  admin          Admin          @relation(fields: [adminUuid], references: [uuid])
+  event          Event          @relation(fields: [eventUuid], references: [uuid])
+
+  @@unique([eventUuid, adminUuid, permission])
+  @@map("EventPermissions")
 }
 
 model AdminPermission {
@@ -81,7 +104,8 @@ model Event {
   attributes       Attribute[]
   emails           Email[]
   forms            Form[]            @relation("EventForms")
-  adminPermissions AdminPermission[]
+  adminPermissions EventPermission[]
+  oldAdminPermissions AdminPermission[]
   participants     Participant[]
 
   @@map("Events")
