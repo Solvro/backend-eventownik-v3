@@ -46,7 +46,7 @@ export class EventsService {
         take,
         orderBy,
         include: {
-          linksData: true,
+          links: true,
         },
       }),
     ]);
@@ -83,7 +83,7 @@ export class EventsService {
         take,
         orderBy,
         include: {
-          linksData: true,
+          links: true,
         },
       }),
     ]);
@@ -92,9 +92,9 @@ export class EventsService {
     return new PageDto(events, pageMetaDto);
   }
 
-  async create(eventDto: EventCreateDto) {
+  async create(eventDto: EventCreateDto, photoUrl: string | null) {
     // TODO: Jak będzie auth to odkomentować łączenie z adminem
-    const { linksData, ...dataWithoutLinks } = eventDto;
+    const { links, ...dataWithoutLinks } = eventDto;
     if (
       (await this.prisma.event.findUnique({
         where: { slug: eventDto.slug },
@@ -108,15 +108,16 @@ export class EventsService {
     const event = await this.prisma.event.create({
       data: {
         ...(dataWithoutLinks as Prisma.EventCreateInput),
+        photoUrl,
         // organizerAdmin: {
         //   connect: { uuid: admin.uuid },
         // },
-        linksData: {
-          create: linksData,
+        links: {
+          create: links,
         },
       },
       include: {
-        linksData: true,
+        links: true,
       },
     });
 
@@ -128,7 +129,7 @@ export class EventsService {
     const event = await this.prisma.event.findUnique({
       where: { uuid },
       include: {
-        linksData: true,
+        links: true,
       },
     });
 
@@ -147,7 +148,7 @@ export class EventsService {
         isPublic: true,
       },
       include: {
-        linksData: true,
+        links: true,
       },
     });
 
@@ -158,7 +159,11 @@ export class EventsService {
     return event;
   }
 
-  async update(uuid: string, eventDto: EventUpdateDto) {
+  async update(
+    uuid: string,
+    eventDto: EventUpdateDto,
+    photoUrl: string | null,
+  ) {
     // TODO: superadmin dowolny, organizator swoje
     const event = await this.prisma.event.findUnique({
       where: { uuid },
@@ -168,29 +173,32 @@ export class EventsService {
       throw new NotFoundException(`Event with UUID ${uuid} not found`);
     }
 
-    const same_slug_event = await this.prisma.event.findFirst({
-      where: { slug: eventDto.slug, uuid: { not: uuid } },
-    });
+    if (eventDto.slug !== undefined && eventDto.slug !== event.slug) {
+      const same_slug_event = await this.prisma.event.findFirst({
+        where: { slug: eventDto.slug, uuid: { not: uuid } },
+      });
 
-    if (same_slug_event !== null) {
-      throw new ConflictException(
-        `Event with slug ${same_slug_event.slug} already exists`,
-      );
+      if (same_slug_event !== null) {
+        throw new ConflictException(
+          `Event with slug ${same_slug_event.slug} already exists`,
+        );
+      }
     }
 
-    const { linksData, ...dataWithoutLinks } = eventDto;
+    const { links, ...dataWithoutLinks } = eventDto;
 
     return await this.prisma.event.update({
       where: { uuid },
       data: {
         ...dataWithoutLinks,
-        linksData: {
+        photoUrl,
+        links: {
           deleteMany: {},
-          create: linksData,
+          create: links,
         },
       },
       include: {
-        linksData: true,
+        links: true,
       },
     });
   }

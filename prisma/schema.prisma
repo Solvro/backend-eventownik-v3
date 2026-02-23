@@ -82,7 +82,7 @@ model Event {
   forms            Form[]            @relation("EventForms")
   adminPermissions AdminPermission[]
   participants     Participant[]
-  linksData       EventLink[]
+  links       EventLink[]
 
   @@map("Events")
 }

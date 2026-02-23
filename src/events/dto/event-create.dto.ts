@@ -92,10 +92,6 @@ export class EventCreateDto {
     type: String,
     example: "https://event-photo.com/photo.jpg",
   })
-  @IsOptional()
-  @IsString()
-  photoUrl?: string | null;
-
   @ApiPropertyOptional({
     description: "Location of the event",
     type: String,
@@ -127,5 +123,5 @@ export class EventCreateDto {
   @IsOptional()
   @ValidateNested({ each: true })
   @Type(() => EventLinkCreateDto)
-  linksData?: EventLinkCreateDto[];
+  links?: EventLinkCreateDto[];
 }

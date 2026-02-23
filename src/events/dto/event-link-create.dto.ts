@@ -31,13 +31,3 @@ export class EventLinkCreateDto {
   @IsString()
   label?: string;
 }
-
-export class EventCreateDto {
-  @ApiProperty({
-    description: "Name of the event",
-    type: String,
-    example: "Tech Conference 2023",
-  })
-  @IsString()
-  readonly name: string;
-}

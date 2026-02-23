@@ -76,7 +76,7 @@ describe("EventsService", () => {
         skip: 0,
         take: 10,
         orderBy: [{ createdAt: "desc" }],
-        include: { linksData: true },
+        include: { links: true },
       });
       expect(result.data).toEqual(mockEvents);
       expect(result.meta.itemCount).toBe(mockCount);
@@ -186,7 +186,7 @@ describe("EventsService", () => {
           skip: 0,
           take: 10,
           orderBy: [{ createdAt: "desc" }],
-          include: { linksData: true },
+          include: { links: true },
         }),
       );
       expect(result.data).toEqual(mockEvents);
@@ -208,7 +208,7 @@ describe("EventsService", () => {
       // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.event.findUnique).toHaveBeenCalledWith({
         where: { uuid },
-        include: { linksData: true },
+        include: { links: true },
       });
     });
     it("should return the event if it exists", async () => {
@@ -222,7 +222,7 @@ describe("EventsService", () => {
       // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.event.findUnique).toHaveBeenCalledWith({
         where: { uuid },
-        include: { linksData: true },
+        include: { links: true },
       });
       expect(result).toEqual(mockEvent);
     });
@@ -255,7 +255,7 @@ describe("EventsService", () => {
           isPublic: true,
           verifiedAt: { not: null },
         },
-        include: { linksData: true },
+        include: { links: true },
       });
     });
     it("should return the event if it exists and is verified", async () => {
@@ -280,7 +280,7 @@ describe("EventsService", () => {
             verifiedAt: { not: null },
             isPublic: true,
           },
-          include: { linksData: true },
+          include: { links: true },
         }),
       );
       expect(result).toEqual(mockEvent);
@@ -288,6 +288,7 @@ describe("EventsService", () => {
   });
 
   describe("create", () => {
+    // TODO: dodać testy dla zdjęć
     it("should create and return the new event", async () => {
       const createDto = {
         name: "New Event",
@@ -302,20 +303,21 @@ describe("EventsService", () => {
       (prisma.event.findUnique as jest.Mock).mockResolvedValue(null);
       (prisma.event.create as jest.Mock).mockResolvedValue(mockCreatedEvent);
 
-      const result = await service.create(createDto);
+      const result = await service.create(createDto, null);
 
       // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.event.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: {
             ...createDto,
+            photoUrl: null,
             // TODO: jak będzie auth to mozna odkomentować
             // organizerAdmin: {
             //   connect: { uuid: temporaryAdminUUID },
             // },
-            linksData: { create: undefined },
+            links: { create: undefined },
           },
-          include: { linksData: true },
+          include: { links: true },
         }),
       );
       expect(result).toEqual(mockCreatedEvent);
@@ -338,7 +340,7 @@ describe("EventsService", () => {
         mockExistingEvent,
       );
 
-      await expect(service.create(createDto)).rejects.toThrow(
+      await expect(service.create(createDto, null)).rejects.toThrow(
         `Event with slug ${createDto.slug} already exists`,
       );
 
@@ -354,7 +356,7 @@ describe("EventsService", () => {
 
       (prisma.event.findUnique as jest.Mock).mockResolvedValue(null);
 
-      await expect(service.update(uuid, updateDto)).rejects.toThrow(
+      await expect(service.update(uuid, updateDto, null)).rejects.toThrow(
         `Event with UUID ${uuid} not found`,
       );
 
@@ -384,7 +386,7 @@ describe("EventsService", () => {
       (prisma.event.findFirst as jest.Mock).mockResolvedValue(null);
       (prisma.event.update as jest.Mock).mockResolvedValue(mockUpdatedEvent);
 
-      const result = await service.update(uuid, updateDto);
+      const result = await service.update(uuid, updateDto, null);
 
       // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.event.update).toHaveBeenCalledWith(
@@ -392,12 +394,13 @@ describe("EventsService", () => {
           where: { uuid },
           data: {
             ...updateDto,
-            linksData: {
+            photoUrl: null,
+            links: {
               deleteMany: {},
               create: undefined,
             },
           },
-          include: { linksData: true },
+          include: { links: true },
         }),
       );
       expect(result).toEqual(mockUpdatedEvent);
