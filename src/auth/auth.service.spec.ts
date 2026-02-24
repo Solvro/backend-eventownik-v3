@@ -147,8 +147,11 @@ describe("AuthService", () => {
       const result = await service.login(mockAdmin);
 
       expect(mockJwtService.sign).toHaveBeenCalled();
+
       expect(mockPrisma.authAccessToken.create).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data: expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           token: expect.any(String),
           type: "refresh_token",
         }),
@@ -156,8 +159,11 @@ describe("AuthService", () => {
       expect(result).toHaveProperty("access_token");
       expect(result).toHaveProperty("refresh_token");
       // Verify that the stored token is a SHA-256 hash of the returned token
-      const storedToken = mockPrisma.authAccessToken.create.mock.calls[0][0]
-        .data.token as string;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unnecessary-type-assertion
+      const storedToken =
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        (mockPrisma.authAccessToken.create.mock.calls[0][0] as any).data
+          .token as string;
       const expectedHash = createHash("sha256")
         .update(result.refresh_token)
         .digest("hex");

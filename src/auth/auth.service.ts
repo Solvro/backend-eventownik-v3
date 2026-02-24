@@ -40,7 +40,7 @@ export class AuthService {
         typeof error === "object" &&
         error !== null &&
         "code" in error &&
-        error.code === "P2002"
+        (error as { code: string }).code === "P2002"
       ) {
         throw new ConflictException("Email already in use");
       }
