@@ -95,16 +95,17 @@ export class AuthService {
       include: { admin: true },
     });
 
-    if (storedToken === null || storedToken.expiresAt < new Date()) {
-      if (storedToken !== null) {
-        await this.prisma.authAccessToken.delete({
-          where: { id: storedToken.id },
-        });
-      }
-      throw new UnauthorizedException("Invalid or expired refresh token");
+    if (storedToken === null) {
+      throw new UnauthorizedException("Invalid refresh token");
     }
 
-    // Rotate token
+    if (storedToken.expiresAt < new Date()) {
+      await this.prisma.authAccessToken.delete({
+        where: { id: storedToken.id },
+      });
+      throw new UnauthorizedException("Expired refresh token");
+    }
+
     await this.prisma.authAccessToken.delete({ where: { id: storedToken.id } });
     return this.login(storedToken.admin);
   }
