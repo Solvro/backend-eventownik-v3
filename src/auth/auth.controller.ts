@@ -1,4 +1,12 @@
-import { Body, Controller, Post, UnauthorizedException } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Request,
+  UnauthorizedException,
+  UseGuards,
+} from "@nestjs/common";
 import {
   ApiCreatedResponse,
   ApiOkResponse,
@@ -9,6 +17,7 @@ import {
 import { AuthService } from "./auth.service";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
+import { JwtAuthGuard } from "./jwt-auth.guard";
 
 @ApiTags("Auth")
 @Controller("auth")
@@ -38,5 +47,13 @@ export class AuthController {
   @ApiOkResponse({ description: "New JWT Access Token and Refresh Token" })
   async refresh(@Body() body: { refresh_token: string }) {
     return this.authService.refreshTokens(body.refresh_token);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get("me")
+  @ApiOperation({ summary: "Get Current User" })
+  @ApiOkResponse({ description: "Current user information" })
+  async getMe(@Request() req) {
+    return req.user;
   }
 }

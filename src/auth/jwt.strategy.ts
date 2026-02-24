@@ -40,16 +40,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       },
     });
 
-    if (user === null) {
-      throw new UnauthorizedException();
-    }
+    if (user === null) throw new UnauthorizedException();
+
+    const { password, ...result } = user;
 
     return {
-      ...user,
+      ...result,
       permissions: user.permissions.map((p) => ({
         eventId: p.eventUuid,
         permission: p.permission,
       })),
-    };
+    } as AuthUser;
   }
 }

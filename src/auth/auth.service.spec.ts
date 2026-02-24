@@ -66,7 +66,7 @@ describe("AuthService", () => {
         lastName: "User",
       };
       const hashedPassword = "hashedPassword123";
-      jest.spyOn(bcrypt, "hash").mockImplementation(async () => hashedPassword);
+      jest.spyOn(bcrypt, "hash").mockImplementation(() => hashedPassword);
       mockPrisma.admin.create.mockResolvedValue({
         ...mockAdmin,
         email: registerData.email,
@@ -93,7 +93,7 @@ describe("AuthService", () => {
         firstName: "New",
         lastName: "User",
       };
-      jest.spyOn(bcrypt, "hash").mockImplementation(async () => "hash");
+      jest.spyOn(bcrypt, "hash").mockImplementation(() => "hash");
       mockPrisma.admin.create.mockRejectedValue({ code: "P2002" });
 
       await expect(service.register(registerData)).rejects.toThrow(
@@ -149,7 +149,7 @@ describe("AuthService", () => {
       expect(mockJwtService.sign).toHaveBeenCalled();
       expect(mockPrisma.authAccessToken.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          token: expect.any(String), // This should be the hash
+          token: expect.any(String),
           type: "refresh_token",
         }),
       });
