@@ -18,7 +18,7 @@ import {
 } from "@nestjs/swagger";
 
 import { AuthService } from "./auth.service";
-import { AdminDto, AuthUserDto } from "./dto/auth-user.dto";
+import { AdminDto } from "./dto/auth-user.dto";
 import { LoginDto } from "./dto/login.dto";
 import { RefreshTokenDto } from "./dto/refresh-token.dto";
 import { RegisterDto } from "./dto/register.dto";
@@ -72,10 +72,14 @@ export class AuthController {
   @Get("me")
   @ApiBearerAuth()
   @ApiOperation({ summary: "Get current authenticated user profile" })
-  @ApiOkResponse({ description: "Current user information", type: AuthUserDto })
+  @ApiOkResponse({ description: "Current user information", type: AdminDto })
   @ApiUnauthorizedResponse({ description: "Unauthorized" })
-  getMe(@Request() request: { user: AuthUser }): AuthUserDto {
-    const { password: _password, ...user } = request.user;
+  getMe(@Request() request: { user: AuthUser }): AdminDto {
+    const {
+      password: _password,
+      permissions: _permissions,
+      ...user
+    } = request.user;
     return user;
   }
 }

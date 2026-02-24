@@ -13,6 +13,7 @@ import {
   Query,
 } from "@nestjs/common";
 import {
+  ApiBearerAuth,
   ApiOperation,
   ApiResponse,
   ApiTags,
@@ -27,6 +28,7 @@ import { OrganizersService } from "./organizers.service";
 
 @ApiTags("Organizers")
 @Controller("events/:eventId/organizers")
+@ApiBearerAuth()
 export class OrganizersController {
   constructor(private readonly organizersService: OrganizersService) {}
 
