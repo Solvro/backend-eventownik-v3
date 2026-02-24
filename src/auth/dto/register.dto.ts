@@ -1,4 +1,11 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength } from "class-validator";
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  Max,
+  MaxLength,
+  MinLength,
+} from "class-validator";
 
 import { ApiProperty } from "@nestjs/swagger";
 
@@ -22,5 +29,6 @@ export class RegisterDto {
   @IsString()
   @IsNotEmpty()
   @MinLength(8)
+  @MaxLength(72) // bcrypt accepts max 72 characters for password
   password!: string;
 }
