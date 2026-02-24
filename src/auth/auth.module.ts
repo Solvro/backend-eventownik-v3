@@ -16,7 +16,7 @@ import { PermissionsGuard } from "./permissions.guard";
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>("JWT_SECRET") ?? "secretKey",
+        secret: configService.getOrThrow<string>("JWT_SECRET"),
         signOptions: { expiresIn: "60m" },
       }),
       inject: [ConfigService],
