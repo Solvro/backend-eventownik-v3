@@ -9,12 +9,6 @@ export class Event implements PrismaEvent {
   @ApiProperty()
   uuid: string;
 
-  @ApiProperty({ isArray: true, type: String })
-  links: string[];
-
-  @ApiProperty({ isArray: true, type: String })
-  policyLinks: string[];
-
   @ApiProperty()
   startDate: Date;
 
@@ -26,6 +20,12 @@ export class Event implements PrismaEvent {
 
   @ApiProperty()
   updatedAt: Date;
+
+  @ApiProperty()
+  slug: string;
+
+  @ApiProperty()
+  isPublic: boolean;
 
   @ApiProperty({ nullable: true, required: false })
   participantsLimit: number | null;
@@ -50,9 +50,6 @@ export class Event implements PrismaEvent {
 
   @ApiProperty({ nullable: true, required: false })
   contactEmail: string | null;
-
-  @ApiProperty({ nullable: true, required: false })
-  slug: string | null;
 
   @ApiProperty({ nullable: true, required: false })
   organizerUuid: string | null;
