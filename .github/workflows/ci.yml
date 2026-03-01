@@ -68,5 +68,7 @@ jobs:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/eventownik_test_db"
 
       - name: Build
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/eventownik_test_db"
         run: npm run build
         if: always()
