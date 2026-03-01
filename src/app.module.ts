@@ -5,6 +5,7 @@ import { ConfigModule } from "@nestjs/config";
 
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
+import { AttributesModule } from "./attributes/attributes.module";
 import { AuthModule } from "./auth/auth.module";
 import { EventsModule } from "./events/events.module";
 import { FormsModule } from "./forms/forms.module";
@@ -25,6 +26,7 @@ import { PrismaModule } from "./prisma/prisma.module";
     }),
     OrganizersModule,
     AuthModule,
+    AttributesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
