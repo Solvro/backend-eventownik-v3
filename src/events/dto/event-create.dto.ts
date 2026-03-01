@@ -61,6 +61,17 @@ export class EventCreateDto {
   isVerified?: boolean;
 
   @ApiPropertyOptional({
+    description:
+      "Date when the event was verified, adds automatically when isVerified is set to true",
+    type: String,
+    example: "2022-12-12 12:12:12",
+  })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  verifiedAt?: Date | null;
+
+  @ApiPropertyOptional({
     description: "Participants limit for the event",
     type: Number,
     example: 100,

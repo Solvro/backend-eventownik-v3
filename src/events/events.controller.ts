@@ -61,6 +61,11 @@ export class EventsController {
     }
     if (request.user.type !== "superadmin") {
       delete eventDto.isVerified;
+      eventDto.verifiedAt = null;
+    } else if (eventDto.isVerified === false) {
+      eventDto.verifiedAt = null;
+    } else if (eventDto.isVerified === true) {
+      eventDto.verifiedAt = new Date();
     }
 
     return this.eventsService.create(eventDto, photoUrl, request.user.uuid);
@@ -95,7 +100,13 @@ export class EventsController {
     }
     if (request.user.type !== "superadmin") {
       delete eventDto.isVerified;
+      eventDto.verifiedAt = null;
+    } else if (eventDto.isVerified === false) {
+      eventDto.verifiedAt = null;
+    } else if (eventDto.isVerified === true) {
+      eventDto.verifiedAt = new Date();
     }
+
     return this.eventsService.update(eventUUID, eventDto, photoUrl);
   }
 
