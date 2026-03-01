@@ -24,7 +24,6 @@ import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { EventCreateDto } from "./dto/event-create.dto";
 import { EventListingDto } from "./dto/event-listing.dto";
-import { EventUpdateDto } from "./dto/event-update.dto";
 import { Event } from "./entities/event.entity";
 import { EventsService } from "./events.service";
 import { UploadPhoto } from "./utils/upload-photo.decorator";
@@ -60,6 +59,9 @@ export class EventsController {
     if (photo !== undefined) {
       photoUrl = `/uploads/events/${photo.filename}`;
     }
+    if (request.user.type !== "superadmin") {
+      delete eventDto.isVerified;
+    }
 
     return this.eventsService.create(eventDto, photoUrl, request.user.uuid);
   }
@@ -83,12 +85,16 @@ export class EventsController {
     @Param("eventId", ParseUUIDPipe) eventUUID: string,
     @UploadedFile()
     photo: Express.Multer.File | undefined,
-    @Body() eventDto: EventUpdateDto,
+    @Body() eventDto: EventCreateDto,
+    @Request() request: { user: AuthUser },
   ): Promise<Event> {
     let photoUrl = eventDto.photoUrl ?? null;
 
     if (photo !== undefined) {
       photoUrl = `/uploads/events/${photo.filename}`;
+    }
+    if (request.user.type !== "superadmin") {
+      delete eventDto.isVerified;
     }
     return this.eventsService.update(eventUUID, eventDto, photoUrl);
   }

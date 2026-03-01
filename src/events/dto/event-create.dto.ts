@@ -56,6 +56,16 @@ export class EventCreateDto {
     example: 100,
   })
   @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  isVerified?: boolean;
+
+  @ApiPropertyOptional({
+    description: "Participants limit for the event",
+    type: Number,
+    example: 100,
+  })
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   participantsLimit?: number | null;

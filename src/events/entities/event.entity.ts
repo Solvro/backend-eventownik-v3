@@ -27,6 +27,9 @@ export class Event implements PrismaEvent {
   @ApiProperty()
   isPublic: boolean;
 
+  @ApiProperty()
+  isVerified: boolean;
+
   @ApiProperty({ nullable: true, required: false })
   participantsLimit: number | null;
 
