@@ -31,13 +31,18 @@ export function UploadPhoto() {
         }),
         limits: { fileSize: 10 * 1024 * 1024 },
         fileFilter: (_request, file, callback) => {
-          const allowedTypes = ["image/png", "image/jpeg", "image/jpg"];
+          const allowedTypes = [
+            "image/png",
+            "image/jpeg",
+            "image/jpg",
+            "image/gif",
+          ];
           if (allowedTypes.includes(file.mimetype)) {
             callback(null, true);
           } else {
             callback(
               new BadRequestException(
-                "Invalid file type. Only PNG and JPEG are allowed.",
+                "Invalid file type. Only PNG, JPEG, and GIF are allowed.",
               ),
               false,
             );

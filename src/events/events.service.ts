@@ -59,7 +59,7 @@ export class EventsService {
 
     const where: Prisma.EventWhereInput = {
       isPublic: true,
-      verifiedAt: { not: null },
+      isVerified: true,
       ...(name === undefined
         ? {}
         : { name: { contains: name, mode: "insensitive" } }),
@@ -91,8 +91,11 @@ export class EventsService {
     return new PageDto(events, pageMetaDto);
   }
 
-  async create(eventDto: EventCreateDto, photoUrl: string | null) {
-    // TODO: Jak będzie auth to odkomentować łączenie z adminem
+  async create(
+    eventDto: EventCreateDto,
+    photoUrl: string | null,
+    adminUuid: string,
+  ) {
     const { links, ...dataWithoutLinks } = eventDto;
     if (
       (await this.prisma.event.findUnique({
@@ -108,15 +111,23 @@ export class EventsService {
       data: {
         ...(dataWithoutLinks as Prisma.EventCreateInput),
         photoUrl,
-        // organizerAdmin: {
-        //   connect: { uuid: admin.uuid },
-        // },
+        organizerAdmin: {
+          connect: { uuid: adminUuid },
+        },
         links: {
           create: links,
         },
       },
       include: {
         links: true,
+      },
+    });
+
+    await this.prisma.eventPermission.create({
+      data: {
+        event: { connect: { uuid: event.uuid } },
+        admin: { connect: { uuid: adminUuid } },
+        permission: "MANAGE_EVENT",
       },
     });
 
@@ -143,7 +154,7 @@ export class EventsService {
     const event = await this.prisma.event.findUnique({
       where: {
         slug,
-        verifiedAt: { not: null },
+        isVerified: true,
         isPublic: true,
       },
       include: {

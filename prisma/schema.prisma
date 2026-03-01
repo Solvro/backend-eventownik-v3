@@ -87,6 +87,7 @@ model Event {
   updatedAt         DateTime  @updatedAt
   slug              String   @unique
   isPublic          Boolean   @default(false)
+  isVerified        Boolean   @default(false)
   participantsLimit Int?
   verifiedAt        DateTime?
   description       String?

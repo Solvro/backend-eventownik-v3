@@ -1,4 +1,9 @@
+import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
+import { AuthUser } from "src/auth/jwt.strategy";
+import { RequirePermission } from "src/auth/permissions.decorator";
+import { PermissionsGuard } from "src/auth/permissions.guard";
 import { PageDto } from "src/common/dto/page.dto";
+import { PermissionType } from "src/generated/prisma/enums";
 
 import {
   Body,
@@ -11,7 +16,9 @@ import {
   Patch,
   Post,
   Query,
+  Request,
   UploadedFile,
+  UseGuards,
 } from "@nestjs/common";
 import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 
@@ -22,12 +29,14 @@ import { Event } from "./entities/event.entity";
 import { EventsService } from "./events.service";
 import { UploadPhoto } from "./utils/upload-photo.decorator";
 
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @ApiTags("Events")
 @Controller("events")
 export class EventsController {
   constructor(private readonly eventsService: EventsService) {}
 
   @Get()
+  @RequirePermission(PermissionType.MANAGE_ALL)
   @ApiOperation({ summary: "Get list of events with pagination and filtering" })
   @ApiOkResponse({ description: "List of events", type: PageDto<Event> })
   async findAll(@Query() dto: EventListingDto): Promise<PageDto<Event>> {
@@ -44,46 +53,54 @@ export class EventsController {
     @UploadedFile()
     photo: Express.Multer.File | undefined,
     @Body() eventDto: EventCreateDto,
+    @Request() request: { user: AuthUser },
   ): Promise<Event> {
-    let photoUrl: string | null = null;
+    let photoUrl = eventDto.photoUrl ?? null;
+
     if (photo !== undefined) {
       photoUrl = `/uploads/events/${photo.filename}`;
     }
-    return this.eventsService.create(eventDto, photoUrl);
+
+    return this.eventsService.create(eventDto, photoUrl, request.user.uuid);
   }
 
-  @Get(":eventUUID")
+  @Get(":eventId")
+  @RequirePermission(PermissionType.MANAGE_EVENT)
   @ApiOperation({ summary: "Get event by UUID" })
   @ApiOkResponse({ description: "The event", type: Event })
   async findOne(
-    @Param("eventUUID", ParseUUIDPipe) eventUUID: string,
+    @Param("eventId", ParseUUIDPipe) eventUUID: string,
   ): Promise<Event> {
     return this.eventsService.findOne(eventUUID);
   }
 
-  @Patch(":eventUUID")
+  @Patch(":eventId")
+  @RequirePermission(PermissionType.MANAGE_EVENT)
   @UploadPhoto()
   @ApiOperation({ summary: "Update event by UUID" })
   @ApiOkResponse({ description: "The updated event", type: Event })
   async update(
-    @Param("eventUUID", ParseUUIDPipe) eventUUID: string,
+    @Param("eventId", ParseUUIDPipe) eventUUID: string,
     @UploadedFile()
     photo: Express.Multer.File | undefined,
     @Body() eventDto: EventUpdateDto,
   ): Promise<Event> {
-    let photoUrl: string | null = null;
+    let photoUrl = eventDto.photoUrl ?? null;
+
     if (photo !== undefined) {
       photoUrl = `/uploads/events/${photo.filename}`;
     }
     return this.eventsService.update(eventUUID, eventDto, photoUrl);
   }
 
-  @Delete(":eventUUID")
+  @Delete(":eventId")
+  // TODO: jakaś inna permisja jak będą współorganizatorzy
+  @RequirePermission(PermissionType.MANAGE_EVENT)
   @ApiOperation({ summary: "Delete event by UUID" })
   @ApiOkResponse({ description: "No content" })
   @HttpCode(204)
   async remove(
-    @Param("eventUUID", ParseUUIDPipe) eventUUID: string,
+    @Param("eventId", ParseUUIDPipe) eventUUID: string,
   ): Promise<Event> {
     return this.eventsService.remove(eventUUID);
   }

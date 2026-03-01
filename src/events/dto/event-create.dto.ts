@@ -102,6 +102,15 @@ export class EventCreateDto {
   location?: string | null;
 
   @ApiPropertyOptional({
+    description: "URL of the event photo",
+    type: String,
+    example: "https://event-photo.com/photo.jpg",
+  })
+  @IsOptional()
+  @IsString()
+  photoUrl?: string | null;
+
+  @ApiPropertyOptional({
     description: "Contact email for the event",
     type: String,
     example: "contact@eventownik.com",
