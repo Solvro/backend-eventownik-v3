@@ -12,6 +12,14 @@ enum OrganizerType {
   superadmin
 }
 
+enum PermissionType {
+  MANAGE_ALL
+  MANAGE_EVENT
+  MANAGE_FORM
+  MANAGE_PARTICIPANT
+  MANAGE_EMAIL
+}
+
 model Admin {
   uuid      String        @id @default(uuid()) @db.Uuid
   firstName String
@@ -24,10 +32,25 @@ model Admin {
   updatedAt DateTime      @updatedAt
 
   events          Event[]           @relation("Organizer")
-  permissions     AdminPermission[]
-  AuthAccessToken AuthAccessToken?
+  permissions     EventPermission[]
+  adminPermissions AdminPermission[]
+  authAccessTokens AuthAccessToken[]
 
   @@map("Admins")
+}
+
+model EventPermission {
+  uuid           String         @id @default(uuid()) @db.Uuid
+  eventUuid      String         @db.Uuid
+  adminUuid      String         @db.Uuid
+  
+  permission     PermissionType 
+
+  admin          Admin          @relation(fields: [adminUuid], references: [uuid])
+  event          Event          @relation(fields: [eventUuid], references: [uuid])
+
+  @@unique([eventUuid, adminUuid, permission])
+  @@map("EventPermissions")
 }
 
 model AdminPermission {
@@ -78,9 +101,10 @@ model Event {
   organizerAdmin   Admin?            @relation("Organizer", fields: [organizerUuid], references: [uuid], onDelete: SetNull)
   registerForm     Form?             @relation("RegisterForm", fields: [registerFormUuid], references: [uuid], onDelete: SetNull)
   attributes       Attribute[]
-  emails           Email[]
+  emails           EmailTemplate[]
   forms            Form[]            @relation("EventForms")
-  adminPermissions AdminPermission[]
+  adminPermissions EventPermission[]
+  oldAdminPermissions AdminPermission[]
   participants     Participant[]
   links       EventLink[]
 
@@ -168,7 +192,7 @@ enum EmailTrigger {
   MANUAL
 }
 
-model Email {
+model EmailTemplate {
   uuid          String       @id @default(uuid()) @db.Uuid
   name          String
   content       String
@@ -182,10 +206,10 @@ model Email {
 
   event             Event?             @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
   form              Form?              @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
-  participantEmails ParticipantEmail[]
-  participantForms  ParticipantForm[]
+  participantEmails ParticipantEmailStatus[]
+  participantForms  ParticipantFormLog[]
 
-  @@map("Emails")
+  @@map("EmailTemplates")
 }
 
 model Form {
@@ -201,8 +225,8 @@ model Form {
 
   event            Event?            @relation("EventForms", fields: [eventUuid], references: [uuid], onDelete: Cascade)
   formDefinitions  FormDefinition[]
-  emails           Email[]
-  participantForms ParticipantForm[]
+  emails           EmailTemplate[]
+  participantForms ParticipantFormLog[]
   registerEvent    Event[]           @relation("RegisterForm")
 
   @@map("Forms")
@@ -232,8 +256,8 @@ model Participant {
 
   event         Event                     @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
   attributes    ParticipantAttribute[]
-  emails        ParticipantEmail[]
-  forms         ParticipantForm[]
+  emails        ParticipantEmailStatus[]
+  forms         ParticipantFormLog[]
   attributeLogs ParticipantAttributeLog[]
 
   @@unique([email, eventUuid])
@@ -260,7 +284,7 @@ enum EmailStatus {
   failed
 }
 
-model ParticipantEmail {
+model ParticipantEmailStatus {
   uuid            String      @id @default(uuid()) @db.Uuid
   status          EmailStatus
   sendAt          DateTime
@@ -271,12 +295,12 @@ model ParticipantEmail {
   emailUuid       String?     @db.Uuid
 
   participant Participant? @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
-  email       Email?       @relation(fields: [emailUuid], references: [uuid], onDelete: Cascade)
+  email       EmailTemplate?       @relation(fields: [emailUuid], references: [uuid], onDelete: Cascade)
 
-  @@map("ParticipantsEmails")
+  @@map("ParticipantsEmailStatuses")
 }
 
-model ParticipantForm {
+model ParticipantFormLog {
   uuid            String    @id @default(uuid()) @db.Uuid
   participantUuid String    @db.Uuid
   formUuid        String    @db.Uuid
@@ -288,9 +312,9 @@ model ParticipantForm {
 
   participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
   form        Form        @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
-  email       Email?      @relation(fields: [emailUuid], references: [uuid], onDelete: SetNull)
+  email       EmailTemplate?      @relation(fields: [emailUuid], references: [uuid], onDelete: SetNull)
 
-  @@map("ParticipantsForms")
+  @@map("ParticipantsFormLogs")
 }
 
 model ParticipantAttributeLog {
@@ -310,14 +334,14 @@ model ParticipantAttributeLog {
 
 model AuthAccessToken {
   id          Int      @id @default(autoincrement())
-  tokenableId String   @unique @map("tokenable_id") @db.Uuid
+  tokenableId String   @map("tokenable_id") @db.Uuid
   type        String
   name        String?
-  hash        String
+  token       String   @unique
   abilities   String
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @map("updated_at")
-  lastUsedAt  DateTime @map("last_used_at")
+  lastUsedAt  DateTime? @map("last_used_at")
   expiresAt   DateTime @map("expires_at")
 
   admin Admin @relation(fields: [tokenableId], references: [uuid], onDelete: Cascade)

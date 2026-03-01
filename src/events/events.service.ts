@@ -21,7 +21,6 @@ export class EventsService {
   async findAll(query: EventListingDto) {
     // TODO: superadmin wszystko widzi, organizator swoje
     const { skip, take, name, location, sort } = query;
-
     const where: Prisma.EventWhereInput = {
       ...(name === undefined
         ? {}
