@@ -1,7 +1,7 @@
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
-import { PermissionType } from "src/generated/prisma/enums";
+import { PermissionType } from "src/generated/prisma/client";
 
 import {
   Body,
@@ -30,9 +30,9 @@ import { UpdateFormDto } from "./dto/update-form.dto";
 import { FormsService } from "./forms.service";
 
 @ApiTags("Forms")
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @RequirePermission(PermissionType.MANAGE_FORM)
-@ApiBearerAuth()
 @Controller("events/:eventId/forms")
 export class FormsController {
   constructor(private readonly formsService: FormsService) {}
