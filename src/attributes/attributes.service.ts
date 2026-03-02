@@ -18,7 +18,6 @@ export class AttributesService {
     return this.prisma.$transaction(async (prisma) => {
       const event = await prisma.event.findUnique({
         where: { uuid: eventId },
-        include: { attributes: true },
       });
       if (event == null) {
         throw new NotFoundException("Event not found");
@@ -78,18 +77,17 @@ export class AttributesService {
   async findOne(id: string, eventId: string) {
     const event = await this.prisma.event.findUnique({
       where: { uuid: eventId },
-      include: { attributes: true },
     });
     if (event == null) {
       throw new NotFoundException("Event not found");
     }
-    const foundAttribute = event.attributes.find(
-      (attribute) => attribute.uuid === id,
-    );
-    if (foundAttribute == null) {
+    const attribute = await this.prisma.attribute.findUnique({
+      where: { uuid: id, eventUuid: eventId },
+    });
+    if (attribute == null) {
       throw new NotFoundException("Attribute not found");
     }
-    return foundAttribute;
+    return attribute;
   }
 
   async update(
@@ -100,20 +98,20 @@ export class AttributesService {
     return this.prisma.$transaction(async (prisma) => {
       const event = await prisma.event.findUnique({
         where: { uuid: eventId },
-        include: { attributes: true },
       });
       if (event == null) {
         throw new NotFoundException("Event not found");
       }
-      const foundAttribute = event.attributes.find(
-        (attribute) => attribute.uuid === id,
-      );
+
+      const foundAttribute = await prisma.attribute.findUnique({
+        where: { uuid: id, eventUuid: eventId },
+      });
       if (foundAttribute == null) {
         throw new NotFoundException("Attribute not found");
       }
 
       return prisma.attribute.update({
-        where: { uuid: id },
+        where: { uuid: id, eventUuid: eventId },
         data: updateAttributeDto,
       });
     });
@@ -122,19 +120,18 @@ export class AttributesService {
   async remove(id: string, eventId: string) {
     const event = await this.prisma.event.findUnique({
       where: { uuid: eventId },
-      include: { attributes: true },
     });
     if (event == null) {
       throw new NotFoundException("Event not found");
     }
-    const foundAttribute = event.attributes.find(
-      (attribute) => attribute.uuid === id,
-    );
+    const foundAttribute = await this.prisma.attribute.findUnique({
+      where: { uuid: id, eventUuid: eventId },
+    });
     if (foundAttribute == null) {
       throw new NotFoundException("Attribute not found");
     }
     return this.prisma.attribute.delete({
-      where: { uuid: id },
+      where: { uuid: id, eventUuid: eventId },
     });
   }
 }
