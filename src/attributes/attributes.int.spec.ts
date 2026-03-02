@@ -9,6 +9,7 @@ import { Test } from "@nestjs/testing";
 
 import { AttributesController } from "./attributes.controller";
 import { AttributesService } from "./attributes.service";
+import { AttributeListingDto } from "./dto/attribute-listing.dto";
 import type { CreateAttributeDto } from "./dto/create-attribute.dto";
 import type { UpdateAttributeDto } from "./dto/update-attribute.dto";
 
@@ -20,6 +21,8 @@ describe("AttributesService", () => {
       create: jest.fn(),
       update: jest.fn(),
       findUnique: jest.fn(),
+      findMany: jest.fn(),
+      count: jest.fn(),
       delete: jest.fn(),
     },
     event: {
@@ -112,6 +115,45 @@ describe("AttributesService", () => {
     await expect(attributeController.create(dto, eventId)).rejects.toThrow(
       "Event not found",
     );
+  });
+
+  it("should find a list of attributes for an event", async () => {
+    const eventId = "test-event-id";
+    const mockAttributes = [
+      {
+        uuid: "test-attribute-id-1",
+        name: "Test Attribute 1",
+        options: ["Option 1", "Option 2"],
+        order: 1,
+        showInList: true,
+        type: AttributeType.block,
+        eventUuid: eventId,
+      },
+      {
+        uuid: "test-attribute-id-2",
+        name: "Test Attribute 2",
+        options: ["Option A", "Option B"],
+        order: 2,
+        showInList: false,
+        type: AttributeType.text,
+        eventUuid: eventId,
+      },
+    ];
+    mockPrismaService.event.findUnique.mockResolvedValue({
+      uuid: eventId,
+      attributes: mockAttributes,
+    });
+    const query = new AttributeListingDto();
+    mockPrismaService.$transaction.mockResolvedValue([
+      mockAttributes.length,
+      mockAttributes,
+    ]);
+    const result = await attributeController.findAll(eventId, query);
+    expect(result.meta.itemCount).toBe(mockAttributes.length);
+    expect(result.data).toEqual(mockAttributes);
+    expect(mockPrismaService.event.findUnique).toHaveBeenCalledWith({
+      where: { uuid: eventId },
+    });
   });
 
   it("should find an attribute by id", async () => {

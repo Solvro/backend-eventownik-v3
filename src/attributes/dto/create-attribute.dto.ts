@@ -1,8 +1,7 @@
-import { Type } from "class-transformer";
 import {
   IsArray,
   IsBoolean,
-  IsDefined,
+  IsEnum,
   IsNumber,
   IsOptional,
   IsString,
@@ -32,8 +31,10 @@ export class CreateAttributeDto {
   @IsBoolean()
   showInList?: boolean;
 
-  @ApiProperty({ enum: AttributeType })
-  @IsDefined()
-  @Type(() => String)
+  @ApiProperty({
+    description: "The type of the attribute",
+    enum: AttributeType,
+  })
+  @IsEnum(AttributeType)
   type: AttributeType;
 }

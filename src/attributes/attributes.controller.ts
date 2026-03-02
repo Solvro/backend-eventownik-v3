@@ -9,10 +9,12 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { AttributesService } from "./attributes.service";
+import { AttributeListingDto } from "./dto/attribute-listing.dto";
 import { CreateAttributeDto } from "./dto/create-attribute.dto";
 import { UpdateAttributeDto } from "./dto/update-attribute.dto";
 
@@ -36,10 +38,20 @@ export class AttributesController {
     return this.attributesService.create(createAttributeDto, eventId);
   }
 
-  // @Get()
-  // findAll() {
-  //   return this.attributesService.findAll();
-  // }
+  @Get()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Get a list of attributes for an event" })
+  @ApiResponse({
+    status: 200,
+    description: "The list of attributes has been successfully retrieved.",
+  })
+  @ApiResponse({ status: 404, description: "Event not found." })
+  async findAll(
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @Query() query: AttributeListingDto,
+  ) {
+    return this.attributesService.findAll(eventId, query);
+  }
 
   @Get(":id")
   @HttpCode(HttpStatus.OK)
