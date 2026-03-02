@@ -30,7 +30,7 @@ export class CreateAttributeDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
-  shownInList?: boolean;
+  showInList?: boolean;
 
   @ApiProperty({ enum: AttributeType })
   @IsDefined()
