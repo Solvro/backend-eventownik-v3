@@ -199,8 +199,18 @@ describe("Attributes Integration", () => {
     mockPrismaService.$transaction.mockImplementation(async (callback) => {
       return await callback(mockPrismaService);
     });
+
     mockPrismaService.event.findUnique.mockResolvedValue({
       uuid: eventId,
+    });
+    mockPrismaService.attribute.findUnique.mockResolvedValue({
+      uuid: attributeId,
+      name: "Test Attribute",
+      options: ["Option 1", "Option 2"],
+      order: 1,
+      showInList: true,
+      type: AttributeType.block,
+      eventUuid: eventId,
     });
     mockPrismaService.attribute.update.mockResolvedValue({
       uuid: attributeId,
@@ -212,6 +222,7 @@ describe("Attributes Integration", () => {
       eventUuid: eventId,
     });
     const result = await attributeController.update(attributeId, eventId, dto);
+
     expect(result).toEqual({
       uuid: attributeId,
       name: dto.name,

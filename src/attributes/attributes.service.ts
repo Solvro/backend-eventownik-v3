@@ -112,7 +112,13 @@ export class AttributesService {
 
       return prisma.attribute.update({
         where: { uuid: id, eventUuid: eventId },
-        data: updateAttributeDto,
+        data: {
+          name: updateAttributeDto.name,
+          options: updateAttributeDto.options,
+          order: updateAttributeDto.order,
+          showInList: updateAttributeDto.showInList,
+          type: updateAttributeDto.type,
+        },
       });
     });
   }
