@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
-import type { Attribute } from "src/generated/prisma/client";
 import { AttributeType } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -85,7 +84,6 @@ describe("AttributesService", () => {
     });
     expect(mockPrismaService.event.findUnique).toHaveBeenCalledWith({
       where: { uuid: eventId },
-      include: { attributes: true },
     });
     expect(mockPrismaService.attribute.create).toHaveBeenCalledWith({
       data: {
@@ -170,13 +168,12 @@ describe("AttributesService", () => {
     };
     mockPrismaService.event.findUnique.mockResolvedValue({
       uuid: eventId,
-      attributes: [mockAttribute],
     });
+    mockPrismaService.attribute.findUnique.mockResolvedValue(mockAttribute);
     const result = await attributeController.findOne(attributeId, eventId);
     expect(result).toEqual(mockAttribute);
     expect(mockPrismaService.event.findUnique).toHaveBeenCalledWith({
       where: { uuid: eventId },
-      include: { attributes: true },
     });
   });
 
@@ -239,24 +236,7 @@ describe("AttributesService", () => {
   it("should delete an attribute", async () => {
     const eventId = "test-event-id";
     const attributeId = "test-attribute-id";
-    mockPrismaService.$transaction.mockImplementation(async (callback) => {
-      return await callback(mockPrismaService);
-    });
-    mockPrismaService.event.findUnique.mockResolvedValue({
-      uuid: eventId,
-      attributes: [
-        {
-          uuid: attributeId,
-          name: "Test Attribute",
-          options: ["Option 1", "Option 2"],
-          order: 1,
-          showInList: true,
-          type: AttributeType.block,
-          eventUuid: eventId,
-        },
-      ] as Attribute[],
-    });
-    mockPrismaService.attribute.delete.mockResolvedValue({
+    const mockAttribute = {
       uuid: attributeId,
       name: "Test Attribute",
       options: ["Option 1", "Option 2"],
@@ -264,7 +244,15 @@ describe("AttributesService", () => {
       showInList: true,
       type: AttributeType.block,
       eventUuid: eventId,
+    };
+    mockPrismaService.$transaction.mockImplementation(async (callback) => {
+      return await callback(mockPrismaService);
     });
+    mockPrismaService.event.findUnique.mockResolvedValue({
+      uuid: eventId,
+    });
+    mockPrismaService.attribute.findUnique.mockResolvedValue(mockAttribute);
+    mockPrismaService.attribute.delete.mockResolvedValue(mockAttribute);
     const result = await attributeController.remove(attributeId, eventId);
     expect(result).toEqual({
       uuid: attributeId,
@@ -276,7 +264,7 @@ describe("AttributesService", () => {
       eventUuid: eventId,
     });
     expect(mockPrismaService.attribute.delete).toHaveBeenCalledWith({
-      where: { uuid: attributeId },
+      where: { uuid: attributeId, eventUuid: eventId },
     });
   });
 });
