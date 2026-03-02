@@ -2,7 +2,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
-  IsNumber,
+  IsInt,
   IsOptional,
   IsString,
 } from "class-validator";
@@ -23,7 +23,7 @@ export class CreateAttributeDto {
   options?: string[];
 
   @ApiProperty()
-  @IsNumber()
+  @IsInt()
   order: number;
 
   @ApiPropertyOptional()
