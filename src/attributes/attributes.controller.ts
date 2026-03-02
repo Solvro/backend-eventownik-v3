@@ -72,8 +72,18 @@ export class AttributesController {
     return this.attributesService.update(id, eventId, updateAttributeDto);
   }
 
-  // @Delete(":id")
-  // remove(@Param("id") id: string) {
-  //   return this.attributesService.remove(+id);
-  // }
+  @Delete(":id")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: "Delete an attribute by id" })
+  @ApiResponse({
+    status: 204,
+    description: "The attribute has been successfully deleted.",
+  })
+  @ApiResponse({ status: 404, description: "Event or attribute not found." })
+  async remove(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+  ) {
+    return this.attributesService.remove(id, eventId);
+  }
 }

@@ -1,4 +1,6 @@
-import { find } from "rxjs";
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+import type { Attribute } from "src/generated/prisma/client";
 import { AttributeType } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -8,7 +10,7 @@ import { Test } from "@nestjs/testing";
 import { AttributesController } from "./attributes.controller";
 import { AttributesService } from "./attributes.service";
 import type { CreateAttributeDto } from "./dto/create-attribute.dto";
-import { UpdateAttributeDto } from "./dto/update-attribute.dto";
+import type { UpdateAttributeDto } from "./dto/update-attribute.dto";
 
 describe("AttributesService", () => {
   let attributeController: AttributesController;
@@ -18,6 +20,7 @@ describe("AttributesService", () => {
       create: jest.fn(),
       update: jest.fn(),
       findUnique: jest.fn(),
+      delete: jest.fn(),
     },
     event: {
       findUnique: jest.fn(),
@@ -189,6 +192,49 @@ describe("AttributesService", () => {
       showInList: dto.showInList,
       type: dto.type,
       eventUuid: eventId,
+    });
+  });
+  it("should delete an attribute", async () => {
+    const eventId = "test-event-id";
+    const attributeId = "test-attribute-id";
+    mockPrismaService.$transaction.mockImplementation(async (callback) => {
+      return await callback(mockPrismaService);
+    });
+    mockPrismaService.event.findUnique.mockResolvedValue({
+      uuid: eventId,
+      attributes: [
+        {
+          uuid: attributeId,
+          name: "Test Attribute",
+          options: ["Option 1", "Option 2"],
+          order: 1,
+          showInList: true,
+          type: AttributeType.block,
+          eventUuid: eventId,
+        },
+      ] as Attribute[],
+    });
+    mockPrismaService.attribute.delete.mockResolvedValue({
+      uuid: attributeId,
+      name: "Test Attribute",
+      options: ["Option 1", "Option 2"],
+      order: 1,
+      showInList: true,
+      type: AttributeType.block,
+      eventUuid: eventId,
+    });
+    const result = await attributeController.remove(attributeId, eventId);
+    expect(result).toEqual({
+      uuid: attributeId,
+      name: "Test Attribute",
+      options: ["Option 1", "Option 2"],
+      order: 1,
+      showInList: true,
+      type: AttributeType.block,
+      eventUuid: eventId,
+    });
+    expect(mockPrismaService.attribute.delete).toHaveBeenCalledWith({
+      where: { uuid: attributeId },
     });
   });
 });
