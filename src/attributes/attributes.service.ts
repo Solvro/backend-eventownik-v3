@@ -118,20 +118,22 @@ export class AttributesService {
   }
 
   async remove(id: string, eventId: string) {
-    const event = await this.prisma.event.findUnique({
-      where: { uuid: eventId },
-    });
-    if (event == null) {
-      throw new NotFoundException("Event not found");
-    }
-    const foundAttribute = await this.prisma.attribute.findUnique({
-      where: { uuid: id, eventUuid: eventId },
-    });
-    if (foundAttribute == null) {
-      throw new NotFoundException("Attribute not found");
-    }
-    return this.prisma.attribute.delete({
-      where: { uuid: id, eventUuid: eventId },
+    return this.prisma.$transaction(async (prisma) => {
+      const event = await prisma.event.findUnique({
+        where: { uuid: eventId },
+      });
+      if (event == null) {
+        throw new NotFoundException("Event not found");
+      }
+      const foundAttribute = await prisma.attribute.findUnique({
+        where: { uuid: id, eventUuid: eventId },
+      });
+      if (foundAttribute == null) {
+        throw new NotFoundException("Attribute not found");
+      }
+      return prisma.attribute.delete({
+        where: { uuid: id, eventUuid: eventId },
+      });
     });
   }
 }

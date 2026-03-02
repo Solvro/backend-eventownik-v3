@@ -12,7 +12,7 @@ import { AttributeListingDto } from "./dto/attribute-listing.dto";
 import type { CreateAttributeDto } from "./dto/create-attribute.dto";
 import type { UpdateAttributeDto } from "./dto/update-attribute.dto";
 
-describe("AttributesService", () => {
+describe("Attributes Integration", () => {
   let attributeController: AttributesController;
 
   const mockPrismaService = {
@@ -201,17 +201,6 @@ describe("AttributesService", () => {
     });
     mockPrismaService.event.findUnique.mockResolvedValue({
       uuid: eventId,
-      attributes: [
-        {
-          uuid: attributeId,
-          name: dto.name,
-          options: dto.options,
-          order: dto.order,
-          showInList: dto.showInList,
-          type: dto.type,
-          eventUuid: eventId,
-        },
-      ],
     });
     mockPrismaService.attribute.update.mockResolvedValue({
       uuid: attributeId,
