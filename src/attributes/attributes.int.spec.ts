@@ -3,6 +3,7 @@
 import { AttributeType } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
+import { NotFoundException } from "@nestjs/common";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
@@ -22,7 +23,8 @@ describe("Attributes Integration", () => {
       findUnique: jest.fn(),
       findMany: jest.fn(),
       count: jest.fn(),
-      delete: jest.fn(),
+      deleteMany: jest.fn(),
+      findFirst: jest.fn(),
     },
     event: {
       findUnique: jest.fn(),
@@ -111,7 +113,7 @@ describe("Attributes Integration", () => {
     });
     mockPrismaService.event.findUnique.mockResolvedValue(null);
     await expect(attributeController.create(dto, eventId)).rejects.toThrow(
-      "Event not found",
+      NotFoundException,
     );
   });
 
@@ -169,7 +171,7 @@ describe("Attributes Integration", () => {
     mockPrismaService.event.findUnique.mockResolvedValue({
       uuid: eventId,
     });
-    mockPrismaService.attribute.findUnique.mockResolvedValue(mockAttribute);
+    mockPrismaService.attribute.findFirst.mockResolvedValue(mockAttribute);
     const result = await attributeController.findOne(attributeId, eventId);
     expect(result).toEqual(mockAttribute);
     expect(mockPrismaService.event.findUnique).toHaveBeenCalledWith({
@@ -183,7 +185,7 @@ describe("Attributes Integration", () => {
     mockPrismaService.event.findUnique.mockResolvedValue(null);
     await expect(
       attributeController.findOne(attributeId, eventId),
-    ).rejects.toThrow("Event not found");
+    ).rejects.toThrow(NotFoundException);
   });
 
   it("should update an attribute", async () => {
@@ -203,7 +205,7 @@ describe("Attributes Integration", () => {
     mockPrismaService.event.findUnique.mockResolvedValue({
       uuid: eventId,
     });
-    mockPrismaService.attribute.findUnique.mockResolvedValue({
+    mockPrismaService.attribute.findFirst.mockResolvedValue({
       uuid: attributeId,
       name: "Test Attribute",
       options: ["Option 1", "Option 2"],
@@ -251,8 +253,7 @@ describe("Attributes Integration", () => {
     mockPrismaService.event.findUnique.mockResolvedValue({
       uuid: eventId,
     });
-    mockPrismaService.attribute.findUnique.mockResolvedValue(mockAttribute);
-    mockPrismaService.attribute.delete.mockResolvedValue(mockAttribute);
+    mockPrismaService.attribute.deleteMany.mockResolvedValue(mockAttribute);
     const result = await attributeController.remove(attributeId, eventId);
     expect(result).toEqual({
       uuid: attributeId,
@@ -263,7 +264,7 @@ describe("Attributes Integration", () => {
       type: AttributeType.block,
       eventUuid: eventId,
     });
-    expect(mockPrismaService.attribute.delete).toHaveBeenCalledWith({
+    expect(mockPrismaService.attribute.deleteMany).toHaveBeenCalledWith({
       where: { uuid: attributeId, eventUuid: eventId },
     });
   });
