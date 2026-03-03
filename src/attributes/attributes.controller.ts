@@ -56,7 +56,6 @@ export class AttributesController {
   }
 
   @Get()
-  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Get a list of attributes for an event" })
   @ApiResponse({
     status: 200,
@@ -72,7 +71,6 @@ export class AttributesController {
   }
 
   @Get(":id")
-  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Get an attribute by id" })
   @ApiResponse({
     status: 200,
@@ -88,7 +86,6 @@ export class AttributesController {
   }
 
   @Patch(":id")
-  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Update an attribute by id" })
   @ApiResponse({
     status: 200,
