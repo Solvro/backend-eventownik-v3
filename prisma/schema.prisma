@@ -137,7 +137,7 @@ model Attribute {
   showInList Boolean       @default(true)
   order      Int
   options    String[]      @default([])
-  name       String?
+  name       String     
 
   event                 Event                  @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
   blocks                Block[]
