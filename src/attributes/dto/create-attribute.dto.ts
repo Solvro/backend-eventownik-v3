@@ -11,10 +11,9 @@ import { AttributeType } from "src/generated/prisma/client";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class CreateAttributeDto {
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty()
   @IsString()
-  name?: string;
+  name: string;
 
   @ApiPropertyOptional({ isArray: true, type: String })
   @IsOptional()
