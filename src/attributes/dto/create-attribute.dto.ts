@@ -1,10 +1,12 @@
 import {
+  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
   IsString,
+  ValidateIf,
 } from "class-validator";
 import { AttributeType } from "src/generated/prisma/client";
 
@@ -16,8 +18,11 @@ export class CreateAttributeDto {
   name: string;
 
   @ApiPropertyOptional({ isArray: true, type: String })
-  @IsOptional()
+  @ValidateIf((o: CreateAttributeDto) =>
+    ["select", "multiSelect"].includes(o.type),
+  )
   @IsArray()
+  @ArrayMinSize(1)
   @IsString({ each: true })
   options?: string[];
 
