@@ -19,7 +19,7 @@ export class BlocksService {
       where: { uuid: attributeId, eventUuid: eventId },
     });
 
-    if (!attribute) {
+    if (attribute === null) {
       throw new NotFoundException(
         `Attribute with UUID ${attributeId} in event ${eventId} not found`,
       );
@@ -37,7 +37,11 @@ export class BlocksService {
 
     return this.prisma.block.create({
       data: {
-        ...createBlockDto,
+        capacity: createBlockDto.capacity,
+        order: createBlockDto.order,
+        name: createBlockDto.name,
+        description: createBlockDto.description,
+        parentUuid: createBlockDto.parentUuid,
         attributeUuid: attributeId,
       },
     });
@@ -86,7 +90,7 @@ export class BlocksService {
       },
     });
 
-    if (!block) {
+    if (block === null) {
       throw new NotFoundException(`Block with UUID ${id} not found`);
     }
 

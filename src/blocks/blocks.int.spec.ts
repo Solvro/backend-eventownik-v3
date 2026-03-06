@@ -60,7 +60,8 @@ describe("Blocks Integration", () => {
       });
       mockPrismaService.block.create.mockResolvedValue({
         uuid: blockId,
-        ...dto,
+        name: dto.name,
+        capacity: dto.capacity,
         attributeUuid: attributeId,
       });
 
@@ -70,7 +71,14 @@ describe("Blocks Integration", () => {
         where: { uuid: attributeId, eventUuid: eventId },
       });
       expect(mockPrismaService.block.create).toHaveBeenCalledWith({
-        data: { ...dto, attributeUuid: attributeId },
+        data: {
+          capacity: dto.capacity,
+          order: dto.order,
+          name: dto.name,
+          description: dto.description,
+          parentUuid: dto.parentUuid,
+          attributeUuid: attributeId,
+        },
       });
       expect(result).toHaveProperty("uuid", blockId);
       expect(result).toHaveProperty("name", dto.name);
@@ -136,10 +144,9 @@ describe("Blocks Integration", () => {
     it("should update a block successfully", async () => {
       const dto: UpdateBlockDto = { name: "Updated Block" };
       mockPrismaService.block.findFirst.mockResolvedValue({ uuid: blockId });
-      mockPrismaService.block.update.mockResolvedValue({
-        uuid: blockId,
-        ...dto,
-      });
+      mockPrismaService.block.update.mockResolvedValue(
+        Object.assign({ uuid: blockId }, dto),
+      );
 
       const result = await blocksController.update(
         eventId,
