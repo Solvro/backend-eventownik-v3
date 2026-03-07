@@ -18,10 +18,11 @@ import { EventUpdateDto } from "./dto/event-update.dto";
 export class EventsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(query: EventListingDto) {
+  async findAll(query: EventListingDto, eventsIds: string[], userType: string) {
     // TODO: superadmin wszystko widzi, organizator swoje
     const { skip, take, name, location, sort } = query;
     const where: Prisma.EventWhereInput = {
+      ...(userType === "superadmin" ? {} : { uuid: { in: eventsIds } }),
       ...(name === undefined
         ? {}
         : { name: { contains: name, mode: "insensitive" } }),
@@ -97,41 +98,48 @@ export class EventsService {
     adminUuid: string,
   ) {
     const { links, ...dataWithoutLinks } = eventDto;
-    if (
-      (await this.prisma.event.findUnique({
-        where: { slug: eventDto.slug },
-      })) !== null
-    ) {
-      throw new ConflictException(
-        `Event with slug ${eventDto.slug} already exists`,
-      );
+
+    try {
+      const event = await this.prisma.$transaction(async (tx) => {
+        const createdEvent = await tx.event.create({
+          data: {
+            ...(dataWithoutLinks as Prisma.EventCreateInput),
+            photoUrl,
+            organizerAdmin: {
+              connect: { uuid: adminUuid },
+            },
+            links: {
+              create: links,
+            },
+          },
+          include: {
+            links: true,
+          },
+        });
+
+        await tx.eventPermission.create({
+          data: {
+            event: { connect: { uuid: createdEvent.uuid } },
+            admin: { connect: { uuid: adminUuid } },
+            permission: "MANAGE_ALL",
+          },
+        });
+
+        return createdEvent;
+      });
+
+      return event;
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new ConflictException(
+          `Event with slug ${eventDto.slug} already exists`,
+        );
+      }
+      throw error;
     }
-
-    const event = await this.prisma.event.create({
-      data: {
-        ...(dataWithoutLinks as Prisma.EventCreateInput),
-        photoUrl,
-        organizerAdmin: {
-          connect: { uuid: adminUuid },
-        },
-        links: {
-          create: links,
-        },
-      },
-      include: {
-        links: true,
-      },
-    });
-
-    await this.prisma.eventPermission.create({
-      data: {
-        event: { connect: { uuid: event.uuid } },
-        admin: { connect: { uuid: adminUuid } },
-        permission: "MANAGE_EVENT",
-      },
-    });
-
-    return event;
   }
 
   async findOne(uuid: string) {
@@ -174,43 +182,57 @@ export class EventsService {
     eventDto: EventUpdateDto,
     photoUrl: string | null,
   ) {
-    // TODO: superadmin dowolny, organizator swoje
-    const event = await this.prisma.event.findUnique({
-      where: { uuid },
-    });
-
-    if (event == null) {
-      throw new NotFoundException(`Event with UUID ${uuid} not found`);
-    }
-
-    if (eventDto.slug !== undefined && eventDto.slug !== event.slug) {
-      const same_slug_event = await this.prisma.event.findFirst({
-        where: { slug: eventDto.slug, uuid: { not: uuid } },
-      });
-
-      if (same_slug_event !== null) {
-        throw new ConflictException(
-          `Event with slug ${same_slug_event.slug} already exists`,
-        );
-      }
-    }
-
+    // TODO: superadmin dowolny, organizator swoj
     const { links, ...dataWithoutLinks } = eventDto;
 
-    return await this.prisma.event.update({
-      where: { uuid },
-      data: {
-        ...dataWithoutLinks,
-        photoUrl,
-        links: {
-          deleteMany: {},
-          create: links,
-        },
-      },
-      include: {
-        links: true,
-      },
-    });
+    try {
+      if (links === undefined) {
+        return await this.prisma.event.update({
+          where: { uuid },
+          data: {
+            ...dataWithoutLinks,
+            photoUrl,
+          },
+          include: {
+            links: true,
+          },
+        });
+      }
+
+      return await this.prisma.$transaction(async (tx) => {
+        await tx.eventLink.deleteMany({
+          where: { eventUuid: uuid },
+        });
+
+        return await tx.event.update({
+          where: { uuid },
+          data: {
+            ...dataWithoutLinks,
+            photoUrl,
+            ...(links.length === 0 ? {} : { links: { create: links } }),
+          },
+          include: {
+            links: true,
+          },
+        });
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new ConflictException(
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+          `Event with slug ${eventDto.slug} already exists`,
+        );
+      } else if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        throw new NotFoundException(`Event with UUID ${uuid} not found`);
+      }
+      throw error;
+    }
   }
 
   async remove(uuid: string) {

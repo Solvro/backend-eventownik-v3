@@ -51,9 +51,9 @@ export class EventCreateDto {
   isPublic: boolean;
 
   @ApiPropertyOptional({
-    description: "Participants limit for the event",
-    type: Number,
-    example: 100,
+    description: "Verification status of the public event, defaults to false",
+    type: Boolean,
+    example: true,
   })
   @IsOptional()
   @Type(() => Boolean)
@@ -154,4 +154,16 @@ export class EventCreateDto {
   @ValidateNested({ each: true })
   @Type(() => EventLinkCreateDto)
   links?: EventLinkCreateDto[];
+
+  applyUserTypeRestrictions(userType: string) {
+    if (userType === "organizer") {
+      this.isVerified = false;
+      this.verifiedAt = null;
+    } else if (userType === "superadmin" && this.isVerified === true) {
+      this.verifiedAt = new Date();
+    } else if (this.isVerified === false) {
+      this.verifiedAt = null;
+    }
+    return this;
+  }
 }

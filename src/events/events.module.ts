@@ -1,7 +1,5 @@
-import {
-  EventsController,
-  PublicEventsController,
-} from "src/events/events.controller";
+import { PublicEventsController } from "src/events/events-public.controller";
+import { EventsController } from "src/events/events.controller";
 
 import { Module } from "@nestjs/common";
 

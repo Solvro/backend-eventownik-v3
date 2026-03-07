@@ -1,6 +1,7 @@
 import { diskStorage } from "multer";
 import { existsSync, mkdirSync } from "node:fs";
-import { extname } from "node:path/win32";
+// eslint-disable-next-line unicorn/import-style
+import { extname } from "node:path";
 
 import {
   BadRequestException,
@@ -42,7 +43,7 @@ export function UploadPhoto() {
           } else {
             callback(
               new BadRequestException(
-                "Invalid file type. Only PNG, JPEG, and GIF are allowed.",
+                "Invalid file type. Only PNG, JPG, JPEG, and GIF are allowed.",
               ),
               false,
             );

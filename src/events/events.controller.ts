@@ -35,12 +35,15 @@ export class EventsController {
   constructor(private readonly eventsService: EventsService) {}
 
   @Get()
-  @RequirePermission(PermissionType.MANAGE_ALL)
   @ApiOperation({ summary: "Get list of events with pagination and filtering" })
   @ApiOkResponse({ description: "List of events", type: PageDto<Event> })
-  async findAll(@Query() dto: EventListingDto): Promise<PageDto<Event>> {
+  async findAll(
+    @Query() dto: EventListingDto,
+    @Request() request: { user: AuthUser },
+  ): Promise<PageDto<Event>> {
     // z auth'em, zwracać swoje eventy / wszystkie dla superadmina
-    return this.eventsService.findAll(dto);
+    const eventsIds = request.user.permissions.map((p) => p.eventId);
+    return this.eventsService.findAll(dto, eventsIds, request.user.type);
   }
 
   // TODO: usuwanie zdjęcia z serwera przy aktualizacji, usuwaniu eventu i gdy nie przejdzie walidacji, to samo dla PUT
@@ -59,14 +62,7 @@ export class EventsController {
     if (photo !== undefined) {
       photoUrl = `/uploads/events/${photo.filename}`;
     }
-    if (request.user.type !== "superadmin") {
-      delete eventDto.isVerified;
-      eventDto.verifiedAt = null;
-    } else if (eventDto.isVerified === false) {
-      eventDto.verifiedAt = null;
-    } else if (eventDto.isVerified === true) {
-      eventDto.verifiedAt = new Date();
-    }
+    eventDto.applyUserTypeRestrictions(request.user.type);
 
     return this.eventsService.create(eventDto, photoUrl, request.user.uuid);
   }
@@ -98,14 +94,7 @@ export class EventsController {
     if (photo !== undefined) {
       photoUrl = `/uploads/events/${photo.filename}`;
     }
-    if (request.user.type !== "superadmin") {
-      delete eventDto.isVerified;
-      eventDto.verifiedAt = null;
-    } else if (eventDto.isVerified === false) {
-      eventDto.verifiedAt = null;
-    } else if (eventDto.isVerified === true) {
-      eventDto.verifiedAt = new Date();
-    }
+    eventDto.applyUserTypeRestrictions(request.user.type);
 
     return this.eventsService.update(eventUUID, eventDto, photoUrl);
   }
@@ -120,27 +109,5 @@ export class EventsController {
     @Param("eventId", ParseUUIDPipe) eventUUID: string,
   ): Promise<Event> {
     return this.eventsService.remove(eventUUID);
-  }
-}
-
-@ApiTags("Events")
-@Controller("public/events")
-export class PublicEventsController {
-  constructor(private readonly eventsService: EventsService) {}
-
-  @Get("")
-  @ApiOperation({
-    summary: "Get list of public events with pagination and filtering",
-  })
-  @ApiOkResponse({ description: "List of public events", type: PageDto<Event> })
-  async findAllPublic(@Query() dto: EventListingDto): Promise<PageDto<Event>> {
-    return this.eventsService.findAllPublic(dto);
-  }
-
-  @Get(":slug")
-  @ApiOperation({ summary: "Get public event by slug" })
-  @ApiOkResponse({ description: "The public event", type: Event })
-  async findOnePublic(@Param("slug") slug: string): Promise<Event> {
-    return this.eventsService.findOnePublic(slug);
   }
 }
