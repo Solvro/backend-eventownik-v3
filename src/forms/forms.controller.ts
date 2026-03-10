@@ -1,3 +1,8 @@
+import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
+import { RequirePermission } from "src/auth/permissions.decorator";
+import { PermissionsGuard } from "src/auth/permissions.guard";
+import { PermissionType } from "src/generated/prisma/client";
+
 import {
   Body,
   Controller,
@@ -10,8 +15,14 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from "@nestjs/common";
-import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from "@nestjs/swagger";
 
 import { CreateFormDto } from "./dto/create-form.dto";
 import { FormListingDto } from "./dto/form-listing.dto";
@@ -19,6 +30,9 @@ import { UpdateFormDto } from "./dto/update-form.dto";
 import { FormsService } from "./forms.service";
 
 @ApiTags("Forms")
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermission(PermissionType.MANAGE_FORM)
 @Controller("events/:eventId/forms")
 export class FormsController {
   constructor(private readonly formsService: FormsService) {}
