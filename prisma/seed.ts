@@ -74,8 +74,6 @@ async function main() {
     data: {
       name: "Sample Event",
       description: "A test event lorem sigmum",
-      links: [] as string[],
-      policyLinks: [] as string[],
       startDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // next week
       endDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 8),
       organizerUuid: admin.uuid,
