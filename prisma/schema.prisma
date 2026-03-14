@@ -153,7 +153,7 @@ model Block {
   updatedAt     DateTime @updatedAt
   capacity      Int?
   order         Int?
-  name          String?
+  name          String
   description   String?
   parentUuid    String?  @db.Uuid
   attributeUuid String?  @db.Uuid

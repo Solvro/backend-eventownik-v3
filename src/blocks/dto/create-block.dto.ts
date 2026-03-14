@@ -13,10 +13,9 @@ export class CreateBlockDto {
   @IsInt()
   order?: number;
 
-  @ApiPropertyOptional({ example: "Name of the block" })
-  @IsOptional()
+  @ApiProperty({ example: "Name of the block" })
   @IsString()
-  name?: string;
+  name: string;
 
   @ApiPropertyOptional({ example: "Description of the block" })
   @IsOptional()

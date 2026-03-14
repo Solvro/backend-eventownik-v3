@@ -16,8 +16,8 @@ export class Block {
   @ApiProperty({ example: 1, nullable: true })
   order: number | null;
 
-  @ApiProperty({ example: "Name of the block", nullable: true })
-  name: string | null;
+  @ApiProperty({ example: "Name of the block" })
+  name: string;
 
   @ApiProperty({ example: "Description of the block", nullable: true })
   description: string | null;
