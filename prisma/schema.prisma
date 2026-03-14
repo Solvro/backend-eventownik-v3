@@ -157,6 +157,7 @@ model Block {
   description   String?
   parentUuid    String?  @db.Uuid
   attributeUuid String?  @db.Uuid
+  isRootBlock   Boolean  @default(false)
 
   parent    Block?     @relation("BlockToBlock", fields: [parentUuid], references: [uuid], onDelete: Cascade)
   children  Block[]    @relation("BlockToBlock")
