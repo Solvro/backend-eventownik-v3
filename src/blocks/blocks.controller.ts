@@ -1,4 +1,8 @@
+import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
+import { RequirePermission } from "src/auth/permissions.decorator";
+import { PermissionsGuard } from "src/auth/permissions.guard";
 import { PageDto } from "src/common/dto/page.dto";
+import { PermissionType } from "src/generated/prisma/enums";
 
 import {
   Body,
@@ -10,9 +14,10 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  Query,
+  UseGuards,
 } from "@nestjs/common";
 import {
+  ApiBearerAuth,
   ApiCreatedResponse,
   ApiNoContentResponse,
   ApiOkResponse,
@@ -27,6 +32,9 @@ import { UpdateBlockDto } from "./dto/update-block.dto";
 import { Block } from "./entities/block.entity";
 
 @ApiTags("Blocks")
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermission(PermissionType.MANAGE_EVENT)
+@ApiBearerAuth()
 @Controller("events/:eventId/attributes/:attributeId/blocks")
 export class BlocksController {
   constructor(private readonly blocksService: BlocksService) {}
