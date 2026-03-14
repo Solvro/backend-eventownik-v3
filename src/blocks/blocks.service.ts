@@ -1,14 +1,14 @@
-import { PageMetaDto } from "src/common/dto/page-meta.dto";
-import { PageDto } from "src/common/dto/page.dto";
-import { parseSortInput } from "src/common/utils/prisma.utility";
-import { Prisma } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 
-import { BlockListingDto } from "./dto/block-listing.dto";
 import { CreateBlockDto } from "./dto/create-block.dto";
 import { UpdateBlockDto } from "./dto/update-block.dto";
+import { Block } from "./entities/block.entity";
 
 @Injectable()
 export class BlocksService {
@@ -28,12 +28,30 @@ export class BlocksService {
     return attribute;
   }
 
+  private async checkParentBlockExists(
+    attributeId: string,
+    parentUuid: string,
+  ) {
+    const parentBlock = await this.prisma.block.findFirst({
+      where: { uuid: parentUuid, attributeUuid: attributeId },
+    });
+
+    if (parentBlock === null) {
+      throw new NotFoundException(
+        `Parent block with UUID ${parentUuid} not found in attribute ${attributeId}`,
+      );
+    }
+
+    return parentBlock;
+  }
+
   async create(
     eventId: string,
     attributeId: string,
     createBlockDto: CreateBlockDto,
   ) {
     await this.checkAttributeExists(eventId, attributeId);
+    await this.checkParentBlockExists(attributeId, createBlockDto.parentUuid);
 
     return this.prisma.block.create({
       data: {
@@ -47,36 +65,58 @@ export class BlocksService {
     });
   }
 
-  async findAll(eventId: string, attributeId: string, query: BlockListingDto) {
+  async findAll(eventId: string, attributeId: string) {
     await this.checkAttributeExists(eventId, attributeId);
 
-    const { skip, take, name, parentUuid, sort } = query;
-    const where: Prisma.BlockWhereInput = {
-      attributeUuid: attributeId,
-      ...(name === undefined
-        ? {}
-        : { name: { contains: name, mode: "insensitive" } }),
-      ...(parentUuid === undefined ? {} : { parentUuid }),
-    };
+    const blocks = await this.prisma.block.findMany({
+      where: { attributeUuid: attributeId },
+    });
 
-    const orderBy = parseSortInput(sort, ["name", "order", "createdAt"]);
+    const blocksMap = new Map<string, Block>();
 
-    if (orderBy.length === 0) {
-      orderBy.push({ createdAt: "desc" });
+    for (const block of blocks) {
+      blocksMap.set(block.uuid, { ...block, children: [] } as Block);
     }
 
-    const [itemCount, blocks] = await this.prisma.$transaction([
-      this.prisma.block.count({ where }),
-      this.prisma.block.findMany({
-        where,
-        skip,
-        take,
-        orderBy,
-      }),
-    ]);
+    let rootBlock: Block | null = null;
 
-    const pageMetaDto = new PageMetaDto({ itemCount, pageOptionsDto: query });
-    return new PageDto(blocks, pageMetaDto);
+    for (const block of blocksMap.values()) {
+      if (block.isRootBlock) {
+        rootBlock = block;
+      }
+      if (block.parentUuid != null) {
+        const parent = blocksMap.get(block.parentUuid);
+        if (parent?.children != null) {
+          parent.children.push(block);
+        }
+      }
+    }
+
+    if (rootBlock === null) {
+      return [];
+    }
+
+    const sortBlocks = (block: Block) => {
+      if (block.children == null) {
+        return;
+      }
+
+      block.children.sort((a: Block, b: Block) => {
+        const orderA = a.order ?? 0;
+        const orderB = b.order ?? 0;
+        if (orderA !== orderB) {
+          return orderA - orderB;
+        }
+        return a.createdAt.getTime() - b.createdAt.getTime();
+      });
+      for (const child of block.children) {
+        sortBlocks(child);
+      }
+    };
+
+    sortBlocks(rootBlock);
+
+    return rootBlock;
   }
 
   async findOne(eventId: string, attributeId: string, id: string) {
@@ -103,7 +143,18 @@ export class BlocksService {
     id: string,
     updateBlockDto: UpdateBlockDto,
   ) {
-    await this.findOne(eventId, attributeId, id);
+    const block = await this.findOne(eventId, attributeId, id);
+
+    if (block.isRootBlock) {
+      throw new BadRequestException("Root block cannot be modified this way");
+    }
+
+    if (updateBlockDto.parentUuid) {
+      if (updateBlockDto.parentUuid === id) {
+        throw new BadRequestException("Block cannot be its own parent");
+      }
+      await this.checkParentBlockExists(attributeId, updateBlockDto.parentUuid);
+    }
 
     return this.prisma.block.update({
       where: { uuid: id },
@@ -112,7 +163,13 @@ export class BlocksService {
   }
 
   async remove(eventId: string, attributeId: string, id: string) {
-    await this.findOne(eventId, attributeId, id);
+    const block = await this.findOne(eventId, attributeId, id);
+
+    if (block.isRootBlock) {
+      throw new BadRequestException(
+        "Cannot delete the root block of an attribute",
+      );
+    }
 
     await this.prisma.block.delete({
       where: { uuid: id },

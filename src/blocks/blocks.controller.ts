@@ -1,7 +1,6 @@
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
-import { PageDto } from "src/common/dto/page.dto";
 import { PermissionType } from "src/generated/prisma/enums";
 
 import {
@@ -26,7 +25,6 @@ import {
 } from "@nestjs/swagger";
 
 import { BlocksService } from "./blocks.service";
-import { BlockListingDto } from "./dto/block-listing.dto";
 import { CreateBlockDto } from "./dto/create-block.dto";
 import { UpdateBlockDto } from "./dto/update-block.dto";
 import { Block } from "./entities/block.entity";
@@ -51,14 +49,16 @@ export class BlocksController {
   }
 
   @Get()
-  @ApiOperation({ summary: "Get list of blocks with pagination and filtering" })
-  @ApiOkResponse({ description: "List of blocks", type: PageDto<Block> })
+  @ApiOperation({ summary: "Get all blocks for the attribute" })
+  @ApiOkResponse({
+    description: "Tree of blocks starting from the root",
+    type: Block,
+  })
   async findAll(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("attributeId", ParseUUIDPipe) attributeId: string,
-    @Query() query: BlockListingDto,
-  ): Promise<PageDto<Block>> {
-    return this.blocksService.findAll(eventId, attributeId, query);
+  ) {
+    return this.blocksService.findAll(eventId, attributeId);
   }
 
   @Get(":id")

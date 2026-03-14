@@ -6,9 +6,9 @@ import { Test } from "@nestjs/testing";
 
 import { BlocksController } from "./blocks.controller";
 import { BlocksService } from "./blocks.service";
-import { BlockListingDto } from "./dto/block-listing.dto";
 import type { CreateBlockDto } from "./dto/create-block.dto";
 import type { UpdateBlockDto } from "./dto/update-block.dto";
+import type { Block } from "./entities/block.entity";
 
 describe("Blocks Integration", () => {
   let blocksController: BlocksController;
@@ -52,7 +52,11 @@ describe("Blocks Integration", () => {
 
   describe("create", () => {
     it("should create a block successfully", async () => {
-      const dto: CreateBlockDto = { name: "Test Block", capacity: 100 };
+      const dto: CreateBlockDto = {
+        name: "Test Block",
+        capacity: 100,
+        parentUuid: "some-parent-uuid",
+      };
 
       mockPrismaService.attribute.findFirst.mockResolvedValue({
         uuid: attributeId,
@@ -86,7 +90,10 @@ describe("Blocks Integration", () => {
 
     it("should throw NotFoundException if attribute or event not found", async () => {
       mockPrismaService.attribute.findFirst.mockResolvedValue(null);
-      const dto: CreateBlockDto = { name: "Test Block" };
+      const dto: CreateBlockDto = {
+        name: "Test Block",
+        parentUuid: "fake-parent-uuid",
+      };
 
       await expect(
         blocksController.create(eventId, attributeId, dto),
@@ -95,23 +102,50 @@ describe("Blocks Integration", () => {
   });
 
   describe("findAll", () => {
-    it("should return a paginated list of blocks", async () => {
-      const dto = new BlockListingDto();
-
+    it("should return a nested tree structure of blocks", async () => {
       mockPrismaService.attribute.findFirst.mockResolvedValue({
         uuid: attributeId,
         eventUuid: eventId,
       });
-      mockPrismaService.$transaction.mockResolvedValue([
-        1, // count
-        [{ uuid: blockId, name: "Test Block", attributeUuid: attributeId }], // items
-      ]);
 
-      const result = await blocksController.findAll(eventId, attributeId, dto);
+      const mockBlocks = [
+        {
+          uuid: "root-uuid",
+          name: "Root Block",
+          isRootBlock: true,
+          parentUuid: null,
+          order: 0,
+          createdAt: new Date("2024-01-01"),
+        },
+        {
+          uuid: "child-uuid",
+          name: "Child Block",
+          isRootBlock: false,
+          parentUuid: "root-uuid",
+          order: 1,
+          createdAt: new Date("2024-01-02"),
+        },
+      ];
 
-      expect(result.data).toHaveLength(1);
-      expect(result.data[0]).toHaveProperty("uuid", blockId);
-      expect(result.meta.itemCount).toBe(1);
+      mockPrismaService.block.findMany.mockResolvedValue(mockBlocks);
+
+      const result = (await blocksController.findAll(
+        eventId,
+        attributeId,
+      )) as Block;
+
+      expect(mockPrismaService.block.findMany).toHaveBeenCalledWith({
+        where: { attributeUuid: attributeId },
+      });
+
+      expect(result).toHaveProperty("uuid", "root-uuid");
+
+      const children = result.children;
+      expect(children).toBeDefined();
+      if (children != null) {
+        expect(children).toHaveLength(1);
+        expect(children[0]).toHaveProperty("uuid", "child-uuid");
+      }
     });
   });
 
@@ -142,8 +176,14 @@ describe("Blocks Integration", () => {
 
   describe("update", () => {
     it("should update a block successfully", async () => {
-      const dto: UpdateBlockDto = { name: "Updated Block" };
-      mockPrismaService.block.findFirst.mockResolvedValue({ uuid: blockId });
+      const dto: UpdateBlockDto = {
+        name: "Updated Block",
+        parentUuid: "some-parent-uuid",
+      };
+      mockPrismaService.block.findFirst.mockResolvedValue({
+        uuid: blockId,
+        isRootBlock: false,
+      });
       mockPrismaService.block.update.mockResolvedValue(
         Object.assign({ uuid: blockId }, dto),
       );
@@ -162,7 +202,10 @@ describe("Blocks Integration", () => {
 
   describe("remove", () => {
     it("should remove a block successfully", async () => {
-      mockPrismaService.block.findFirst.mockResolvedValue({ uuid: blockId });
+      mockPrismaService.block.findFirst.mockResolvedValue({
+        uuid: blockId,
+        isRootBlock: false,
+      });
       mockPrismaService.block.delete.mockResolvedValue({ uuid: blockId });
 
       await blocksController.remove(eventId, attributeId, blockId);

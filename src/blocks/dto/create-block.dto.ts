@@ -1,6 +1,6 @@
 import { IsInt, IsOptional, IsString, IsUUID } from "class-validator";
 
-import { ApiPropertyOptional } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class CreateBlockDto {
   @ApiPropertyOptional({ example: 100 })
@@ -22,8 +22,7 @@ export class CreateBlockDto {
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({ example: "3d2f558c-df42-477d-bb2b-674fce2e886a" })
-  @IsOptional()
+  @ApiProperty({ example: "3d2f558c-df42-477d-bb2b-674fce2e886a" })
   @IsUUID()
-  parentUuid?: string;
+  parentUuid: string;
 }
