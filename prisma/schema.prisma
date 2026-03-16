@@ -173,10 +173,11 @@ model Block {
   updatedAt     DateTime @updatedAt
   capacity      Int?
   order         Int?
-  name          String?
+  name          String
   description   String?
   parentUuid    String?  @db.Uuid
   attributeUuid String?  @db.Uuid
+  isRootBlock   Boolean  @default(false)
 
   parent    Block?     @relation("BlockToBlock", fields: [parentUuid], references: [uuid], onDelete: Cascade)
   children  Block[]    @relation("BlockToBlock")
