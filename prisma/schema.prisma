@@ -179,6 +179,7 @@ model EmailTemplate {
   updatedAt     DateTime     @updatedAt
   triggerValue  String?
   triggerValue2 String?
+  order         Int?
   eventUuid     String?      @db.Uuid
   formUuid      String?      @db.Uuid
 

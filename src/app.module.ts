@@ -9,6 +9,7 @@ import { AppService } from "./app.service";
 import { AttributesModule } from "./attributes/attributes.module";
 import { AuthModule } from "./auth/auth.module";
 import { BlocksModule } from "./blocks/blocks.module";
+import { EmailsService } from "./emails/emails.service";
 import { EventsModule } from "./events/events.module";
 import { FormsModule } from "./forms/forms.module";
 import { OrganizersModule } from "./organizers/organizers.module";
@@ -35,6 +36,6 @@ import { PrismaModule } from "./prisma/prisma.module";
     ParticipantsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, EmailsService],
 })
 export class AppModule {}
