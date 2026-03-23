@@ -1,6 +1,6 @@
 import { Response } from "express";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import path from "node:path";
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
@@ -40,7 +40,7 @@ export class ParticipantsAttributesController {
     @Param("eventId", ParseUUIDPipe) eventUuid: string,
     @Param("participantId", ParseUUIDPipe) participantUuid: string,
     @Param("attributeId", ParseUUIDPipe) attributeUuid: string,
-    @Res() res: Response,
+    @Res() response: Response,
   ) {
     const participantAttribute =
       await this.prisma.participantAttribute.findFirst({
@@ -51,15 +51,20 @@ export class ParticipantsAttributesController {
         },
       });
 
-    if (!participantAttribute?.value) {
+    if (participantAttribute?.value == null) {
       throw new NotFoundException("Attribute doesn't have a file");
     }
 
     const filename = participantAttribute.value;
-    const filePath = join(process.cwd(), "uploads", "attributes", filename);
+    const filePath = path.join(
+      process.cwd(),
+      "uploads",
+      "attributes",
+      filename,
+    );
 
     if (existsSync(filePath)) {
-      res.download(filePath);
+      response.download(filePath);
     } else {
       throw new NotFoundException("File not found on server");
     }

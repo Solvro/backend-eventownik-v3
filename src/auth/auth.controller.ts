@@ -29,7 +29,9 @@ import { AuthUser } from "./jwt.strategy";
 @ApiTags("Auth")
 @Controller("auth")
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private authService: AuthService) {
+    ``;
+  }
 
   @Post("register")
   @ApiOperation({ summary: "Register new admin" })

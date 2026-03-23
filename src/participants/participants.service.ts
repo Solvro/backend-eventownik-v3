@@ -1,6 +1,6 @@
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
-import { Prisma } from "src/generated/prisma/client";
+import { Participant, Prisma } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import {
@@ -27,7 +27,7 @@ export class ParticipantsService {
   ): Promise<
     Prisma.ParticipantAttributeUncheckedCreateWithoutParticipantInput[]
   > {
-    if (!participantAttributes || participantAttributes.length === 0) {
+    if (participantAttributes == null || participantAttributes.length === 0) {
       return [];
     }
 
@@ -59,13 +59,13 @@ export class ParticipantsService {
       let valueToSave = attribute.value;
 
       if (type === "block") {
-        if (!valueToSave || valueToSave === "null") {
+        if (valueToSave == null || valueToSave === "null") {
           valueToSave = null;
         } else {
           const block = await this.prisma.block.findUnique({
             where: { uuid: valueToSave },
           });
-          if (!block) {
+          if (block == null) {
             throw new BadRequestException(
               `Block with UUID ${valueToSave} does not exist.`,
             );
@@ -73,15 +73,13 @@ export class ParticipantsService {
         }
       }
 
-      if (valueToSave !== undefined) {
-        // TODO: Integrate EmailService for attribute_changed trigger
-        // EmailService.sendOnTrigger(event, participant, "attribute_changed", attr.attributeUuid, valueToSave);
+      // TODO: Integrate EmailService for attribute_changed trigger
+      // EmailService.sendOnTrigger(event, participant, "attribute_changed", attr.attributeUuid, valueToSave);
 
-        transformedAttributes.push({
-          attributeUuid: attribute.attributeUuid,
-          value: valueToSave,
-        });
-      }
+      transformedAttributes.push({
+        attributeUuid: attribute.attributeUuid,
+        value: valueToSave,
+      });
     }
 
     return transformedAttributes;
@@ -93,7 +91,7 @@ export class ParticipantsService {
     try {
       return await this.prisma.$transaction(async (tx) => {
         const event = await tx.event.findUnique({ where: { uuid: eventUuid } });
-        if (!event) {
+        if (event == null) {
           throw new NotFoundException(`Event NOT FOUND`);
         }
 
@@ -206,7 +204,7 @@ export class ParticipantsService {
       where: { uuid: participantUuid, eventUuid },
     });
 
-    if (!participant) {
+    if (participant == null) {
       throw new NotFoundException("Participant not found");
     }
 
@@ -241,14 +239,14 @@ export class ParticipantsService {
   async findAll(eventUuid: string, query: ParticipantListingDto) {
     const { skip, take, bonus_attributes, filters } = query;
 
-    let filterQuery: any = {};
-    if (filters) {
+    let filterQuery: Prisma.ParticipantWhereInput = {};
+    if (filters != null) {
       try {
-        const parsedFilters =
+        const parsedFilters: unknown =
           typeof filters === "string" ? JSON.parse(filters) : filters;
-        if (typeof parsedFilters === "object" && parsedFilters !== null) {
+        if (typeof parsedFilters === "object" && parsedFilters != null) {
           filterQuery = {
-            AND: Object.entries(parsedFilters).map(
+            AND: Object.entries(parsedFilters as Record<string, unknown>).map(
               ([attributeUuid, value]) => ({
                 attributes: {
                   some: {
@@ -270,9 +268,8 @@ export class ParticipantsService {
       ...filterQuery,
     };
 
-    const bonusAttributesArray = bonus_attributes
-      ? bonus_attributes.split(",")
-      : [];
+    const bonusAttributesArray =
+      bonus_attributes == null ? [] : bonus_attributes.split(",");
 
     const [itemCount, participants] = await this.prisma.$transaction([
       this.prisma.participant.count({ where }),
@@ -315,7 +312,7 @@ export class ParticipantsService {
       })),
     }));
 
-    return new PageDto(data as any, pageMetaDto);
+    return new PageDto(data as unknown as Participant[], pageMetaDto);
   }
 
   async findOne(eventUuid: string, participantUuid: string) {
@@ -331,7 +328,7 @@ export class ParticipantsService {
       },
     });
 
-    if (!participant) {
+    if (participant == null) {
       throw new NotFoundException("Participant not found");
     }
 
@@ -373,7 +370,9 @@ export class ParticipantsService {
       include: {
         attributes: {
           where: {
-            attributeUuid: { in: attributes?.length ? attributes : undefined },
+            attributeUuid: {
+              in: attributes.length > 0 ? attributes : undefined,
+            },
           },
           include: {
             attribute: {
@@ -386,7 +385,7 @@ export class ParticipantsService {
       },
     });
 
-    if (!participant) {
+    if (participant == null) {
       throw new NotFoundException("Participant not found");
     }
 

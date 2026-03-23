@@ -17,5 +17,5 @@ export class ParticipantListingDto extends PageOptionsDto {
     description: "JSON string or object of filters for attributes",
   })
   @IsOptional()
-  readonly filters?: any;
+  readonly filters?: unknown;
 }

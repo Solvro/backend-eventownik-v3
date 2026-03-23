@@ -18,7 +18,7 @@ export class PublicParticipantsController {
     return this.participantsService.findOnePublic(
       eventUuid,
       participantUuid,
-      attributes || [],
+      attributes ?? [],
     );
   }
 }
