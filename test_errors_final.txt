@@ -1,0 +1,60 @@
+
+> backend-eventownik-v3@0.0.1 test
+> jest src/participants/
+
+PASS src/participants/public-participants.controller.spec.ts
+  ● Console
+
+    console.log
+      [dotenv@17.2.3] injecting env (3) from .env -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+
+      at _log (../node_modules/dotenv/lib/main.js:142:11)
+
+PASS src/participants/participants.service.spec.ts
+  ● Console
+
+    console.log
+      [dotenv@17.2.3] injecting env (3) from .env -- tip: 📡 add observability to secrets: https://dotenvx.com/ops
+
+      at _log (../node_modules/dotenv/lib/main.js:142:11)
+
+FAIL src/participants/participants-attributes.controller.spec.ts
+  ● Test suite failed to run
+
+    [96msrc/participants/participants-attributes.controller.spec.ts[0m:[93m102[0m:[93m52[0m - [91merror[0m[90m TS2554: [0mExpected 1 arguments, but got 0.
+
+    [7m102[0m       mockParticipantsService.bulkUpdateAttributes.mockResolvedValue();
+    [7m   [0m [91m                                                   ~~~~~~~~~~~~~~~~~[0m
+
+      [96mnode_modules/@types/jest/index.d.ts[0m:[93m1439[0m:[93m27[0m
+        [7m1439[0m         mockResolvedValue(value: ResolvedValue<T>): this;
+        [7m    [0m [96m                          ~~~~~~~~~~~~~~~~~~~~~~~[0m
+        An argument for 'value' was not provided.
+
+FAIL src/participants/participants.controller.spec.ts
+  ● Test suite failed to run
+
+    [96msrc/participants/participants.controller.spec.ts[0m:[93m107[0m:[93m42[0m - [91merror[0m[90m TS2554: [0mExpected 1 arguments, but got 0.
+
+    [7m107[0m       mockParticipantsService.unregister.mockResolvedValue();
+    [7m   [0m [91m                                         ~~~~~~~~~~~~~~~~~[0m
+
+      [96mnode_modules/@types/jest/index.d.ts[0m:[93m1439[0m:[93m27[0m
+        [7m1439[0m         mockResolvedValue(value: ResolvedValue<T>): this;
+        [7m    [0m [96m                          ~~~~~~~~~~~~~~~~~~~~~~~[0m
+        An argument for 'value' was not provided.
+    [96msrc/participants/participants.controller.spec.ts[0m:[93m124[0m:[93m46[0m - [91merror[0m[90m TS2554: [0mExpected 1 arguments, but got 0.
+
+    [7m124[0m       mockParticipantsService.unregisterMany.mockResolvedValue();
+    [7m   [0m [91m                                             ~~~~~~~~~~~~~~~~~[0m
+
+      [96mnode_modules/@types/jest/index.d.ts[0m:[93m1439[0m:[93m27[0m
+        [7m1439[0m         mockResolvedValue(value: ResolvedValue<T>): this;
+        [7m    [0m [96m                          ~~~~~~~~~~~~~~~~~~~~~~~[0m
+        An argument for 'value' was not provided.
+
+Test Suites: 2 failed, 2 passed, 4 total
+Tests:       15 passed, 15 total
+Snapshots:   0 total
+Time:        4.706 s
+Ran all test suites matching /src\\participants\\/i.

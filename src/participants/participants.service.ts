@@ -302,7 +302,7 @@ export class ParticipantsService {
     const data = participants.map((participant) => ({
       uuid: participant.uuid,
       email: participant.email,
-      createdAt: participant.createdAt, // Or format it? Will leave to Nest serialization
+      createdAt: participant.createdAt,
       attributes: participant.attributes.map((attribute) => ({
         uuid: attribute.attributeUuid,
         name: attribute.attribute.name,
@@ -361,7 +361,6 @@ export class ParticipantsService {
     participantUuid: string,
     attributes: string[],
   ) {
-    // In Adonis: await participant.load("attributes", q => ... whereIn id, request.input('attributes'))
     const participant = await this.prisma.participant.findFirst({
       where: {
         uuid: participantUuid,
@@ -375,11 +374,7 @@ export class ParticipantsService {
             },
           },
           include: {
-            attribute: {
-              // Note: Adonis restricted this to attributes that 'has("forms")'.
-              // We'll have to see if that implies they should belong to a form...
-              // Without knowing how `has("forms")` mapped in Adonis perfectly, we might filter it or leave it
-            },
+            attribute: {},
           },
         },
       },

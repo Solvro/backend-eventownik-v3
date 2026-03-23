@@ -1,0 +1,41 @@
+
+> backend-eventownik-v3@0.0.1 lint
+> eslint "{src,apps,libs,test}/**/*.ts" --fix
+
+
+C:\Users\loudsheep\Source\Web\backend-eventownik-v3\src\participants\dto\participant-bulk-update.dto.ts
+  12:3  warning  Property returning array should set array option property true  @darraghor/nestjs-typed/api-property-returning-array-should-set-array
+
+C:\Users\loudsheep\Source\Web\backend-eventownik-v3\src\participants\dto\participant-create.dto.ts
+  20:3  warning  Property marked as required should use @ApiProperty decorator   @darraghor/nestjs-typed/api-property-matches-property-optionality
+  35:3  warning  Property returning array should set array option property true  @darraghor/nestjs-typed/api-property-returning-array-should-set-array
+
+C:\Users\loudsheep\Source\Web\backend-eventownik-v3\src\participants\dto\unregister-many.dto.ts
+  6:3  warning  Property returning array should set array option property true  @darraghor/nestjs-typed/api-property-returning-array-should-set-array
+
+C:\Users\loudsheep\Source\Web\backend-eventownik-v3\src\participants\participants-attributes.controller.spec.ts
+  102:83  error  Unexpected empty async arrow function  @typescript-eslint/no-empty-function
+
+C:\Users\loudsheep\Source\Web\backend-eventownik-v3\src\participants\participants-attributes.controller.ts
+   3:1  error    Use default import for module `node:path`                                                                                                                                    unicorn/import-style
+  36:3  warning  A method decorated with @Get, @Post etc. should specify the expected ApiResponse e.g. @ApiOkResponse(type: MyType). These decorators are in the @nestjs/swagger npm package  @darraghor/nestjs-typed/api-method-should-specify-api-response
+  73:3  warning  A method decorated with @Get, @Post etc. should specify the expected ApiResponse e.g. @ApiOkResponse(type: MyType). These decorators are in the @nestjs/swagger npm package  @darraghor/nestjs-typed/api-method-should-specify-api-response
+
+C:\Users\loudsheep\Source\Web\backend-eventownik-v3\src\participants\participants.controller.spec.ts
+  107:73  error  Unexpected empty async arrow function  @typescript-eslint/no-empty-function
+  124:77  error  Unexpected empty async arrow function  @typescript-eslint/no-empty-function
+
+C:\Users\loudsheep\Source\Web\backend-eventownik-v3\src\participants\participants.controller.ts
+   33:3  warning  A method decorated with @Get, @Post etc. should specify the expected ApiResponse e.g. @ApiOkResponse(type: MyType). These decorators are in the @nestjs/swagger npm package  @darraghor/nestjs-typed/api-method-should-specify-api-response
+   43:3  warning  A method decorated with @Get, @Post etc. should specify the expected ApiResponse e.g. @ApiOkResponse(type: MyType). These decorators are in the @nestjs/swagger npm package  @darraghor/nestjs-typed/api-method-should-specify-api-response
+   53:3  warning  A method decorated with @Get, @Post etc. should specify the expected ApiResponse e.g. @ApiOkResponse(type: MyType). These decorators are in the @nestjs/swagger npm package  @darraghor/nestjs-typed/api-method-should-specify-api-response
+   63:3  warning  A method decorated with @Get, @Post etc. should specify the expected ApiResponse e.g. @ApiOkResponse(type: MyType). These decorators are in the @nestjs/swagger npm package  @darraghor/nestjs-typed/api-method-should-specify-api-response
+   78:3  warning  A method decorated with @Get, @Post etc. should specify the expected ApiResponse e.g. @ApiOkResponse(type: MyType). These decorators are in the @nestjs/swagger npm package  @darraghor/nestjs-typed/api-method-should-specify-api-response
+   89:3  warning  A method decorated with @Get, @Post etc. should specify the expected ApiResponse e.g. @ApiOkResponse(type: MyType). These decorators are in the @nestjs/swagger npm package  @darraghor/nestjs-typed/api-method-should-specify-api-response
+  100:3  warning  A method decorated with @Get, @Post etc. should specify the expected ApiResponse e.g. @ApiOkResponse(type: MyType). These decorators are in the @nestjs/swagger npm package  @darraghor/nestjs-typed/api-method-should-specify-api-response
+
+C:\Users\loudsheep\Source\Web\backend-eventownik-v3\src\participants\public-participants.controller.ts
+  11:3  warning  A method decorated with @Get, @Post etc. should specify the expected ApiResponse e.g. @ApiOkResponse(type: MyType). These decorators are in the @nestjs/swagger npm package  @darraghor/nestjs-typed/api-method-should-specify-api-response
+
+✖ 18 problems (4 errors, 14 warnings)
+

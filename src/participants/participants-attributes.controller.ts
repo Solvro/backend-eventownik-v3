@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { existsSync } from "node:fs";
-import path from "node:path";
+// eslint-disable-next-line unicorn/import-style
+import * as path from "node:path";
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
