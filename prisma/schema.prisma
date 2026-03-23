@@ -33,7 +33,6 @@ model Admin {
 
   events          Event[]           @relation("Organizer")
   permissions     EventPermission[]
-  adminPermissions AdminPermission[]
   authAccessTokens AuthAccessToken[]
 
   @@map("Admins")
@@ -51,31 +50,6 @@ model EventPermission {
 
   @@unique([eventUuid, adminUuid, permission])
   @@map("EventPermissions")
-}
-
-model AdminPermission {
-  uuid           String   @id @default(uuid()) @db.Uuid
-  eventUuid      String   @db.Uuid
-  permissionUuid String   @db.Uuid
-  adminUuid      String   @db.Uuid
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  admin      Admin      @relation(fields: [adminUuid], references: [uuid], onDelete: Cascade)
-  event      Event      @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
-  permission Permission @relation(fields: [permissionUuid], references: [uuid], onDelete: Cascade)
-
-  @@map("AdminsPermissions")
-}
-
-model Permission {
-  uuid    String @id @default(uuid()) @db.Uuid
-  action  String
-  subject String
-
-  adminPermissions AdminPermission[]
-
-  @@map("Permissions")
 }
 
 model Event {
@@ -105,7 +79,6 @@ model Event {
   emails           EmailTemplate[]
   forms            Form[]            @relation("EventForms")
   adminPermissions EventPermission[]
-  oldAdminPermissions AdminPermission[]
   participants     Participant[]
   links       EventLink[]
 
