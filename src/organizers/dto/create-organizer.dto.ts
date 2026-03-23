@@ -11,6 +11,7 @@ import { PermissionType } from "src/generated/prisma/client";
 import { ApiProperty } from "@nestjs/swagger";
 
 export class CreateOrganizerDto {
+  @ApiProperty({ isArray: true })
   @IsArray()
   @ArrayUnique()
   @ArrayMinSize(1)
