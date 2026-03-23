@@ -18,6 +18,7 @@ enum PermissionType {
   MANAGE_FORM
   MANAGE_PARTICIPANT
   MANAGE_EMAIL
+  MANAGE_SETTINGS
 }
 
 model Admin {
