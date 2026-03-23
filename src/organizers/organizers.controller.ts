@@ -132,7 +132,7 @@ export class OrganizersController {
   })
   @ApiResponse({
     status: 400,
-    description: "All permissionIds's elements must be unique",
+    description: "Duplicate permissions are not allowed",
   })
   async update(
     @Param("eventId", ParseUUIDPipe) eventId: string,

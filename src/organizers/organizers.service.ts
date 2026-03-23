@@ -5,6 +5,7 @@ import { Prisma } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -38,13 +39,26 @@ export class OrganizersService {
         throw new NotFoundException(`Event with uuid: ${eventUuid} not found`);
       }
 
-      await tx.eventPermission.createMany({
-        data: permissions.map((permission) => ({
-          eventUuid,
-          adminUuid: admin.uuid,
-          permission,
-        })),
-      });
+      try {
+        await tx.eventPermission.createMany({
+          data: permissions.map((permission) => ({
+            eventUuid,
+            adminUuid: admin.uuid,
+            permission,
+          })),
+        });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          throw new BadRequestException(
+            "One or more permissions already exist for this organizer in this event",
+          );
+        }
+
+        throw error;
+      }
 
       return tx.admin.findUnique({
         where: { uuid: admin.uuid },
