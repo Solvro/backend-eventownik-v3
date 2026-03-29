@@ -1,11 +1,12 @@
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { parseSortInput } from "src/common/utils/prisma.utility";
-import { Prisma } from "src/generated/prisma/browser";
+import { OpenCondition, Prisma } from "src/generated/prisma/browser";
 
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from "@nestjs/common";
 
@@ -26,6 +27,15 @@ export class FormsService {
     ) {
       throw new BadRequestException(
         "Open date must be earlier than close date",
+      );
+    }
+
+    if (
+      createFormDto.openCondition === OpenCondition.ON_DATE &&
+      createFormDto.closeDate == null
+    ) {
+      throw new BadRequestException(
+        "Close date must be provided when open condition is ON_DATE",
       );
     }
 
@@ -153,6 +163,15 @@ export class FormsService {
       );
     }
 
+    if (
+      updateFormDto.openCondition === OpenCondition.ON_DATE &&
+      updateFormDto.closeDate == null
+    ) {
+      throw new BadRequestException(
+        "Close date must be provided when open condition is ON_DATE",
+      );
+    }
+
     return await this.prisma.$transaction(async (prisma) => {
       const event = await prisma.event.findUnique({
         where: { uuid: eventUuid },
@@ -260,5 +279,26 @@ export class FormsService {
       }
       return deletedForms;
     });
+  }
+
+  async isOpen(formUuid: string, eventUuid: string) {
+    const form = await this.findOne(formUuid, eventUuid);
+    switch (form.openCondition) {
+      case OpenCondition.MANUAL: {
+        return form.isOpen;
+      }
+      case OpenCondition.ON_DATE: {
+        const now = new Date();
+        if (form.closeDate == null) {
+          throw new InternalServerErrorException(
+            "Form with ON_DATE open condition must have a close date",
+          );
+        }
+        return (
+          (form.openDate == null ? true : form.openDate <= now) &&
+          form.closeDate >= now
+        );
+      }
+    }
   }
 }

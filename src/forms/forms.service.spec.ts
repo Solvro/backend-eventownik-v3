@@ -56,6 +56,7 @@ describe("FormsService", () => {
       closeDate: new Date(Date.now() + 1000),
       description: "A test form",
       isFirstForm: true,
+      openCondition: "ON_DATE",
       attributes: [
         { attributeUuid: "attr-uuid-1", isRequired: true, order: 1 },
         { attributeUuid: "attr-uuid-2", isRequired: false, order: 2 },

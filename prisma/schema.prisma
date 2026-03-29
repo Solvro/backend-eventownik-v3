@@ -230,7 +230,7 @@ model Form {
   description String?
   eventUuid   String?   @db.Uuid
   isOpen      Boolean   @default(false)
-  openCondition OpenCondition?
+  openCondition OpenCondition @default(MANUAL)
 
   event            Event?            @relation("EventForms", fields: [eventUuid], references: [uuid], onDelete: Cascade)
   formDefinitions  FormDefinition[]
