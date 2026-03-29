@@ -214,6 +214,11 @@ model EmailTemplate {
   @@map("EmailTemplates")
 }
 
+enum OpenCondition {
+  ON_DATE
+  MANUAL
+}
+
 model Form {
   uuid        String    @id @default(uuid()) @db.Uuid
   name        String
@@ -224,6 +229,8 @@ model Form {
   closeDate   DateTime?
   description String?
   eventUuid   String?   @db.Uuid
+  isOpen      Boolean   @default(false)
+  openCondition OpenCondition?
 
   event            Event?            @relation("EventForms", fields: [eventUuid], references: [uuid], onDelete: Cascade)
   formDefinitions  FormDefinition[]
