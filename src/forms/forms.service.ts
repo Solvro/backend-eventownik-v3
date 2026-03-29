@@ -13,6 +13,7 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateFormDto } from "./dto/create-form.dto";
 import { FormListingDto } from "./dto/form-listing.dto";
+import { FormSubmitionDto } from "./dto/form-submition.dto";
 import { UpdateFormDto } from "./dto/update-form.dto";
 
 @Injectable()
@@ -300,5 +301,143 @@ export class FormsService {
         );
       }
     }
+  }
+
+  async formSubmit(
+    eventUuid: string,
+    formUuid: string,
+    submissionData: FormSubmitionDto,
+  ) {
+    return await this.prisma.$transaction(async (prisma) => {
+      const event = await prisma.event.findUnique({
+        where: { uuid: eventUuid },
+        include: { participants: true },
+      });
+      if (event == null) {
+        throw new NotFoundException(`Event with id: ${eventUuid} not found`);
+      }
+      const form = await prisma.form.findUnique({
+        where: { uuid: formUuid, eventUuid },
+        include: {
+          formDefinitions: {
+            include: { attribute: true },
+          },
+        },
+      });
+      if (form == null) {
+        throw new NotFoundException(`Form with id: ${formUuid} not found`);
+      }
+      const isFormOpen = await this.isOpen(formUuid, eventUuid);
+      if (!isFormOpen) {
+        throw new BadRequestException(`Form with id: ${formUuid} is closed`);
+      }
+
+      if (
+        event.registerFormUuid === formUuid &&
+        submissionData.email === undefined
+      ) {
+        throw new BadRequestException(
+          `Email is required for the registration form`,
+        );
+      } else if (
+        event.registerFormUuid !== formUuid &&
+        submissionData.participantId === undefined
+      ) {
+        throw new BadRequestException(
+          `Participant ID is required for non-registration forms`,
+        );
+      }
+
+      const normalizedAttributes: Record<string, string | null | undefined> =
+        {};
+
+      for (const [key, value] of Object.entries(
+        submissionData.attributes as Record<string, string | null | undefined>,
+      )) {
+        if (value === null || value === "null" || value === "") {
+          normalizedAttributes[key] = null;
+        } else if (value !== undefined) {
+          normalizedAttributes[key] = value;
+        }
+      }
+
+      if (submissionData.participantId !== undefined) {
+        const participant = await prisma.participant.findUnique({
+          where: { uuid: submissionData.participantId },
+        });
+        if (participant == null) {
+          throw new NotFoundException(
+            `Participant with id: ${submissionData.participantId} not found`,
+          );
+        }
+
+        for (const attribute in normalizedAttributes) {
+          await prisma.participantAttribute.updateMany({
+            where: {
+              participantUuid: submissionData.participantId,
+              attributeUuid: attribute,
+            },
+            data: {
+              value: normalizedAttributes[attribute],
+            },
+          });
+        }
+      } else if (submissionData.email !== undefined) {
+        if (
+          event.participantsLimit !== null &&
+          event.participantsLimit <= event.participants.length
+        ) {
+          throw new BadRequestException(
+            `Event with id: ${eventUuid} has reached the participants limit`,
+          );
+        }
+        const participant = await prisma.participant.findFirst({
+          where: { email: submissionData.email, eventUuid },
+        });
+        if (participant != null) {
+          throw new BadRequestException(
+            `Participant with email: ${submissionData.email} already exists`,
+          );
+        }
+        const newParticipant = await prisma.participant.create({
+          data: {
+            email: submissionData.email,
+            eventUuid,
+          },
+        });
+        for (const attribute in normalizedAttributes) {
+          await prisma.participantAttribute.create({
+            data: {
+              participantUuid: newParticipant.uuid,
+              attributeUuid: attribute,
+              value: normalizedAttributes[attribute],
+            },
+          });
+        }
+      }
+
+      // TODO: poprawić
+      const missingAttributes = await prisma.participantAttribute.findMany({
+        where: {
+          participantUuid: submissionData.participantId,
+          attributeUuid: {
+            in: form.formDefinitions
+              .filter((formDeff) => formDeff.isRequired)
+              .map((formDeff) => formDeff.attributeUuid)
+              .filter((uuid): uuid is string => uuid !== null),
+          },
+          value: null,
+        },
+      });
+      if (missingAttributes.length > 0) {
+        throw new NotFoundException(
+          `Missing required attributes: ${missingAttributes
+            .map((attribute) => attribute.attributeUuid)
+            .join(", ")}`,
+        );
+      }
+
+      return null;
+    });
   }
 }
