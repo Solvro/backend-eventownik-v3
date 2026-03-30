@@ -2,12 +2,16 @@ import { BlocksService } from "src/blocks/blocks.service";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { parseSortInput } from "src/common/utils/prisma.utility";
-import { Prisma } from "src/generated/prisma/client";
+import {
+  Prisma,
+  Attribute as PrismaAttribute,
+} from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import { Injectable, NotFoundException } from "@nestjs/common";
 
 import { AttributeListingDto } from "./dto/attribute-listing.dto";
+import { BulkUpdateAttributeDto } from "./dto/bulk-update-attribute.dto";
 import { CreateAttributeDto } from "./dto/create-attribute.dto";
 import { UpdateAttributeDto } from "./dto/update-attribute.dto";
 
@@ -198,12 +202,9 @@ export class AttributesService {
     });
   }
 
-  async bulkUpdate(
-    eventId: string,
-    attributes: Array<CreateAttributeDto & { uuid?: string }>,
-  ) {
+  async bulkUpdate(eventId: string, attributes: BulkUpdateAttributeDto[]) {
     return this.prisma.$transaction(async (prisma) => {
-      const results = [];
+      const results: PrismaAttribute[] = [];
       for (const item of attributes) {
         if (item.uuid == null) {
           results.push(await this.createTx(prisma, item, eventId));
