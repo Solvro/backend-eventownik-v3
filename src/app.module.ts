@@ -3,6 +3,7 @@ import * as Joi from "joi";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 
+import { AdminsModule } from "./admins/admins.module";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { AttributesModule } from "./attributes/attributes.module";
@@ -29,6 +30,7 @@ import { PrismaModule } from "./prisma/prisma.module";
     AuthModule,
     AttributesModule,
     BlocksModule,
+    AdminsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
