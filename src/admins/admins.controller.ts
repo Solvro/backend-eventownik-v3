@@ -1,43 +1,107 @@
+import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
+import { AuthUser } from "src/auth/jwt.strategy";
+
 import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
+  Request,
+  UseGuards,
 } from "@nestjs/common";
+import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { AdminsService } from "./admins.service";
 import { CreateAdminDto } from "./dto/create-admin.dto";
 import { UpdateAdminDto } from "./dto/update-admin.dto";
+import { Admin } from "./entities/admin.entity";
+import { checkAdminType } from "./utils/check-admin-type";
 
+@UseGuards(JwtAuthGuard)
+@ApiTags("Admins")
 @Controller("admins")
 export class AdminsController {
   constructor(private readonly adminsService: AdminsService) {}
 
   @Post()
-  create(@Body() createAdminDto: CreateAdminDto) {
-    return this.adminsService.create(createAdminDto);
+  @ApiOperation({ summary: "Create a new admin" })
+  @ApiResponse({
+    status: 201,
+    description: "The admin has been successfully created.",
+  })
+  @ApiResponse({ status: 403, description: "Invalid admin type." })
+  async create(
+    @Body() createAdminDto: CreateAdminDto,
+    @Request() request: { user: AuthUser },
+  ) {
+    if (!checkAdminType(request.user)) {
+      throw new ForbiddenException("Only superadmins can create new admins");
+    }
+    return await this.adminsService.create(createAdminDto);
   }
 
   @Get()
-  findAll() {
-    return this.adminsService.findAll();
+  @ApiOperation({ summary: "Get list of all admins" })
+  @ApiResponse({ status: 200, description: "List of admins." })
+  @ApiResponse({ status: 403, description: "Invalid admin type." })
+  async findAll(@Request() request: { user: AuthUser }) {
+    if (!checkAdminType(request.user)) {
+      throw new ForbiddenException("Invalid admin type");
+    }
+    return await this.adminsService.findAll();
   }
 
-  @Get(":id")
-  findOne(@Param("id") id: string) {
-    return this.adminsService.findOne(+id);
+  @Get(":adminId")
+  @ApiOperation({ summary: "Get a admin by id" })
+  @ApiResponse({ status: 200, description: "The admin." })
+  @ApiResponse({ status: 404, description: "Admin not found." })
+  @ApiResponse({ status: 403, description: "Invalid admin type." })
+  async findOne(
+    @Param("adminId", ParseUUIDPipe) adminId: string,
+    @Request() request: { user: AuthUser },
+  ): Promise<Admin> {
+    if (!checkAdminType(request.user)) {
+      throw new ForbiddenException("Invalid admin type");
+    }
+    return await this.adminsService.findOne(adminId);
   }
 
-  @Patch(":id")
-  update(@Param("id") id: string, @Body() updateAdminDto: UpdateAdminDto) {
-    return this.adminsService.update(+id, updateAdminDto);
+  @Patch(":adminId")
+  @ApiOperation({ summary: "Update a admin by id" })
+  @ApiResponse({ status: 200, description: "The updated admin." })
+  @ApiResponse({ status: 404, description: "Admin not found." })
+  @ApiResponse({ status: 403, description: "Invalid admin type." })
+  async update(
+    @Param("adminId", ParseUUIDPipe) adminId: string,
+    @Body() updateAdminDto: UpdateAdminDto,
+    @Request() request: { user: AuthUser },
+  ): Promise<Admin> {
+    if (!checkAdminType(request.user)) {
+      throw new ForbiddenException("Invalid admin type");
+    }
+    return await this.adminsService.update(adminId, updateAdminDto);
   }
 
-  @Delete(":id")
-  remove(@Param("id") id: string) {
-    return this.adminsService.remove(+id);
+  @Delete(":adminId")
+  @ApiOperation({ summary: "Delete a admin by id" })
+  @ApiResponse({
+    status: 200,
+    description: "The admin has been successfully deleted.",
+  })
+  @ApiResponse({ status: 404, description: "Admin not found." })
+  @ApiResponse({ status: 403, description: "Invalid admin type." })
+  async remove(
+    @Param("adminId", ParseUUIDPipe) adminId: string,
+    @Request() request: { user: AuthUser },
+  ): Promise<Admin> {
+    if (!checkAdminType(request.user)) {
+      throw new ForbiddenException("Invalid admin type");
+    }
+    return await this.adminsService.remove(adminId);
   }
 }
