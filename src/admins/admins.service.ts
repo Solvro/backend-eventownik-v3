@@ -1,9 +1,13 @@
+import { PageMetaDto } from "src/common/dto/page-meta.dto";
+import { PageDto } from "src/common/dto/page.dto";
+import { parseSortInput } from "src/common/utils/prisma.utility";
 import { Prisma } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import { Injectable, NotFoundException } from "@nestjs/common";
 
 import { CreateAdminDto } from "./dto/create-admin.dto";
+import { ListAdminDto } from "./dto/list-admin.dto";
 import { UpdateAdminDto } from "./dto/update-admin.dto";
 
 @Injectable()
@@ -13,21 +17,50 @@ export class AdminsService {
   async create(createAdminDto: CreateAdminDto) {
     return await this.prisma.$transaction(async (tx) => {
       const admin = await tx.admin.create({
-        data: {
-          firstName: createAdminDto.fistName,
-          lastName: createAdminDto.lastName,
-          email: createAdminDto.email,
-          password: createAdminDto.password,
-          type: createAdminDto.type,
-          active: createAdminDto.active,
-        },
+        data: { ...(createAdminDto as Prisma.AdminCreateInput) },
       });
       return admin; // TODO: add permissions attachment
     });
   }
 
-  async findAll() {
-    return await this.prisma.admin.findMany();
+  async findAll(query: ListAdminDto) {
+    const { skip, take, email, firstName, lastName, type, sort } = query;
+
+    const where: Prisma.AdminWhereInput = {
+      ...(email === undefined
+        ? {}
+        : { email: { contains: email, mode: "insensitive" } }),
+      ...(firstName === undefined
+        ? {}
+        : { firstName: { contains: firstName, mode: "insensitive" } }),
+      ...(lastName === undefined
+        ? {}
+        : { lastName: { contains: lastName, mode: "insensitive" } }),
+      ...(type === undefined ? {} : { type: { equals: type } }),
+    };
+
+    const orderBy = parseSortInput(sort, [
+      "email",
+      "firstName",
+      "lastName",
+      "createdAt",
+    ]);
+
+    if (orderBy.length === 0) {
+      orderBy.push({ createdAt: "desc" });
+    }
+
+    const [itemCount, admins] = await this.prisma.$transaction([
+      this.prisma.admin.count({ where }),
+      this.prisma.admin.findMany({
+        where,
+        skip,
+        take,
+        orderBy,
+      }),
+    ]);
+    const pageMetaDto = new PageMetaDto({ itemCount, pageOptionsDto: query });
+    return new PageDto(admins, pageMetaDto);
   }
 
   async findOne(id: string) {
@@ -45,12 +78,7 @@ export class AdminsService {
       const admin = await this.prisma.admin.update({
         where: { uuid: id },
         data: {
-          firstName: updateAdminDto.fistName,
-          lastName: updateAdminDto.lastName,
-          email: updateAdminDto.email,
-          password: updateAdminDto.password,
-          type: updateAdminDto.type,
-          active: updateAdminDto.active,
+          ...(updateAdminDto as Prisma.AdminUpdateInput),
         },
       });
       return admin;

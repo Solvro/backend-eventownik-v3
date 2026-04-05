@@ -8,7 +8,7 @@ export class CreateAdminDto {
     example: "John",
     type: String,
   })
-  fistName!: string;
+  firstName!: string;
 
   @ApiProperty({
     description: "Last name of the admin",
