@@ -1,5 +1,6 @@
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { AuthUser } from "src/auth/jwt.strategy";
+import { EventListingDto } from "src/events/dto/event-listing.dto";
 
 import {
   Body,
@@ -11,6 +12,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Request,
   UseGuards,
 } from "@nestjs/common";
@@ -49,11 +51,14 @@ export class AdminsController {
   @ApiOperation({ summary: "Get list of all admins" })
   @ApiResponse({ status: 200, description: "List of admins." })
   @ApiResponse({ status: 403, description: "Invalid admin type." })
-  async findAll(@Request() request: { user: AuthUser }) {
+  async findAll(
+    @Request() request: { user: AuthUser },
+    @Query() dto: EventListingDto,
+  ) {
     if (!checkAdminType(request.user)) {
       throw new ForbiddenException("Invalid admin type");
     }
-    return await this.adminsService.findAll();
+    return await this.adminsService.findAll(dto);
   }
 
   @Get(":adminId")
