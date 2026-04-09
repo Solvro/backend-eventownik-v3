@@ -20,7 +20,12 @@ import {
   Res,
   UseGuards,
 } from "@nestjs/common";
-import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import {
+  ApiNotFoundResponse,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from "@nestjs/swagger";
 
 import { ParticipantBulkUpdateDto } from "./dto/participant-bulk-update.dto";
 import { ParticipantsService } from "./participants.service";
@@ -37,6 +42,7 @@ export class ParticipantsAttributesController {
   @Get(":participantId/attributes/:attributeId/download")
   @RequirePermission(PermissionType.MANAGE_PARTICIPANT)
   @ApiOperation({ summary: "Download an attribute file" })
+  @ApiNotFoundResponse({ description: "Attribute file not found" })
   async downloadFile(
     @Param("eventId", ParseUUIDPipe) eventUuid: string,
     @Param("participantId", ParseUUIDPipe) participantUuid: string,
@@ -74,6 +80,8 @@ export class ParticipantsAttributesController {
   @Patch("attributes/:attributeId/bulk-update")
   @RequirePermission(PermissionType.MANAGE_PARTICIPANT)
   @ApiOperation({ summary: "Bulk update participants attributes" })
+  @ApiResponse({ status: 204, description: "Attributes updated" })
+  @ApiNotFoundResponse({ description: "Attribute or Event not found" })
   @HttpCode(204)
   async bulkUpdate(
     @Param("eventId", ParseUUIDPipe) eventUuid: string,

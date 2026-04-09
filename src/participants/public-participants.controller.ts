@@ -1,6 +1,12 @@
 import { Controller, Get, Param, ParseUUIDPipe, Query } from "@nestjs/common";
-import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import {
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from "@nestjs/swagger";
 
+import { Participant } from "./entities/participant.entity";
 import { ParticipantsService } from "./participants.service";
 
 @ApiTags("Public Participants")
@@ -10,6 +16,8 @@ export class PublicParticipantsController {
 
   @Get(":participantId")
   @ApiOperation({ summary: "Get public participant" })
+  @ApiOkResponse({ type: Participant })
+  @ApiNotFoundResponse({ description: "Participant not found" })
   async index(
     @Param("eventId", ParseUUIDPipe) eventUuid: string,
     @Param("participantId", ParseUUIDPipe) participantUuid: string,

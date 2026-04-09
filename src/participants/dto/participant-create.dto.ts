@@ -12,7 +12,10 @@ import {
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class ParticipantAttributeDto {
-  @ApiProperty({ description: "UUID of the attribute" })
+  @ApiProperty({
+    description: "UUID of the attribute",
+    example: "550e8400-e29b-41d4-a716-446655440000",
+  })
   @IsUUID()
   @IsNotEmpty()
   attributeUuid: string;
@@ -20,6 +23,7 @@ export class ParticipantAttributeDto {
   @ApiPropertyOptional({
     description: "Value of the attribute",
     nullable: true,
+    example: "John Doe",
   })
   @IsString()
   @IsOptional()
@@ -27,7 +31,10 @@ export class ParticipantAttributeDto {
 }
 
 export class ParticipantCreateDto {
-  @ApiProperty({ description: "Email of the participant" })
+  @ApiProperty({
+    description: "Email of the participant",
+    example: "participant@example.com",
+  })
   @IsEmail()
   @IsNotEmpty()
   email: string;

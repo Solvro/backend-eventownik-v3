@@ -86,19 +86,26 @@ describe("ParticipantsService", () => {
       mockPrismaService.attribute.findMany.mockResolvedValue([
         { uuid: "attr-1", type: "text" },
       ]);
-      const createdParticipant = {
+      const prismaParticipant = {
         uuid: "part-123",
         email: "test@example.com",
         createdAt: new Date(),
-        attributes: [{ attributeUuid: "attr-1", value: "val-1" }],
+        attributes: [
+          {
+            attributeUuid: "attr-1",
+            value: "val-1",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            attribute: { name: "Attr 1" },
+          },
+        ],
       };
-      mockPrismaService.participant.create.mockResolvedValue(
-        createdParticipant,
-      );
+      mockPrismaService.participant.create.mockResolvedValue(prismaParticipant);
 
       const result = await service.createParticipant(eventUuid, createDto);
 
-      expect(result).toEqual(createdParticipant);
+      expect(result.uuid).toBe("part-123");
+      expect(result.attributes[0].name).toBe("Attr 1");
       expect(mockPrismaService.participant.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -142,6 +149,39 @@ describe("ParticipantsService", () => {
     });
   });
 
+  describe("register", () => {
+    const eventUuid = "event-123";
+    const email = "internal@example.com";
+    const attributes = [{ attributeUuid: "attr-1", value: "val-1" }];
+
+    it("should allow internal registration of a participant", async () => {
+      mockPrismaService.event.findUnique.mockResolvedValue({ uuid: eventUuid });
+      mockPrismaService.attribute.findMany.mockResolvedValue([
+        { uuid: "attr-1", type: "text" },
+      ]);
+      mockPrismaService.participant.create.mockResolvedValue({
+        uuid: "part-int",
+        email,
+        createdAt: new Date(),
+        attributes: [
+          {
+            attributeUuid: "attr-1",
+            value: "val-1",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            attribute: { name: "Attr 1" },
+          },
+        ],
+      });
+
+      const result = await service.register(eventUuid, email, attributes);
+
+      expect(result.email).toBe(email);
+      expect(result.attributes[0].name).toBe("Attr 1");
+      expect(mockPrismaService.participant.create).toHaveBeenCalled();
+    });
+  });
+
   describe("updateParticipant", () => {
     const eventUuid = "event-123";
     const participantUuid = "part-123";
@@ -161,6 +201,8 @@ describe("ParticipantsService", () => {
       mockPrismaService.participant.update.mockResolvedValue({
         uuid: participantUuid,
         email: "updated@example.com",
+        createdAt: new Date(),
+        attributes: [],
       });
 
       const result = await service.updateParticipant(
@@ -169,10 +211,7 @@ describe("ParticipantsService", () => {
         updateDto,
       );
 
-      expect(result).toEqual({
-        uuid: participantUuid,
-        email: "updated@example.com",
-      });
+      expect(result.email).toBe("updated@example.com");
       expect(
         mockPrismaService.participantAttribute.deleteMany,
       ).toHaveBeenCalled();
@@ -276,7 +315,7 @@ describe("ParticipantsService", () => {
 
       expect(result.uuid).toBe(participantUuid);
       expect(result.attributes[0].name).toBe("Attr Name");
-      expect(result.emails[0].status).toBe("sent");
+      expect(result.emails?.[0].status).toBe("sent");
     });
 
     it("should throw NotFoundException if participant not found", async () => {

@@ -122,9 +122,7 @@ describe("ParticipantsAttributesController", () => {
         newValue: "newVal",
       };
 
-      mockParticipantsService.bulkUpdateAttributes.mockReturnValue(
-        Promise.resolve(),
-      );
+      mockParticipantsService.bulkUpdateAttributes.mockResolvedValue(null);
 
       await controller.bulkUpdate(eventUuid, attributeUuid, dto);
 

@@ -1,6 +1,13 @@
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
-import { Participant, Prisma } from "src/generated/prisma/client";
+import {
+  Attribute,
+  EmailTemplate,
+  ParticipantAttribute,
+  ParticipantEmailStatus,
+  Prisma,
+  Participant as PrismaParticipant,
+} from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import {
@@ -16,10 +23,46 @@ import {
 } from "./dto/participant-create.dto";
 import { ParticipantListingDto } from "./dto/participant-listing.dto";
 import { ParticipantUpdateDto } from "./dto/participant-update.dto";
+import { Participant } from "./entities/participant.entity";
+
+type ParticipantWithRelations = PrismaParticipant & {
+  attributes?: (ParticipantAttribute & {
+    attribute?: Attribute;
+  })[];
+  emails?: (ParticipantEmailStatus & {
+    email?: EmailTemplate | null;
+  })[];
+};
 
 @Injectable()
 export class ParticipantsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private mapToEntity(participant: ParticipantWithRelations): Participant {
+    return {
+      uuid: participant.uuid,
+      email: participant.email,
+      createdAt: participant.createdAt,
+      attributes:
+        participant.attributes?.map((attribute) => ({
+          uuid: attribute.attributeUuid,
+          name: attribute.attribute?.name ?? "",
+          value: attribute.value,
+          createdAt: attribute.createdAt,
+          updatedAt: attribute.updatedAt,
+        })) ?? [],
+      emails: participant.emails?.map((emailStatus) => ({
+        uuid: emailStatus.uuid,
+        status: emailStatus.status,
+        sendAt: emailStatus.sendAt,
+        sendBy: emailStatus.sendBy,
+        name: emailStatus.email?.name,
+        content: emailStatus.email?.content,
+        trigger: emailStatus.email?.trigger,
+        triggerValue: emailStatus.email?.triggerValue,
+      })),
+    };
+  }
 
   private async prepareAttributesForSave(
     eventUuid: string,
@@ -85,9 +128,22 @@ export class ParticipantsService {
     return transformedAttributes;
   }
 
-  async createParticipant(eventUuid: string, createDto: ParticipantCreateDto) {
-    const { participantAttributes, ...participantData } = createDto;
+  async createParticipant(
+    eventUuid: string,
+    createDto: ParticipantCreateDto,
+  ): Promise<Participant> {
+    return this.register(
+      eventUuid,
+      createDto.email,
+      createDto.participantAttributes,
+    );
+  }
 
+  async register(
+    eventUuid: string,
+    email: string,
+    participantAttributes?: ParticipantAttributeDto[],
+  ): Promise<Participant> {
     try {
       return await this.prisma.$transaction(async (tx) => {
         const event = await tx.event.findUnique({ where: { uuid: eventUuid } });
@@ -102,20 +158,22 @@ export class ParticipantsService {
 
         const participant = await tx.participant.create({
           data: {
-            ...participantData,
+            email,
             eventUuid,
             attributes: {
               create: attributesToCreate,
             },
           },
           include: {
-            attributes: true,
+            attributes: {
+              include: { attribute: true },
+            },
           },
         });
 
         // TODO: Integrate EmailService -> trigger 'participant_registered'
 
-        return participant;
+        return this.mapToEntity(participant);
       });
     } catch (error) {
       if (
@@ -134,7 +192,7 @@ export class ParticipantsService {
     eventUuid: string,
     participantUuid: string,
     updateDto: ParticipantUpdateDto,
-  ) {
+  ): Promise<Participant> {
     const { participantAttributes, ...updates } = updateDto;
 
     const participant = await this.prisma.participant.findUnique({
@@ -146,7 +204,7 @@ export class ParticipantsService {
     }
 
     try {
-      const txResult = await this.prisma.$transaction(async (tx) => {
+      return await this.prisma.$transaction(async (tx) => {
         const dataToUpdate: Prisma.ParticipantUpdateInput = { ...updates };
 
         if (participantAttributes !== undefined) {
@@ -173,19 +231,18 @@ export class ParticipantsService {
           };
         }
 
-        return await tx.participant.update({
+        const updatedParticipant = await tx.participant.update({
           where: { uuid: participantUuid },
           data: dataToUpdate,
           include: {
             attributes: {
               include: { attribute: true },
-              where: { attribute: { showInList: true } },
             },
           },
         });
-      });
 
-      return txResult;
+        return this.mapToEntity(updatedParticipant);
+      });
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -236,7 +293,10 @@ export class ParticipantsService {
     });
   }
 
-  async findAll(eventUuid: string, query: ParticipantListingDto) {
+  async findAll(
+    eventUuid: string,
+    query: ParticipantListingDto,
+  ): Promise<PageDto<Participant>> {
     const { skip, take, bonus_attributes, filters } = query;
 
     let filterQuery: Prisma.ParticipantWhereInput = {};
@@ -299,23 +359,17 @@ export class ParticipantsService {
 
     const pageMetaDto = new PageMetaDto({ itemCount, pageOptionsDto: query });
 
-    const data = participants.map((participant) => ({
-      uuid: participant.uuid,
-      email: participant.email,
-      createdAt: participant.createdAt,
-      attributes: participant.attributes.map((attribute) => ({
-        uuid: attribute.attributeUuid,
-        name: attribute.attribute.name,
-        value: attribute.value,
-        createdAt: attribute.createdAt,
-        updatedAt: attribute.updatedAt,
-      })),
-    }));
+    const data = participants.map((participant) =>
+      this.mapToEntity(participant),
+    );
 
-    return new PageDto(data as unknown as Participant[], pageMetaDto);
+    return new PageDto(data, pageMetaDto);
   }
 
-  async findOne(eventUuid: string, participantUuid: string) {
+  async findOne(
+    eventUuid: string,
+    participantUuid: string,
+  ): Promise<Participant> {
     const participant = await this.prisma.participant.findFirst({
       where: { uuid: participantUuid, eventUuid },
       include: {
@@ -332,28 +386,7 @@ export class ParticipantsService {
       throw new NotFoundException("Participant not found");
     }
 
-    return {
-      uuid: participant.uuid,
-      email: participant.email,
-      createdAt: participant.createdAt,
-      attributes: participant.attributes.map((attribute) => ({
-        uuid: attribute.attributeUuid,
-        name: attribute.attribute.name,
-        value: attribute.value,
-        createdAt: attribute.createdAt,
-        updatedAt: attribute.updatedAt,
-      })),
-      emails: participant.emails.map((emailStatus) => ({
-        uuid: emailStatus.uuid,
-        status: emailStatus.status,
-        sendAt: emailStatus.sendAt,
-        sendBy: emailStatus.sendBy,
-        name: emailStatus.email?.name,
-        content: emailStatus.email?.content,
-        trigger: emailStatus.email?.trigger,
-        triggerValue: emailStatus.email?.triggerValue,
-      })),
-    };
+    return this.mapToEntity(participant);
   }
 
   async findOnePublic(

@@ -128,7 +128,7 @@ describe("ParticipantsController", () => {
       const eventUuid = "event-123";
       const participantUuid = "part-123";
 
-      mockParticipantsService.unregister.mockReturnValue(Promise.resolve());
+      mockParticipantsService.unregister.mockResolvedValue(null);
 
       await controller.destroy(eventUuid, participantUuid);
 
@@ -150,7 +150,7 @@ describe("ParticipantsController", () => {
         participantsToUnregisterIds: ["p-1", "p-2"],
       };
 
-      mockParticipantsService.unregisterMany.mockReturnValue(Promise.resolve());
+      mockParticipantsService.unregisterMany.mockResolvedValue(null);
 
       await controller.unregisterMany(eventUuid, dto);
 
