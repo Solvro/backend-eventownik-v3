@@ -334,7 +334,7 @@ export class ParticipantsService {
     eventUuid: string,
     query: ParticipantListingDto,
   ): Promise<PageDto<Participant>> {
-    const { skip, take, bonus_attributes, filters } = query;
+    const { skip, take, bonusAttributes: bonus_attributes, filters } = query;
 
     let filterQuery: Prisma.ParticipantWhereInput = {};
     if (filters != null) {

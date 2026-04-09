@@ -14,13 +14,13 @@ export class Participant {
   createdAt: Date;
 
   @ApiProperty({
-    type: [ParticipantAttribute],
+    isArray: true,
     description: "List of attributes associated with the participant",
   })
   attributes: ParticipantAttribute[];
 
   @ApiProperty({
-    type: [ParticipantEmailStatus],
+    isArray: true,
     description: "List of email statuses for the participant",
     required: false,
   })

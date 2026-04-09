@@ -12,7 +12,7 @@ export class ParticipantListingDto extends PageOptionsDto {
   @IsOptional()
   @IsString()
   @MaxLength(1000)
-  readonly bonus_attributes?: string;
+  readonly bonusAttributes?: string;
 
   // Since nestjs handles object query params slightly differently,
   // we can expect it to be parsed if it's encoded or we treat it as an object
