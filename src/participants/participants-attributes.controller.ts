@@ -62,7 +62,7 @@ export class ParticipantsAttributesController {
       throw new NotFoundException("Attribute doesn't have a file");
     }
 
-    const filename = participantAttribute.value;
+    const filename = path.basename(participantAttribute.value);
     const filePath = path.join(
       process.cwd(),
       "uploads",

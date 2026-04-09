@@ -101,18 +101,62 @@ export class ParticipantsService {
       const type = validAttributeMap.get(attribute.attributeUuid);
       let valueToSave = attribute.value;
 
-      if (type === "block") {
-        if (valueToSave == null || valueToSave === "null") {
-          valueToSave = null;
-        } else {
-          const block = await this.prisma.block.findUnique({
-            where: { uuid: valueToSave },
-          });
-          if (block == null) {
+      switch (type) {
+        case "block": {
+          if (valueToSave == null || valueToSave === "null") {
+            valueToSave = null;
+          } else {
+            const block = await this.prisma.block.findFirst({
+              where: {
+                uuid: valueToSave,
+                attribute: { eventUuid },
+              },
+            });
+            if (block == null) {
+              throw new BadRequestException(
+                `Block with UUID ${valueToSave} does not exist.`,
+              );
+            }
+          }
+
+          break;
+        }
+        case "number": {
+          if (valueToSave != null && Number.isNaN(Number(valueToSave))) {
             throw new BadRequestException(
-              `Block with UUID ${valueToSave} does not exist.`,
+              `Attribute ${attribute.attributeUuid} must be a valid number.`,
             );
           }
+
+          break;
+        }
+        case "date":
+        case "datetime": {
+          if (valueToSave != null && Number.isNaN(Date.parse(valueToSave))) {
+            throw new BadRequestException(
+              `Attribute ${attribute.attributeUuid} must be a valid date/time format.`,
+            );
+          }
+
+          break;
+        }
+        case "checkbox": {
+          if (
+            valueToSave != null &&
+            !["true", "false", "1", "0", "on", "off"].includes(
+              valueToSave.toLowerCase(),
+            )
+          ) {
+            throw new BadRequestException(
+              `Attribute ${attribute.attributeUuid} must be a boolean value.`,
+            );
+          }
+
+          break;
+        }
+        case undefined:
+        default: {
+          break;
         }
       }
 
@@ -276,18 +320,11 @@ export class ParticipantsService {
     eventUuid: string,
     participantsToUnregisterIds: string[],
   ) {
-    const participants = await this.prisma.participant.findMany({
-      where: {
-        uuid: { in: participantsToUnregisterIds },
-        eventUuid,
-      },
-    });
-
-    // TODO: Send emails for each unregister
+    // TODO: Send emails for each unregister (requires fetching emails or moving logic to a job)
 
     await this.prisma.participant.deleteMany({
       where: {
-        uuid: { in: participants.map((p) => p.uuid) },
+        uuid: { in: participantsToUnregisterIds },
         eventUuid,
       },
     });
@@ -301,25 +338,34 @@ export class ParticipantsService {
 
     let filterQuery: Prisma.ParticipantWhereInput = {};
     if (filters != null) {
+      if (typeof filters === "string" && filters.length > 2000) {
+        throw new BadRequestException("Filters string is too long");
+      }
+
       try {
         const parsedFilters: unknown =
           typeof filters === "string" ? JSON.parse(filters) : filters;
+
         if (typeof parsedFilters === "object" && parsedFilters != null) {
           filterQuery = {
-            AND: Object.entries(parsedFilters as Record<string, unknown>).map(
-              ([attributeUuid, value]) => ({
+            AND: Object.entries(parsedFilters as Record<string, unknown>)
+              .filter(([uuid]) =>
+                /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+                  uuid,
+                ),
+              )
+              .map(([attributeUuid, value]) => ({
                 attributes: {
                   some: {
                     attributeUuid,
                     value: value as string,
                   },
                 },
-              }),
-            ),
+              })),
           };
         }
       } catch {
-        // Ignored
+        throw new BadRequestException("Invalid filters JSON");
       }
     }
 
@@ -402,6 +448,7 @@ export class ParticipantsService {
       include: {
         attributes: {
           where: {
+            attribute: { showInList: true },
             attributeUuid: {
               in: attributes.length > 0 ? attributes : undefined,
             },
@@ -450,6 +497,17 @@ export class ParticipantsService {
       );
     }
 
+    // Validate value using common logic
+    const validatedAttributes = await this.prepareAttributesForSave(eventUuid, [
+      { attributeUuid, value: newValue },
+    ]);
+
+    if (validatedAttributes.length === 0) {
+      throw new BadRequestException("Invalid attribute or value");
+    }
+
+    const valueToSave = validatedAttributes[0].value;
+
     await this.prisma.$transaction(async (tx) => {
       // Delete existing
       await tx.participantAttribute.deleteMany({
@@ -464,7 +522,7 @@ export class ParticipantsService {
         data: uniqueParticipantIds.map((pUuid) => ({
           participantUuid: pUuid,
           attributeUuid,
-          value: newValue,
+          value: valueToSave ?? "",
         })),
       });
     });

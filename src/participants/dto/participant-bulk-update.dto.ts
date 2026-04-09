@@ -1,4 +1,5 @@
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsNotEmpty,
@@ -20,6 +21,7 @@ export class ParticipantBulkUpdateDto {
   @IsArray()
   @IsUUID("4", { each: true })
   @ArrayMinSize(1)
+  @ArrayMaxSize(500)
   participantIds: string[];
 
   @ApiProperty({

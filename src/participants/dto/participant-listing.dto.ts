@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from "class-validator";
+import { IsOptional, IsString, MaxLength } from "class-validator";
 import { PageOptionsDto } from "src/common/dto/page-options.dto";
 
 import { ApiPropertyOptional } from "@nestjs/swagger";
@@ -11,6 +11,7 @@ export class ParticipantListingDto extends PageOptionsDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(1000)
   readonly bonus_attributes?: string;
 
   // Since nestjs handles object query params slightly differently,

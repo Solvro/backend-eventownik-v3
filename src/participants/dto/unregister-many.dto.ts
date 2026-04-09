@@ -1,4 +1,4 @@
-import { ArrayMinSize, IsArray, IsUUID } from "class-validator";
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsUUID } from "class-validator";
 
 import { ApiProperty } from "@nestjs/swagger";
 
@@ -14,5 +14,6 @@ export class UnregisterManyDto {
   @IsArray()
   @IsUUID("4", { each: true })
   @ArrayMinSize(1)
+  @ArrayMaxSize(500)
   participantsToUnregisterIds: string[];
 }
