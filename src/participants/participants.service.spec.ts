@@ -74,7 +74,7 @@ describe("ParticipantsService", () => {
     expect(service).toBeDefined();
   });
 
-  describe("createParticipant", () => {
+  describe("create", () => {
     const eventUuid = "event-123";
     const createDto: ParticipantCreateDto = {
       email: "test@example.com",
@@ -102,7 +102,7 @@ describe("ParticipantsService", () => {
       };
       mockPrismaService.participant.create.mockResolvedValue(prismaParticipant);
 
-      const result = await service.createParticipant(eventUuid, createDto);
+      const result = await service.create(eventUuid, createDto);
 
       expect(result.uuid).toBe("part-123");
       expect(result.attributes[0].name).toBe("Attr 1");
@@ -122,9 +122,9 @@ describe("ParticipantsService", () => {
     it("should throw NotFoundException if event does not exist", async () => {
       mockPrismaService.event.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.createParticipant(eventUuid, createDto),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.create(eventUuid, createDto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it("should throw ConflictException on P2002 error", async () => {
@@ -143,9 +143,9 @@ describe("ParticipantsService", () => {
 
       mockPrismaService.participant.create.mockRejectedValue(error);
 
-      await expect(
-        service.createParticipant(eventUuid, createDto),
-      ).rejects.toThrow(ConflictException);
+      await expect(service.create(eventUuid, createDto)).rejects.toThrow(
+        ConflictException,
+      );
     });
   });
 
@@ -182,7 +182,7 @@ describe("ParticipantsService", () => {
     });
   });
 
-  describe("updateParticipant", () => {
+  describe("update", () => {
     const eventUuid = "event-123";
     const participantUuid = "part-123";
     const updateDto: ParticipantUpdateDto = {
@@ -205,7 +205,7 @@ describe("ParticipantsService", () => {
         attributes: [],
       });
 
-      const result = await service.updateParticipant(
+      const result = await service.update(
         eventUuid,
         participantUuid,
         updateDto,
@@ -235,7 +235,7 @@ describe("ParticipantsService", () => {
       });
 
       await expect(
-        service.updateParticipant(eventUuid, participantUuid, updateDto),
+        service.update(eventUuid, participantUuid, updateDto),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -326,8 +326,8 @@ describe("ParticipantsService", () => {
     });
   });
 
-  describe("unregister", () => {
-    it("should successfully unregister a participant", async () => {
+  describe("remove", () => {
+    it("should successfully remove a participant", async () => {
       const eventUuid = "event-123";
       const participantUuid = "part-123";
 
@@ -336,7 +336,7 @@ describe("ParticipantsService", () => {
         eventUuid,
       });
 
-      await service.unregister(eventUuid, participantUuid);
+      await service.remove(eventUuid, participantUuid);
 
       expect(mockPrismaService.participant.delete).toHaveBeenCalledWith({
         where: { uuid: participantUuid },
@@ -345,13 +345,11 @@ describe("ParticipantsService", () => {
 
     it("should throw error if participant to unregister not found", async () => {
       mockPrismaService.participant.findFirst.mockResolvedValue(null);
-      await expect(service.unregister("e", "p")).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.remove("e", "p")).rejects.toThrow(NotFoundException);
     });
   });
 
-  describe("unregisterMany", () => {
+  describe("removeMany", () => {
     it("should batch delete participants", async () => {
       const eventUuid = "event-123";
       const ids = ["p-1", "p-2"];
@@ -361,7 +359,7 @@ describe("ParticipantsService", () => {
         { uuid: "p-2" },
       ]);
 
-      await service.unregisterMany(eventUuid, ids);
+      await service.removeMany(eventUuid, ids);
 
       expect(mockPrismaService.participant.deleteMany).toHaveBeenCalledWith({
         where: {

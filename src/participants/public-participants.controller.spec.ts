@@ -32,7 +32,7 @@ describe("PublicParticipantsController", () => {
     expect(controller).toBeDefined();
   });
 
-  describe("index", () => {
+  describe("findOne", () => {
     it("should return the public participant with listed attributes", async () => {
       const eventUuid = "event-123";
       const participantUuid = "part-123";
@@ -41,7 +41,7 @@ describe("PublicParticipantsController", () => {
       const expectedResult = { uuid: participantUuid };
       mockParticipantsService.findOnePublic.mockResolvedValue(expectedResult);
 
-      const result = await controller.index(
+      const result = await controller.findOne(
         eventUuid,
         participantUuid,
         attributes,
@@ -61,7 +61,7 @@ describe("PublicParticipantsController", () => {
 
       mockParticipantsService.findOnePublic.mockResolvedValue({});
 
-      await controller.index(eventUuid, participantUuid);
+      await controller.findOne(eventUuid, participantUuid);
 
       expect(mockParticipantsService.findOnePublic).toHaveBeenCalledWith(
         eventUuid,

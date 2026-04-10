@@ -3,6 +3,7 @@ import {
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiTags,
 } from "@nestjs/swagger";
 
@@ -16,9 +17,11 @@ export class PublicParticipantsController {
 
   @Get(":participantId")
   @ApiOperation({ summary: "Get public participant" })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "participantId", description: "UUID of the participant" })
   @ApiOkResponse({ type: Participant })
   @ApiNotFoundResponse({ description: "Participant not found" })
-  async index(
+  async findOne(
     @Param("eventId", ParseUUIDPipe) eventUuid: string,
     @Param("participantId", ParseUUIDPipe) participantUuid: string,
     @Query("attributes") attributes?: string[],

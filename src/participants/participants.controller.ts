@@ -1,6 +1,7 @@
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
+import { ApiPaginatedResponse } from "src/common/decorators/api-paginated-response.decorator";
 import { PageDto } from "src/common/dto/page.dto";
 import { PermissionType } from "src/generated/prisma/enums";
 
@@ -19,13 +20,14 @@ import {
 } from "@nestjs/common";
 import {
   ApiConflictResponse,
+  ApiCreatedResponse,
   ApiExtraModels,
+  ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
-  ApiResponse,
+  ApiParam,
   ApiTags,
-  getSchemaPath,
 } from "@nestjs/swagger";
 
 import { ParticipantCreateDto } from "./dto/participant-create.dto";
@@ -45,23 +47,9 @@ export class ParticipantsController {
   @Get()
   @RequirePermission(PermissionType.MANAGE_PARTICIPANT)
   @ApiOperation({ summary: "Get all participants for a specific event" })
-  @ApiOkResponse({
-    description: "Paginated list of participants",
-    schema: {
-      allOf: [
-        { $ref: getSchemaPath(PageDto) },
-        {
-          properties: {
-            data: {
-              type: "array",
-              items: { $ref: getSchemaPath(Participant) },
-            },
-          },
-        },
-      ],
-    },
-  })
-  async index(
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiPaginatedResponse(Participant)
+  async findAll(
     @Param("eventId", ParseUUIDPipe) eventUuid: string,
     @Query() query: ParticipantListingDto,
   ): Promise<PageDto<Participant>> {
@@ -71,26 +59,28 @@ export class ParticipantsController {
   @Post()
   @RequirePermission(PermissionType.MANAGE_PARTICIPANT)
   @ApiOperation({ summary: "Create a new participant" })
-  @ApiResponse({
-    status: 201,
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiCreatedResponse({
     description: "The participant has been successfully created.",
     type: Participant,
   })
   @ApiConflictResponse({ description: "Email already exists in this event" })
   @ApiNotFoundResponse({ description: "Event not found" })
-  async store(
+  async create(
     @Param("eventId", ParseUUIDPipe) eventUuid: string,
     @Body() dto: ParticipantCreateDto,
   ): Promise<Participant> {
-    return this.participantsService.createParticipant(eventUuid, dto);
+    return this.participantsService.create(eventUuid, dto);
   }
 
   @Get(":id")
   @RequirePermission(PermissionType.MANAGE_PARTICIPANT)
   @ApiOperation({ summary: "Get a participant by UUID" })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "id", description: "UUID of the participant" })
   @ApiOkResponse({ type: Participant })
   @ApiNotFoundResponse({ description: "Participant not found" })
-  async show(
+  async findOne(
     @Param("eventId", ParseUUIDPipe) eventUuid: string,
     @Param("id", ParseUUIDPipe) participantUuid: string,
   ): Promise<Participant> {
@@ -100,6 +90,8 @@ export class ParticipantsController {
   @Patch(":id")
   @RequirePermission(PermissionType.MANAGE_PARTICIPANT)
   @ApiOperation({ summary: "Update a participant" })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "id", description: "UUID of the participant" })
   @ApiOkResponse({ type: Participant })
   @ApiNotFoundResponse({ description: "Participant or Attribute not found" })
   @ApiConflictResponse({ description: "Email conflict" })
@@ -108,49 +100,50 @@ export class ParticipantsController {
     @Param("id", ParseUUIDPipe) participantUuid: string,
     @Body() dto: ParticipantUpdateDto,
   ): Promise<Participant> {
-    return this.participantsService.updateParticipant(
-      eventUuid,
-      participantUuid,
-      dto,
-    );
+    return this.participantsService.update(eventUuid, participantUuid, dto);
   }
 
   @Delete(":id")
   @RequirePermission(PermissionType.MANAGE_PARTICIPANT)
   @ApiOperation({ summary: "Delete a participant" })
-  @ApiResponse({ status: 204, description: "Participant deleted" })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "id", description: "UUID of the participant" })
+  @ApiNoContentResponse({ description: "Participant deleted" })
   @ApiNotFoundResponse({ description: "Participant not found" })
   @HttpCode(204)
-  async destroy(
+  async remove(
     @Param("eventId", ParseUUIDPipe) eventUuid: string,
     @Param("id", ParseUUIDPipe) participantUuid: string,
   ) {
-    return this.participantsService.unregister(eventUuid, participantUuid);
+    return this.participantsService.remove(eventUuid, participantUuid);
   }
 
   @Delete(":id/unregister")
   @RequirePermission(PermissionType.MANAGE_PARTICIPANT)
   @ApiOperation({ summary: "Unregister a participant from an event" })
-  @ApiResponse({ status: 204, description: "Participant unregistered" })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "id", description: "UUID of the participant" })
+  @ApiNoContentResponse({ description: "Participant unregistered" })
   @ApiNotFoundResponse({ description: "Participant not found" })
   @HttpCode(204)
   async unregister(
     @Param("eventId", ParseUUIDPipe) eventUuid: string,
     @Param("id", ParseUUIDPipe) participantUuid: string,
   ) {
-    return this.participantsService.unregister(eventUuid, participantUuid);
+    return this.participantsService.remove(eventUuid, participantUuid);
   }
 
   @Post("unregister-many")
   @RequirePermission(PermissionType.MANAGE_PARTICIPANT)
   @ApiOperation({ summary: "Unregister many participants from an event" })
-  @ApiResponse({ status: 204, description: "Participants unregistered" })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiNoContentResponse({ description: "Participants unregistered" })
   @HttpCode(204)
   async unregisterMany(
     @Param("eventId", ParseUUIDPipe) eventUuid: string,
     @Body() dto: UnregisterManyDto,
   ) {
-    return this.participantsService.unregisterMany(
+    return this.participantsService.removeMany(
       eventUuid,
       dto.participantsToUnregisterIds,
     );

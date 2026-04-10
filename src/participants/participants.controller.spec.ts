@@ -13,11 +13,11 @@ describe("ParticipantsController", () => {
 
   const mockParticipantsService = {
     findAll: jest.fn(),
-    createParticipant: jest.fn(),
+    create: jest.fn(),
     findOne: jest.fn(),
-    updateParticipant: jest.fn(),
-    unregister: jest.fn(),
-    unregisterMany: jest.fn(),
+    update: jest.fn(),
+    remove: jest.fn(),
+    removeMany: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -39,7 +39,7 @@ describe("ParticipantsController", () => {
     expect(controller).toBeDefined();
   });
 
-  describe("index", () => {
+  describe("findAll", () => {
     it("should return a list of participants", async () => {
       const eventUuid = "event-123";
       const query = new ParticipantListingDto();
@@ -47,7 +47,7 @@ describe("ParticipantsController", () => {
 
       mockParticipantsService.findAll.mockResolvedValue(expectedResult);
 
-      const result = await controller.index(eventUuid, query);
+      const result = await controller.findAll(eventUuid, query);
 
       expect(result).toBe(expectedResult);
       expect(mockParticipantsService.findAll).toHaveBeenCalledWith(
@@ -57,7 +57,7 @@ describe("ParticipantsController", () => {
     });
   });
 
-  describe("store", () => {
+  describe("create", () => {
     it("should create and return a participant", async () => {
       const eventUuid = "event-123";
       const dto: ParticipantCreateDto = {
@@ -66,21 +66,19 @@ describe("ParticipantsController", () => {
       };
       const expectedResult = { uuid: "part-123", email: "test@test.com" };
 
-      mockParticipantsService.createParticipant.mockResolvedValue(
-        expectedResult,
-      );
+      mockParticipantsService.create.mockResolvedValue(expectedResult);
 
-      const result = await controller.store(eventUuid, dto);
+      const result = await controller.create(eventUuid, dto);
 
       expect(result).toBe(expectedResult);
-      expect(mockParticipantsService.createParticipant).toHaveBeenCalledWith(
+      expect(mockParticipantsService.create).toHaveBeenCalledWith(
         eventUuid,
         dto,
       );
     });
   });
 
-  describe("show", () => {
+  describe("findOne", () => {
     it("should return a specific participant", async () => {
       const eventUuid = "event-123";
       const participantUuid = "part-123";
@@ -88,7 +86,7 @@ describe("ParticipantsController", () => {
 
       mockParticipantsService.findOne.mockResolvedValue(expectedResult);
 
-      const result = await controller.show(eventUuid, participantUuid);
+      const result = await controller.findOne(eventUuid, participantUuid);
 
       expect(result).toBe(expectedResult);
       expect(mockParticipantsService.findOne).toHaveBeenCalledWith(
@@ -108,14 +106,12 @@ describe("ParticipantsController", () => {
         email: "updated@test.com",
       };
 
-      mockParticipantsService.updateParticipant.mockResolvedValue(
-        expectedResult,
-      );
+      mockParticipantsService.update.mockResolvedValue(expectedResult);
 
       const result = await controller.update(eventUuid, participantUuid, dto);
 
       expect(result).toBe(expectedResult);
-      expect(mockParticipantsService.updateParticipant).toHaveBeenCalledWith(
+      expect(mockParticipantsService.update).toHaveBeenCalledWith(
         eventUuid,
         participantUuid,
         dto,
@@ -123,23 +119,23 @@ describe("ParticipantsController", () => {
     });
   });
 
-  describe("destroy/unregister", () => {
+  describe("remove/unregister", () => {
     it("should delete a participant", async () => {
       const eventUuid = "event-123";
       const participantUuid = "part-123";
 
-      mockParticipantsService.unregister.mockResolvedValue(null);
+      mockParticipantsService.remove.mockResolvedValue(null);
 
-      await controller.destroy(eventUuid, participantUuid);
+      await controller.remove(eventUuid, participantUuid);
 
-      expect(mockParticipantsService.unregister).toHaveBeenCalledWith(
+      expect(mockParticipantsService.remove).toHaveBeenCalledWith(
         eventUuid,
         participantUuid,
       );
 
       // Testing unregister alias
       await controller.unregister(eventUuid, participantUuid);
-      expect(mockParticipantsService.unregister).toHaveBeenCalledTimes(2);
+      expect(mockParticipantsService.remove).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -150,11 +146,11 @@ describe("ParticipantsController", () => {
         participantsToUnregisterIds: ["p-1", "p-2"],
       };
 
-      mockParticipantsService.unregisterMany.mockResolvedValue(null);
+      mockParticipantsService.removeMany.mockResolvedValue(null);
 
       await controller.unregisterMany(eventUuid, dto);
 
-      expect(mockParticipantsService.unregisterMany).toHaveBeenCalledWith(
+      expect(mockParticipantsService.removeMany).toHaveBeenCalledWith(
         eventUuid,
         dto.participantsToUnregisterIds,
       );

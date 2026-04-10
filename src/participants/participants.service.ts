@@ -172,7 +172,7 @@ export class ParticipantsService {
     return transformedAttributes;
   }
 
-  async createParticipant(
+  async create(
     eventUuid: string,
     createDto: ParticipantCreateDto,
   ): Promise<Participant> {
@@ -232,7 +232,7 @@ export class ParticipantsService {
     }
   }
 
-  async updateParticipant(
+  async update(
     eventUuid: string,
     participantUuid: string,
     updateDto: ParticipantUpdateDto,
@@ -300,7 +300,7 @@ export class ParticipantsService {
     }
   }
 
-  async unregister(eventUuid: string, participantUuid: string) {
+  async remove(eventUuid: string, participantUuid: string) {
     const participant = await this.prisma.participant.findFirst({
       where: { uuid: participantUuid, eventUuid },
     });
@@ -316,10 +316,7 @@ export class ParticipantsService {
     });
   }
 
-  async unregisterMany(
-    eventUuid: string,
-    participantsToUnregisterIds: string[],
-  ) {
+  async removeMany(eventUuid: string, participantsToUnregisterIds: string[]) {
     // TODO: Send emails for each unregister (requires fetching emails or moving logic to a job)
 
     await this.prisma.participant.deleteMany({
