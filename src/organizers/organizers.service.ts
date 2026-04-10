@@ -5,6 +5,7 @@ import { Prisma } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -17,8 +18,9 @@ import { UpdateOrganizerDto } from "./dto/update-organizer.dto";
 @Injectable()
 export class OrganizersService {
   constructor(private readonly prisma: PrismaService) {}
+
   async create(eventUuid: string, createOrganizerDto: CreateOrganizerDto) {
-    const { email, permissionIds } = createOrganizerDto;
+    const { email, permissions } = createOrganizerDto;
 
     return await this.prisma.$transaction(async (tx) => {
       const admin = await tx.admin.findFirst({
@@ -38,28 +40,34 @@ export class OrganizersService {
       }
 
       try {
-        const creationPromises = permissionIds.map(async (permissionUuid) =>
-          tx.adminPermission.create({
-            data: {
-              eventUuid,
-              adminUuid: admin.uuid,
-              permissionUuid,
-            },
-          }),
-        );
-
-        return await Promise.all(creationPromises);
+        await tx.eventPermission.createMany({
+          data: permissions.map((permission) => ({
+            eventUuid,
+            adminUuid: admin.uuid,
+            permission,
+          })),
+        });
       } catch (error) {
         if (
           error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === "P2003" // Foreign key constraint failed
+          error.code === "P2002"
         ) {
-          throw new NotFoundException(
-            "One or more Permission IDs are invalid or do not exist",
+          throw new BadRequestException(
+            "One or more permissions already exist for this organizer in this event",
           );
         }
+
         throw error;
       }
+
+      return tx.admin.findUnique({
+        where: { uuid: admin.uuid },
+        include: {
+          permissions: {
+            where: { eventUuid },
+          },
+        },
+      });
     });
   }
 
@@ -69,17 +77,25 @@ export class OrganizersService {
         uuid: eventUuid,
       },
     });
+
     if (event == null) {
       throw new NotFoundException(`Event with uuid: ${eventUuid} not found`);
     }
 
     const { skip, take, isActive, sort } = query;
     const where: Prisma.AdminWhereInput = {
-      permissions: {
-        some: {
-          eventUuid,
+      OR: [
+        {
+          events: {
+            some: { uuid: eventUuid },
+          },
         },
-      },
+        {
+          permissions: {
+            some: { eventUuid },
+          },
+        },
+      ],
       ...(isActive === undefined ? {} : { active: isActive }),
     };
 
@@ -101,15 +117,10 @@ export class OrganizersService {
         skip,
         take,
         orderBy,
-        select: {
-          uuid: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          type: true,
-          active: true,
-          createdAt: true,
-          updatedAt: true,
+        omit: {
+          password: true,
+        },
+        include: {
           permissions: {
             where: {
               eventUuid,
@@ -127,21 +138,23 @@ export class OrganizersService {
     const organizer = await this.prisma.admin.findFirst({
       where: {
         uuid: organizerUuid,
-        permissions: {
-          some: {
-            eventUuid,
+        OR: [
+          {
+            events: {
+              some: { uuid: eventUuid },
+            },
           },
-        },
+          {
+            permissions: {
+              some: { eventUuid },
+            },
+          },
+        ],
       },
-      select: {
-        uuid: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        type: true,
-        active: true,
-        createdAt: true,
-        updatedAt: true,
+      omit: {
+        password: true,
+      },
+      include: {
         permissions: {
           where: {
             eventUuid,
@@ -164,7 +177,7 @@ export class OrganizersService {
     organizerUuid: string,
     updateOrganizerDto: UpdateOrganizerDto,
   ) {
-    const { permissionIds } = updateOrganizerDto;
+    const { permissions } = updateOrganizerDto;
 
     return await this.prisma.$transaction(async (tx) => {
       const event = await tx.event.findUnique({
@@ -185,10 +198,21 @@ export class OrganizersService {
         );
       }
 
-      const isAssigned = await tx.adminPermission.findFirst({
+      const isAssigned = await tx.admin.findFirst({
         where: {
-          eventUuid,
-          adminUuid: organizerUuid,
+          uuid: organizerUuid,
+          OR: [
+            {
+              events: {
+                some: { uuid: eventUuid },
+              },
+            },
+            {
+              permissions: {
+                some: { eventUuid },
+              },
+            },
+          ],
         },
       });
 
@@ -198,32 +222,20 @@ export class OrganizersService {
         );
       }
 
-      await tx.adminPermission.deleteMany({
+      await tx.eventPermission.deleteMany({
         where: {
           eventUuid,
           adminUuid: organizerUuid,
         },
       });
 
-      try {
-        await tx.adminPermission.createMany({
-          data: permissionIds.map((permissionUuid) => ({
-            eventUuid,
-            adminUuid: organizerUuid,
-            permissionUuid,
-          })),
-        });
-      } catch (error) {
-        if (
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === "P2003" // P2003 - foregin key constraint failed
-        ) {
-          throw new NotFoundException(
-            "One or more Permission IDs are invalid or do not exist",
-          );
-        }
-        throw error;
-      }
+      await tx.eventPermission.createMany({
+        data: permissions.map((permission) => ({
+          eventUuid,
+          adminUuid: organizerUuid,
+          permission,
+        })),
+      });
 
       return await tx.admin.findUnique({
         where: { uuid: organizerUuid },
@@ -242,26 +254,54 @@ export class OrganizersService {
   }
 
   async remove(eventUuid: string, organizerUuid: string) {
-    const organizers = await this.prisma.adminPermission.groupBy({
-      by: ["adminUuid"],
+    const targetOrganizer = await this.prisma.admin.findFirst({
       where: {
-        eventUuid,
+        uuid: organizerUuid,
+        OR: [
+          {
+            events: {
+              some: { uuid: eventUuid },
+            },
+          },
+          {
+            permissions: {
+              some: { eventUuid },
+            },
+          },
+        ],
       },
     });
 
-    if (!organizers.some((org) => org.adminUuid === organizerUuid)) {
+    if (targetOrganizer == null) {
       throw new NotFoundException(
         "Organizer was not assigned to this event or does not exist",
       );
     }
 
-    if (organizers.length === 1) {
+    const organizersCount = await this.prisma.admin.count({
+      where: {
+        OR: [
+          {
+            events: {
+              some: { uuid: eventUuid },
+            },
+          },
+          {
+            permissions: {
+              some: { eventUuid },
+            },
+          },
+        ],
+      },
+    });
+
+    if (organizersCount <= 1) {
       throw new ForbiddenException(
         "Unable to remove the last organizer from the event.",
       );
     }
 
-    await this.prisma.adminPermission.deleteMany({
+    await this.prisma.eventPermission.deleteMany({
       where: {
         adminUuid: organizerUuid,
         eventUuid,
