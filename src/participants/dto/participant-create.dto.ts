@@ -27,7 +27,7 @@ export class ParticipantAttributeDto {
   })
   @IsString()
   @IsOptional()
-  value: string | null;
+  value?: string | null;
 }
 
 export class ParticipantCreateDto {
@@ -39,7 +39,7 @@ export class ParticipantCreateDto {
   @IsNotEmpty()
   email: string;
 
-  @ApiPropertyOptional({ type: [ParticipantAttributeDto] })
+  @ApiPropertyOptional({ type: ParticipantAttributeDto, isArray: true })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ParticipantAttributeDto)

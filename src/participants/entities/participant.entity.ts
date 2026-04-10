@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 import { ParticipantAttribute } from "./participant-attribute.entity";
 import { ParticipantEmailStatus } from "./participant-email-status.entity";
@@ -19,10 +19,9 @@ export class Participant {
   })
   attributes: ParticipantAttribute[];
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     isArray: true,
     description: "List of email statuses for the participant",
-    required: false,
   })
   emails?: ParticipantEmailStatus[];
 }

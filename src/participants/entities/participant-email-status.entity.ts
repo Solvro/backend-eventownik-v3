@@ -1,6 +1,6 @@
 import { EmailStatus, EmailTrigger } from "src/generated/prisma/client";
 
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class ParticipantEmailStatus {
   @ApiProperty({ description: "UUID of the email status" })
@@ -18,19 +18,22 @@ export class ParticipantEmailStatus {
   })
   sendBy: string | null;
 
-  @ApiProperty({ description: "Name of the email template", nullable: true })
+  @ApiPropertyOptional({
+    description: "Name of the email template",
+    nullable: true,
+  })
   name?: string;
 
-  @ApiProperty({ description: "Content of the email", nullable: true })
+  @ApiPropertyOptional({ description: "Content of the email", nullable: true })
   content?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     enum: EmailTrigger,
     description: "Trigger of the email",
     nullable: true,
   })
   trigger?: EmailTrigger;
 
-  @ApiProperty({ description: "Trigger value", nullable: true })
+  @ApiPropertyOptional({ description: "Trigger value", nullable: true })
   triggerValue?: string | null;
 }
