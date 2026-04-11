@@ -11,6 +11,7 @@ import { BlocksModule } from "./blocks/blocks.module";
 import { EventsModule } from "./events/events.module";
 import { FormsModule } from "./forms/forms.module";
 import { OrganizersModule } from "./organizers/organizers.module";
+import { ParticipantsModule } from "./participants/participants.module";
 import { PrismaModule } from "./prisma/prisma.module";
 
 @Module({
@@ -29,6 +30,7 @@ import { PrismaModule } from "./prisma/prisma.module";
     AuthModule,
     AttributesModule,
     BlocksModule,
+    ParticipantsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
