@@ -364,6 +364,7 @@ export class FormsService {
         }
       }
 
+      //File handling
       for (const attribute in normalizedAttributes) {
         const foundAttribute = form.formDefinitions.find(
           (formDefinition) => formDefinition.attributeUuid === attribute,
@@ -378,12 +379,13 @@ export class FormsService {
           foundAttribute.attribute?.type === AttributeType.file &&
           isString(attributeValue)
         ) {
-          const fileName = fileNames.findLast((f) =>
-            f.includes(attributeValue),
+          const fileName = fileNames.find((f) =>
+            f.endsWith(`#####${attributeValue}`),
           );
           if (fileName !== undefined) {
+            fileNames.splice(fileNames.indexOf(fileName), 1);
             normalizedAttributes[attribute] =
-              `./uploads/forms/${eventUuid}/${formUuid}${fileName}`;
+              `./uploads/forms/${eventUuid}/${formUuid}/#####${fileName}`;
           }
         }
       }

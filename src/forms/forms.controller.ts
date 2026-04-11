@@ -126,7 +126,7 @@ export class FormsController {
     files: Express.Multer.File[],
     @Body() submissionData: FormSubmitionDto,
   ) {
-    const filenames = files.map((file) => file.filename);
+    const filenames: string[] = files.map((file) => file.filename);
     return this.formsService.formSubmit(
       formId,
       eventId,
