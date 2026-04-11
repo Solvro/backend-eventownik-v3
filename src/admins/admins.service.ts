@@ -1,10 +1,15 @@
+import * as bcrypt from "bcrypt";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { parseSortInput } from "src/common/utils/prisma.utility";
 import { Prisma } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 
 import { CreateAdminDto } from "./dto/create-admin.dto";
 import { ListAdminDto } from "./dto/list-admin.dto";
@@ -15,11 +20,29 @@ export class AdminsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(createAdminDto: CreateAdminDto) {
+    const { password, ...adminData } = createAdminDto;
+    const hashedPassword = await bcrypt.hash(password, 12);
+
     return await this.prisma.$transaction(async (tx) => {
-      const admin = await tx.admin.create({
-        data: { ...(createAdminDto as Prisma.AdminCreateInput) },
-      });
-      return admin; // TODO: add permissions attachment
+      try {
+        const admin = await tx.admin.create({
+          data: {
+            ...(adminData as Prisma.AdminCreateInput),
+            password: hashedPassword,
+          },
+        });
+        return admin;
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          throw new ConflictException(
+            `Admin with email ${adminData.email} already exists`,
+          );
+        }
+        throw error;
+      }
     });
   }
 
@@ -68,26 +91,26 @@ export class AdminsService {
       where: { uuid: id },
     });
     if (admin == null) {
-      throw new NotFoundException("Admin not found");
+      throw new NotFoundException(`Admin with UUID ${id} not found`);
     }
     return admin;
   }
 
   async update(id: string, updateAdminDto: UpdateAdminDto) {
     try {
-      const admin = await this.prisma.admin.update({
+      return await this.prisma.admin.update({
         where: { uuid: id },
-        data: {
-          ...(updateAdminDto as Prisma.AdminUpdateInput),
-        },
+        data: updateAdminDto,
       });
-      return admin;
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2025"
-      ) {
-        throw new NotFoundException(`Admin with ID ${id} not found`);
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === "P2025") {
+          throw new NotFoundException(`Admin with UUID ${id} not found`);
+        }
+
+        if (error.code === "P2002") {
+          throw new ConflictException("Email already in use");
+        }
       }
       throw error;
     }
@@ -103,7 +126,7 @@ export class AdminsService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2025"
       ) {
-        throw new NotFoundException(`Admin with ID ${id} not found`);
+        throw new NotFoundException(`Admin with UUID ${id} not found`);
       }
       throw error;
     }

@@ -1,3 +1,4 @@
+import { IsBoolean, IsEmail, IsEnum, IsString } from "class-validator";
 import type { OrganizerType } from "src/generated/prisma/enums";
 
 import { ApiProperty } from "@nestjs/swagger";
@@ -8,6 +9,7 @@ export class CreateAdminDto {
     example: "John",
     type: String,
   })
+  @IsString()
   firstName!: string;
 
   @ApiProperty({
@@ -15,6 +17,7 @@ export class CreateAdminDto {
     example: "Doe",
     type: String,
   })
+  @IsString()
   lastName!: string;
 
   @ApiProperty({
@@ -22,6 +25,7 @@ export class CreateAdminDto {
     example: "john.doe@example.com",
     type: String,
   })
+  @IsEmail()
   email!: string;
 
   @ApiProperty({
@@ -29,13 +33,15 @@ export class CreateAdminDto {
     example: "strongpassword123",
     type: String,
   })
+  @IsString()
   password!: string;
 
   @ApiProperty({
     description: "Type of the admin",
-    example: "SUPER_ADMIN",
+    example: "organizer",
     enum: ["organizer", "superadmin"],
   })
+  @IsEnum(["organizer", "superadmin"])
   type!: OrganizerType;
 
   @ApiProperty({
@@ -43,5 +49,6 @@ export class CreateAdminDto {
     example: true,
     type: Boolean,
   })
+  @IsBoolean()
   active!: boolean;
 }
