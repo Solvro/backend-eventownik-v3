@@ -12,13 +12,13 @@ import type {
   ParticipantAttributeLog,
   ParticipantEmailStatus,
   ParticipantFormLog,
-  Permission,
 } from "src/generated/prisma/client";
 import {
   AttributeType,
   EmailStatus,
   EmailTrigger,
   OrganizerType,
+  PermissionType,
   PrismaClient,
 } from "src/generated/prisma/client";
 
@@ -29,7 +29,7 @@ const prisma = new PrismaClient({ adapter });
 
 async function main() {
   await prisma.participantAttributeLog.deleteMany();
-  await prisma.adminPermission.deleteMany();
+  await prisma.eventPermission.deleteMany();
   await prisma.participantAttribute.deleteMany();
   await prisma.participantEmailStatus.deleteMany();
   await prisma.participantFormLog.deleteMany();
@@ -40,7 +40,6 @@ async function main() {
   await prisma.attribute.deleteMany();
   await prisma.participant.deleteMany();
   await prisma.event.deleteMany();
-  await prisma.permission.deleteMany();
   await prisma.admin.deleteMany();
 
   await prisma.admin.create({
@@ -64,12 +63,7 @@ async function main() {
       active: true,
     },
   });
-  const permission: Permission = await prisma.permission.create({
-    data: {
-      action: "manage",
-      subject: "all",
-    },
-  });
+
   const event: Event = await prisma.event.create({
     data: {
       name: "Sample Event",
@@ -86,11 +80,11 @@ async function main() {
     },
   });
 
-  await prisma.adminPermission.create({
+  await prisma.eventPermission.create({
     data: {
       adminUuid: admin.uuid,
       eventUuid: event.uuid,
-      permissionUuid: permission.uuid,
+      permission: PermissionType.MANAGE_ALL,
     },
   });
 
