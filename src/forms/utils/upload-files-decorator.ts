@@ -1,7 +1,5 @@
 import { diskStorage } from "multer";
 import { existsSync, mkdirSync } from "node:fs";
-// eslint-disable-next-line unicorn/import-style
-import { extname } from "node:path";
 
 import { UseInterceptors, applyDecorators } from "@nestjs/common";
 import { FilesInterceptor } from "@nestjs/platform-express";
