@@ -1,7 +1,9 @@
+import { isString } from "class-validator";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { parseSortInput } from "src/common/utils/prisma.utility";
 import { OpenCondition, Prisma } from "src/generated/prisma/browser";
+import { Attribute, AttributeType } from "src/generated/prisma/client";
 
 import {
   BadRequestException,
@@ -307,6 +309,7 @@ export class FormsService {
     eventUuid: string,
     formUuid: string,
     submissionData: FormSubmitionDto,
+    fileNames: string[],
   ) {
     return await this.prisma.$transaction(async (prisma) => {
       const event = await prisma.event.findUnique({
@@ -344,7 +347,7 @@ export class FormsService {
         submissionData.participantId === undefined
       ) {
         throw new BadRequestException(
-          `Participant ID is required for non-registration forms`,
+          `Participant UUID is required for non-registration forms`,
         );
       }
 
@@ -358,6 +361,48 @@ export class FormsService {
           normalizedAttributes[key] = null;
         } else if (value !== undefined) {
           normalizedAttributes[key] = value;
+        }
+      }
+
+      for (const attribute in normalizedAttributes) {
+        const foundAttribute = form.formDefinitions.find(
+          (formDefinition) => formDefinition.attributeUuid === attribute,
+        );
+        if (foundAttribute == null) {
+          throw new BadRequestException(
+            `Attribute with id: ${attribute} is not part of the form`,
+          );
+        }
+        const attributeValue = normalizedAttributes[attribute];
+        if (
+          foundAttribute.attribute?.type === AttributeType.file &&
+          isString(attributeValue)
+        ) {
+          const fileName = fileNames.findLast((f) =>
+            f.includes(attributeValue),
+          );
+          if (fileName !== undefined) {
+            normalizedAttributes[attribute] =
+              `./uploads/forms/${eventUuid}/${formUuid}${fileName}`;
+          }
+        }
+      }
+
+      const requiredAttributes = form.formDefinitions
+        .filter(
+          (formDefinition) =>
+            formDefinition.isRequired && formDefinition.attribute !== null,
+        )
+        .map((formDefinition) => formDefinition.attribute) as Attribute[];
+
+      for (const attribute of requiredAttributes) {
+        if (
+          normalizedAttributes[attribute.uuid] === undefined ||
+          normalizedAttributes[attribute.uuid] === null
+        ) {
+          throw new BadRequestException(
+            `Missing required attribute with id: ${attribute.uuid}`,
+          );
         }
       }
 
@@ -416,27 +461,7 @@ export class FormsService {
         }
       }
 
-      // TODO: poprawić
-      const missingAttributes = await prisma.participantAttribute.findMany({
-        where: {
-          participantUuid: submissionData.participantId,
-          attributeUuid: {
-            in: form.formDefinitions
-              .filter((formDeff) => formDeff.isRequired)
-              .map((formDeff) => formDeff.attributeUuid)
-              .filter((uuid): uuid is string => uuid !== null),
-          },
-          value: null,
-        },
-      });
-      if (missingAttributes.length > 0) {
-        throw new NotFoundException(
-          `Missing required attributes: ${missingAttributes
-            .map((attribute) => attribute.attributeUuid)
-            .join(", ")}`,
-        );
-      }
-
+      //ToDO poprawic
       return null;
     });
   }

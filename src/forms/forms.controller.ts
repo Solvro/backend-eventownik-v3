@@ -15,6 +15,7 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFiles,
   UseGuards,
 } from "@nestjs/common";
 import {
@@ -26,8 +27,10 @@ import {
 
 import { CreateFormDto } from "./dto/create-form.dto";
 import { FormListingDto } from "./dto/form-listing.dto";
+import { FormSubmitionDto } from "./dto/form-submition.dto";
 import { UpdateFormDto } from "./dto/update-form.dto";
 import { FormsService } from "./forms.service";
+import { UploadFiles } from "./utils/upload-files-decorator";
 
 @ApiTags("Forms")
 @ApiBearerAuth()
@@ -107,5 +110,28 @@ export class FormsController {
     @Param("id", ParseUUIDPipe) formId: string,
   ) {
     return this.formsService.remove(formId, eventId);
+  }
+
+  @Post(":id/submit")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Submit a form for an event" })
+  @ApiResponse({ status: 200, description: "Form submitted successfully." })
+  @ApiResponse({ status: 404, description: "Event or Form not found." })
+  @ApiResponse({ status: 400, description: "Form is closed." })
+  @UploadFiles()
+  async submit(
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @Param("id", ParseUUIDPipe) formId: string,
+    @UploadedFiles()
+    files: Express.Multer.File[],
+    @Body() submissionData: FormSubmitionDto,
+  ) {
+    const filenames = files.map((file) => file.filename);
+    return this.formsService.formSubmit(
+      formId,
+      eventId,
+      submissionData,
+      filenames,
+    );
   }
 }
