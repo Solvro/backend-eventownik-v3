@@ -1,7 +1,7 @@
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
-import { PermissionType } from "src/generated/prisma/client";
+import { PermissionType } from "src/generated/prisma/enums";
 
 import {
   Body,
@@ -123,13 +123,14 @@ export class FormsController {
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("id", ParseUUIDPipe) formId: string,
     @UploadedFiles()
-    files: Express.Multer.File[],
+    files: Express.Multer.File[] | null,
     @Body() submissionData: FormSubmitionDto,
   ) {
-    const filenames: string[] = files.map((file) => file.filename);
+    const filenames: string[] =
+      files == null ? [] : files.map((file) => file.filename);
     return this.formsService.formSubmit(
-      formId,
       eventId,
+      formId,
       submissionData,
       filenames,
     );

@@ -4,6 +4,9 @@ import { PageDto } from "src/common/dto/page.dto";
 import { parseSortInput } from "src/common/utils/prisma.utility";
 import { OpenCondition, Prisma } from "src/generated/prisma/browser";
 import { Attribute, AttributeType } from "src/generated/prisma/client";
+import { ParticipantAttributeDto } from "src/participants/dto/participant-create.dto";
+import { ParticipantUpdateDto } from "src/participants/dto/participant-update.dto";
+import { ParticipantsService } from "src/participants/participants.service";
 
 import {
   BadRequestException,
@@ -20,7 +23,10 @@ import { UpdateFormDto } from "./dto/update-form.dto";
 
 @Injectable()
 export class FormsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private participantService: ParticipantsService,
+  ) {}
 
   async create(eventUuid: string, createFormDto: CreateFormDto) {
     if (
@@ -352,17 +358,14 @@ export class FormsService {
       }
 
       const normalizedAttributes: Record<string, string | null | undefined> =
-        {};
-
-      for (const [key, value] of Object.entries(
-        submissionData.attributes as Record<string, string | null | undefined>,
-      )) {
-        if (value === null || value === "null" || value === "") {
-          normalizedAttributes[key] = null;
-        } else if (value !== undefined) {
-          normalizedAttributes[key] = value;
-        }
-      }
+        submissionData.attributes
+          .flat()
+          .reduce<
+            Record<string, string | null | undefined>
+          >((accumulator, attribute: ParticipantAttributeDto) => {
+            accumulator[attribute.attributeUuid] = attribute.value;
+            return accumulator;
+          }, {});
 
       //File handling
       for (const attribute in normalizedAttributes) {
@@ -408,28 +411,30 @@ export class FormsService {
         }
       }
 
-      if (submissionData.participantId !== undefined) {
-        const participant = await prisma.participant.findUnique({
-          where: { uuid: submissionData.participantId },
-        });
-        if (participant == null) {
-          throw new NotFoundException(
-            `Participant with id: ${submissionData.participantId} not found`,
-          );
-        }
+      if (
+        event.registerFormUuid !== formUuid &&
+        submissionData.participantId !== undefined
+      ) {
+        const participantDtoAttributes: ParticipantUpdateDto = {
+          email: submissionData.email,
+          participantAttributes: Object.entries(normalizedAttributes).map(
+            ([attributeUuid, value]) =>
+              ({
+                attributeUuid,
+                value,
+              }) as ParticipantAttributeDto,
+          ),
+        };
 
-        for (const attribute in normalizedAttributes) {
-          await prisma.participantAttribute.updateMany({
-            where: {
-              participantUuid: submissionData.participantId,
-              attributeUuid: attribute,
-            },
-            data: {
-              value: normalizedAttributes[attribute],
-            },
-          });
-        }
-      } else if (submissionData.email !== undefined) {
+        return await this.participantService.update(
+          eventUuid,
+          submissionData.participantId,
+          participantDtoAttributes,
+        );
+      } else if (
+        event.registerFormUuid === formUuid &&
+        submissionData.email !== undefined
+      ) {
         if (
           event.participantsLimit !== null &&
           event.participantsLimit <= event.participants.length
@@ -438,29 +443,16 @@ export class FormsService {
             `Event with id: ${eventUuid} has reached the participants limit`,
           );
         }
-        const participant = await prisma.participant.findFirst({
-          where: { email: submissionData.email, eventUuid },
-        });
-        if (participant != null) {
-          throw new BadRequestException(
-            `Participant with email: ${submissionData.email} already exists`,
-          );
-        }
-        const newParticipant = await prisma.participant.create({
-          data: {
-            email: submissionData.email,
-            eventUuid,
-          },
-        });
-        for (const attribute in normalizedAttributes) {
-          await prisma.participantAttribute.create({
-            data: {
-              participantUuid: newParticipant.uuid,
-              attributeUuid: attribute,
-              value: normalizedAttributes[attribute],
-            },
-          });
-        }
+        return await this.participantService.register(
+          eventUuid,
+          submissionData.email,
+          Object.entries(normalizedAttributes).map(
+            ([attributeUuid, value]) => ({
+              attributeUuid,
+              value,
+            }),
+          ),
+        );
       }
 
       //ToDO poprawic

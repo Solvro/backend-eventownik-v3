@@ -1,6 +1,17 @@
-import { IsOptional, IsString } from "class-validator";
+import { Type } from "class-transformer";
+import { IsArray, IsOptional, IsString, ValidateNested } from "class-validator";
 
-import { ApiPropertyOptional } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+
+export class ParticipantAttributeDto {
+  @ApiProperty()
+  @IsString()
+  attributeUuid: string;
+
+  @ApiProperty()
+  @IsString()
+  value: string;
+}
 
 export class FormSubmitionDto {
   @ApiPropertyOptional()
@@ -13,5 +24,12 @@ export class FormSubmitionDto {
   @IsString()
   participantId?: string;
 
-  [key: string]: unknown;
+  @ApiProperty({
+    isArray: true,
+    description: "Array of participant attributes with their values",
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ParticipantAttributeDto)
+  attributes: ParticipantAttributeDto[];
 }
