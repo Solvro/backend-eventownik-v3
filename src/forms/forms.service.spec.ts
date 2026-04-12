@@ -1,9 +1,13 @@
+import { ParticipantsService } from "src/participants/participants.service";
+
+import { BadRequestException } from "@nestjs/common";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
 import { PrismaService } from "../prisma/prisma.service";
 import type { CreateFormDto } from "./dto/create-form.dto";
 import { FormListingDto } from "./dto/form-listing.dto";
+import type { FormSubmitionDto } from "./dto/form-submition.dto";
 import { FormsService } from "./forms.service";
 
 describe("FormsService", () => {
@@ -33,12 +37,19 @@ describe("FormsService", () => {
     $transaction: jest.fn(),
   };
 
+  const mockParticipantsService = {
+    update: jest.fn(),
+    register: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [FormsService, PrismaService],
+      providers: [FormsService, PrismaService, ParticipantsService],
     })
       .overrideProvider(PrismaService)
       .useValue(mockPrismaService)
+      .overrideProvider(ParticipantsService)
+      .useValue(mockParticipantsService)
       .compile();
 
     service = module.get<FormsService>(FormsService);
@@ -294,5 +305,147 @@ describe("FormsService", () => {
     await expect(service.remove(formUuid, eventUuid)).rejects.toThrow(
       `Form with id: ${formUuid} not found`,
     );
+  });
+
+  describe("formSubmit", () => {
+    const eventUuid = "event-123";
+    const formUuid = "form-123";
+    const participantId = "part-123";
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+      mockPrismaService.$transaction.mockImplementation((callback) =>
+        callback(mockPrismaService),
+      );
+    });
+
+    it("should throw BadRequestException if form is closed", async () => {
+      mockPrismaService.event.findUnique.mockResolvedValue({ uuid: eventUuid });
+      mockPrismaService.form.findUnique.mockResolvedValue({ uuid: formUuid });
+
+      jest.spyOn(service, "isOpen").mockResolvedValue(false);
+
+      await expect(
+        service.formSubmit(
+          eventUuid,
+          formUuid,
+          { attributes: [] } as FormSubmitionDto,
+          [],
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("should register a new participant if it is a registration form", async () => {
+      const submissionData = {
+        email: "test@example.com",
+        attributes: [[{ attributeUuid: "attr-1", value: "value-1" }]],
+      } as unknown as FormSubmitionDto;
+
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
+        registerFormUuid: formUuid,
+        participants: [],
+        participantsLimit: 10,
+      });
+
+      mockPrismaService.form.findUnique.mockResolvedValue({
+        uuid: formUuid,
+        formDefinitions: [
+          {
+            attributeUuid: "attr-1",
+            isRequired: true,
+            attribute: { uuid: "attr-1" },
+          },
+        ],
+      });
+
+      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockParticipantsService.register.mockResolvedValue({
+        id: 1,
+        email: submissionData.email,
+      });
+
+      const result = await service.formSubmit(
+        eventUuid,
+        formUuid,
+        submissionData,
+        [],
+      );
+
+      expect(mockParticipantsService.register).toHaveBeenCalledWith(
+        eventUuid,
+        submissionData.email,
+        [{ attributeUuid: "attr-1", value: "value-1" }],
+      );
+      expect(result).toBeDefined();
+    });
+
+    it("should update existing participant if it is not a registration form", async () => {
+      const submissionData = {
+        participantId,
+        attributes: [[{ attributeUuid: "attr-1", value: "updated-value" }]],
+      } as unknown as FormSubmitionDto;
+
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
+        registerFormUuid: "other-form-uuid",
+      });
+
+      mockPrismaService.form.findUnique.mockResolvedValue({
+        uuid: formUuid,
+        formDefinitions: [
+          {
+            attributeUuid: "attr-1",
+            isRequired: false,
+            attribute: { uuid: "attr-1" },
+          },
+        ],
+      });
+
+      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockParticipantsService.update.mockResolvedValue({
+        id: participantId,
+        status: "updated",
+      });
+
+      await service.formSubmit(eventUuid, formUuid, submissionData, []);
+
+      expect(mockParticipantsService.update).toHaveBeenCalledWith(
+        eventUuid,
+        participantId,
+        expect.objectContaining({
+          participantAttributes: [
+            { attributeUuid: "attr-1", value: "updated-value" },
+          ],
+        }),
+      );
+    });
+
+    it("should throw BadRequestException if registration limit is reached", async () => {
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
+        registerFormUuid: formUuid,
+        participants: Array.from({ length: 5 }),
+        participantsLimit: 5,
+      });
+
+      mockPrismaService.form.findUnique.mockResolvedValue({
+        uuid: formUuid,
+        formDefinitions: [],
+      });
+      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+
+      const submissionData = {
+        email: "full@test.com",
+        attributes: [],
+      } as unknown as FormSubmitionDto;
+
+      await expect(
+        service.formSubmit(eventUuid, formUuid, submissionData, []),
+      ).rejects.toThrow(
+        `Event with id: ${eventUuid} has reached the participants limit`,
+      );
+    });
   });
 });
