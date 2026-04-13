@@ -175,7 +175,7 @@ export class AttributesService {
     if (
       foundAttribute.type === "block" &&
       nextType === "block" &&
-      updateAttributeDto.name &&
+      updateAttributeDto.name != null &&
       updateAttributeDto.name !== foundAttribute.name
     ) {
       await prisma.block.updateMany({
