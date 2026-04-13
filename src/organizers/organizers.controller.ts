@@ -1,4 +1,8 @@
+import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
+import { RequirePermission } from "src/auth/permissions.decorator";
+import { PermissionsGuard } from "src/auth/permissions.guard";
 import { PageDto } from "src/common/dto/page.dto";
+import { PermissionType } from "src/generated/prisma/enums";
 
 import {
   Body,
@@ -11,6 +15,7 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from "@nestjs/common";
 import {
   ApiBearerAuth,
@@ -27,12 +32,23 @@ import { UpdateOrganizerDto } from "./dto/update-organizer.dto";
 import { OrganizersService } from "./organizers.service";
 
 @ApiTags("Organizers")
-@Controller("events/:eventId/organizers")
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermission(PermissionType.MANAGE_EVENT)
+@ApiResponse({
+  status: 401,
+  description: "Unauthorized",
+})
+@ApiResponse({
+  status: 403,
+  description: "Forbidden - insufficient permissions",
+})
+@Controller("events/:eventId/organizers")
 export class OrganizersController {
   constructor(private readonly organizersService: OrganizersService) {}
 
   @Post()
+  @RequirePermission(PermissionType.MANAGE_SETTINGS)
   @ApiOperation({ summary: "Add an organizer to event" })
   @ApiResponse({
     status: 201,
@@ -103,6 +119,7 @@ export class OrganizersController {
   }
 
   @Patch(":organizerId")
+  @RequirePermission(PermissionType.MANAGE_SETTINGS)
   @ApiOperation({ summary: "Update organizer permissions" })
   @ApiResponse({
     status: 200,
@@ -115,7 +132,7 @@ export class OrganizersController {
   })
   @ApiResponse({
     status: 400,
-    description: "All permissionIds's elements must be unique",
+    description: "Duplicate permissions are not allowed",
   })
   async update(
     @Param("eventId", ParseUUIDPipe) eventId: string,
@@ -130,6 +147,7 @@ export class OrganizersController {
   }
 
   @Delete(":organizerId")
+  @RequirePermission(PermissionType.MANAGE_SETTINGS)
   @HttpCode(204)
   @ApiOperation({ summary: "Delete organizer" })
   @ApiResponse({
