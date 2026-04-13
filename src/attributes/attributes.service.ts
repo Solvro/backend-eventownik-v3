@@ -27,13 +27,6 @@ export class AttributesService {
     createAttributeDto: CreateAttributeDto,
     eventId: string,
   ) {
-    const event = await prisma.event.findUnique({
-      where: { uuid: eventId },
-    });
-    if (event == null) {
-      throw new NotFoundException(`Event with uuid ${eventId} not found`);
-    }
-
     const attribute = await prisma.attribute.create({
       data: {
         name: createAttributeDto.name,
@@ -41,7 +34,7 @@ export class AttributesService {
         order: createAttributeDto.order,
         showInList: createAttributeDto.showInList,
         type: createAttributeDto.type,
-        eventUuid: event.uuid,
+        eventUuid: eventId,
       },
     });
 
@@ -59,6 +52,13 @@ export class AttributesService {
 
   async create(createAttributeDto: CreateAttributeDto, eventId: string) {
     return this.prisma.$transaction(async (prisma) => {
+      const event = await prisma.event.findUnique({
+        where: { uuid: eventId },
+      });
+      if (event == null) {
+        throw new NotFoundException(`Event with uuid ${eventId} not found`);
+      }
+
       return this.createTx(prisma, createAttributeDto, eventId);
     });
   }
@@ -123,6 +123,13 @@ export class AttributesService {
     updateAttributeDto: UpdateAttributeDto,
   ) {
     return this.prisma.$transaction(async (prisma) => {
+      const event = await prisma.event.findUnique({
+        where: { uuid: eventId },
+      });
+      if (event == null) {
+        throw new NotFoundException(`Event with uuid ${eventId} not found`);
+      }
+
       return this.updateTx(prisma, id, eventId, updateAttributeDto);
     });
   }
@@ -133,13 +140,6 @@ export class AttributesService {
     eventId: string,
     updateAttributeDto: UpdateAttributeDto,
   ) {
-    const event = await prisma.event.findUnique({
-      where: { uuid: eventId },
-    });
-    if (event == null) {
-      throw new NotFoundException(`Event with uuid ${eventId} not found`);
-    }
-
     const foundAttribute = await prisma.attribute.findFirst({
       where: { uuid: id, eventUuid: eventId },
     });
@@ -170,6 +170,18 @@ export class AttributesService {
     }
     if (foundAttribute.type === "block" && nextType !== "block") {
       await this.blocksService.deleteRootBlocks(updated.uuid, prisma);
+    }
+
+    if (
+      foundAttribute.type === "block" &&
+      nextType === "block" &&
+      updateAttributeDto.name &&
+      updateAttributeDto.name !== foundAttribute.name
+    ) {
+      await prisma.block.updateMany({
+        where: { attributeUuid: updated.uuid, isRootBlock: true },
+        data: { name: updateAttributeDto.name },
+      });
     }
 
     return updated;
@@ -204,10 +216,19 @@ export class AttributesService {
 
   async bulkUpdate(eventId: string, attributes: BulkUpdateAttributeDto[]) {
     return this.prisma.$transaction(async (prisma) => {
+      const event = await prisma.event.findUnique({
+        where: { uuid: eventId },
+      });
+      if (event == null) {
+        throw new NotFoundException(`Event with uuid ${eventId} not found`);
+      }
+
       const results: PrismaAttribute[] = [];
       for (const item of attributes) {
         if (item.uuid == null) {
-          results.push(await this.createTx(prisma, item, eventId));
+          results.push(
+            await this.createTx(prisma, item as CreateAttributeDto, eventId),
+          );
         } else {
           results.push(await this.updateTx(prisma, item.uuid, eventId, item));
         }

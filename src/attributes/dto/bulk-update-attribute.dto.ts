@@ -1,10 +1,10 @@
 import { IsOptional, IsUUID } from "class-validator";
 
-import { ApiPropertyOptional } from "@nestjs/swagger";
+import { ApiPropertyOptional, PartialType } from "@nestjs/swagger";
 
 import { CreateAttributeDto } from "./create-attribute.dto";
 
-export class BulkUpdateAttributeDto extends CreateAttributeDto {
+export class BulkUpdateAttributeDto extends PartialType(CreateAttributeDto) {
   @ApiPropertyOptional({
     description:
       "If provided, updates an existing attribute; otherwise creates.",

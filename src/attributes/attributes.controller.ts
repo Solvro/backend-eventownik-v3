@@ -57,7 +57,7 @@ export class AttributesController {
     return this.attributesService.create(createAttributeDto, eventId);
   }
 
-  @Post("bulk")
+  @Patch("bulk")
   @ApiOperation({
     summary: "Create/update many attributes (single transaction)",
   })

@@ -111,7 +111,7 @@ export class BlocksService {
   async deleteRootBlocks(attributeId: string, tx: Prisma.TransactionClient) {
     const prisma = this.getClient(tx);
     return prisma.block.deleteMany({
-      where: { attributeUuid: attributeId, isRootBlock: true },
+      where: { attributeUuid: attributeId },
     });
   }
 
