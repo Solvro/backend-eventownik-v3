@@ -12,6 +12,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseArrayPipe,
   ParseUUIDPipe,
   Patch,
   Post,
@@ -27,6 +28,7 @@ import {
 
 import { AttributesService } from "./attributes.service";
 import { AttributeListingDto } from "./dto/attribute-listing.dto";
+import { BulkUpdateAttributeDto } from "./dto/bulk-update-attribute.dto";
 import { CreateAttributeDto } from "./dto/create-attribute.dto";
 import { UpdateAttributeDto } from "./dto/update-attribute.dto";
 import { Attribute } from "./entities/attribute.entity";
@@ -53,6 +55,25 @@ export class AttributesController {
     @Param("eventId", ParseUUIDPipe) eventId: string,
   ) {
     return this.attributesService.create(createAttributeDto, eventId);
+  }
+
+  @Patch("bulk")
+  @ApiOperation({
+    summary: "Create/update many attributes (single transaction)",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Attributes successfully processed.",
+    type: Attribute,
+    isArray: true,
+  })
+  @ApiResponse({ status: 404, description: "Event or attribute not found." })
+  async bulkUpdate(
+    @Body(new ParseArrayPipe({ items: BulkUpdateAttributeDto }))
+    attributes: BulkUpdateAttributeDto[],
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+  ) {
+    return this.attributesService.bulkUpdate(eventId, attributes);
   }
 
   @Get()
