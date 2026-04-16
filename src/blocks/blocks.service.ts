@@ -1,3 +1,4 @@
+import { Prisma } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import {
@@ -14,8 +15,17 @@ import { Block } from "./entities/block.entity";
 export class BlocksService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async checkAttributeExists(eventId: string, attributeId: string) {
-    const attribute = await this.prisma.attribute.findFirst({
+  private getClient(tx?: Prisma.TransactionClient) {
+    return tx ?? this.prisma;
+  }
+
+  private async checkAttributeExists(
+    eventId: string,
+    attributeId: string,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const prisma = this.getClient(tx);
+    const attribute = await prisma.attribute.findFirst({
       where: { uuid: attributeId, eventUuid: eventId },
     });
 
@@ -31,8 +41,10 @@ export class BlocksService {
   private async checkParentBlockExists(
     attributeId: string,
     parentUuid: string,
+    tx?: Prisma.TransactionClient,
   ) {
-    const parentBlock = await this.prisma.block.findFirst({
+    const prisma = this.getClient(tx);
+    const parentBlock = await prisma.block.findFirst({
       where: { uuid: parentUuid, attributeUuid: attributeId },
     });
 
@@ -62,6 +74,44 @@ export class BlocksService {
         parentUuid: createBlockDto.parentUuid,
         attributeUuid: attributeId,
       },
+    });
+  }
+
+  async ensureRootBlock(
+    eventId: string,
+    attributeId: string,
+    rootName: string,
+    tx: Prisma.TransactionClient,
+  ) {
+    const prisma = this.getClient(tx);
+    await this.checkAttributeExists(eventId, attributeId, tx);
+
+    const existingRoot = await prisma.block.findFirst({
+      where: { attributeUuid: attributeId, isRootBlock: true },
+      select: { uuid: true },
+    });
+    if (existingRoot != null) {
+      return existingRoot;
+    }
+
+    return prisma.block.create({
+      data: {
+        name: rootName,
+        description: null,
+        capacity: null,
+        order: 0,
+        parentUuid: null,
+        attributeUuid: attributeId,
+        isRootBlock: true,
+      },
+      select: { uuid: true },
+    });
+  }
+
+  async deleteRootBlocks(attributeId: string, tx: Prisma.TransactionClient) {
+    const prisma = this.getClient(tx);
+    return prisma.block.deleteMany({
+      where: { attributeUuid: attributeId },
     });
   }
 
