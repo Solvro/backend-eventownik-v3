@@ -1,8 +1,3 @@
-import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
-import { RequirePermission } from "src/auth/permissions.decorator";
-import { PermissionsGuard } from "src/auth/permissions.guard";
-import { PermissionType } from "src/generated/prisma/enums";
-
 import {
   Body,
   Controller,
@@ -16,14 +11,8 @@ import {
   Post,
   Query,
   UploadedFiles,
-  UseGuards,
 } from "@nestjs/common";
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from "@nestjs/swagger";
+import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 import { CreateFormDto } from "./dto/create-form.dto";
 import { FormListingDto } from "./dto/form-listing.dto";

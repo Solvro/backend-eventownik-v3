@@ -1,5 +1,4 @@
 import { BlocksService } from "src/blocks/blocks.service";
-import { Block } from "src/blocks/entities/block.entity";
 import { ParticipantsService } from "src/participants/participants.service";
 
 import { BadRequestException } from "@nestjs/common";
@@ -326,8 +325,9 @@ describe("FormsService", () => {
 
     beforeEach(() => {
       jest.clearAllMocks();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+
       mockPrismaService.$transaction.mockImplementation((callback) =>
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
         callback(mockPrismaService),
       );
     });
