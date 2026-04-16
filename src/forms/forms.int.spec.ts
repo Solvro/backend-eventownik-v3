@@ -1,3 +1,4 @@
+import { BlocksService } from "src/blocks/blocks.service";
 import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -47,6 +48,7 @@ describe("Forms Integration", () => {
           useValue: mockPrismaService,
         },
         ParticipantsService,
+        BlocksService,
       ],
     }).compile();
     formsController = module.get<FormsController>(FormsController);

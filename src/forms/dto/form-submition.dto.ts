@@ -8,9 +8,13 @@ export class ParticipantAttributeDto {
   @IsString()
   attributeUuid: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional({
+    description:
+      "Value for the participant attribute: \n - For files: write the send filename \n -For multiselekt write options with ; as separator",
+  })
+  @IsOptional()
   @IsString()
-  value: string;
+  value?: string;
 }
 
 export class FormSubmitionDto {

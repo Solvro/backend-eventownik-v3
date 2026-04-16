@@ -1,4 +1,5 @@
 import { isString } from "class-validator";
+import { BlocksService } from "src/blocks/blocks.service";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { parseSortInput } from "src/common/utils/prisma.utility";
@@ -26,6 +27,7 @@ export class FormsService {
   constructor(
     private prisma: PrismaService,
     private participantService: ParticipantsService,
+    private blocksService: BlocksService,
   ) {}
 
   async create(eventUuid: string, createFormDto: CreateFormDto) {
@@ -367,7 +369,6 @@ export class FormsService {
             return accumulator;
           }, {});
 
-      //File handling
       for (const attribute in normalizedAttributes) {
         const foundAttribute = form.formDefinitions.find(
           (formDefinition) => formDefinition.attributeUuid === attribute,
@@ -382,6 +383,7 @@ export class FormsService {
           foundAttribute.attribute?.type === AttributeType.file &&
           isString(attributeValue)
         ) {
+          //Files handling
           const fileName = fileNames.find((f) =>
             f.endsWith(`#####${attributeValue}`),
           );
@@ -389,6 +391,34 @@ export class FormsService {
             fileNames.splice(fileNames.indexOf(fileName), 1);
             normalizedAttributes[attribute] =
               `./uploads/forms/${eventUuid}/${formUuid}/#####${fileName}`;
+          }
+        } else if (
+          foundAttribute.attribute?.type === AttributeType.block &&
+          isString(attributeValue)
+        ) {
+          //TODO: Blocks handling
+        } else if (
+          (foundAttribute.attribute?.type === AttributeType.multiSelect ||
+            foundAttribute.attribute?.type === AttributeType.select) &&
+          isString(attributeValue)
+        ) {
+          //Select and multiselect handling
+          const options = foundAttribute.attribute.options;
+          if (foundAttribute.attribute.type === AttributeType.select) {
+            if (!options.includes(attributeValue)) {
+              throw new BadRequestException(
+                `Invalid value for attribute with id: ${attribute}. Allowed values are: ${options.join(", ")}`,
+              );
+            }
+          } else {
+            const values = attributeValue.split(";");
+            for (const value of values) {
+              if (!options.includes(value)) {
+                throw new BadRequestException(
+                  `Invalid value for attribute with id: ${attribute}. Allowed values are: ${options.join(", ")}`,
+                );
+              }
+            }
           }
         }
       }
@@ -455,8 +485,9 @@ export class FormsService {
         );
       }
 
-      //ToDO poprawic
-      return null;
+      throw new InternalServerErrorException(
+        `Unexpected error in form submission.`,
+      );
     });
   }
 }

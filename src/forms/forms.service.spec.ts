@@ -1,3 +1,5 @@
+import { BlocksService } from "src/blocks/blocks.service";
+import { Block } from "src/blocks/entities/block.entity";
 import { ParticipantsService } from "src/participants/participants.service";
 
 import { BadRequestException } from "@nestjs/common";
@@ -41,15 +43,25 @@ describe("FormsService", () => {
     update: jest.fn(),
     register: jest.fn(),
   };
+  const mockBlocksService = {
+    canSignToBlock: jest.fn(),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [FormsService, PrismaService, ParticipantsService],
+      providers: [
+        FormsService,
+        PrismaService,
+        ParticipantsService,
+        BlocksService,
+      ],
     })
       .overrideProvider(PrismaService)
       .useValue(mockPrismaService)
       .overrideProvider(ParticipantsService)
       .useValue(mockParticipantsService)
+      .overrideProvider(BlocksService)
+      .useValue(mockBlocksService)
       .compile();
 
     service = module.get<FormsService>(FormsService);

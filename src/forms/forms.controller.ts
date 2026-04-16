@@ -33,9 +33,9 @@ import { FormsService } from "./forms.service";
 import { UploadFiles } from "./utils/upload-files-decorator";
 
 @ApiTags("Forms")
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard, PermissionsGuard)
-@RequirePermission(PermissionType.MANAGE_FORM)
+// @ApiBearerAuth()
+// @UseGuards(JwtAuthGuard, PermissionsGuard)
+// @RequirePermission(PermissionType.MANAGE_FORM)
 @Controller("events/:eventId/forms")
 export class FormsController {
   constructor(private readonly formsService: FormsService) {}
