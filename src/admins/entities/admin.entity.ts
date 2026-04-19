@@ -1,3 +1,5 @@
+import { Exclude } from "class-transformer";
+
 import { ApiProperty } from "@nestjs/swagger";
 
 import {
@@ -19,6 +21,7 @@ export class Admin implements PrismaAdmin {
   email!: string;
 
   @ApiProperty()
+  @Exclude()
   password!: string;
 
   @ApiProperty()

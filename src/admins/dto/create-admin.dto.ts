@@ -1,4 +1,12 @@
-import { IsBoolean, IsEmail, IsEnum, IsString } from "class-validator";
+import {
+  IsBoolean,
+  IsEmail,
+  IsEnum,
+  IsNotEmpty,
+  IsString,
+  MaxLength,
+  MinLength,
+} from "class-validator";
 import type { OrganizerType } from "src/generated/prisma/enums";
 
 import { ApiProperty } from "@nestjs/swagger";
@@ -34,6 +42,9 @@ export class CreateAdminDto {
     type: String,
   })
   @IsString()
+  @IsNotEmpty()
+  @MinLength(8)
+  @MaxLength(72)
   password!: string;
 
   @ApiProperty({

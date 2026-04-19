@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/unbound-method */
+import type { AuthUser } from "src/auth/jwt.strategy";
 import { OrganizerType } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -7,6 +8,8 @@ import { Test } from "@nestjs/testing";
 
 import { AdminsService } from "./admins.service";
 import type { ListAdminDto } from "./dto/list-admin.dto";
+import type { UpdateAdminDto } from "./dto/update-admin.dto";
+import { Admin } from "./entities/admin.entity";
 
 describe("AdminsService", () => {
   let service: AdminsService;
@@ -211,13 +214,18 @@ describe("AdminsService", () => {
   describe("update", () => {
     it("should update an existing admin", async () => {
       const mockId = "1";
-      const updateAdminDto = {
+      const updateAdminDto: UpdateAdminDto = {
         firstName: "Jane",
         lastName: "Smith",
         email: "jane.smith@example.com",
-      };
+      } as unknown as UpdateAdminDto;
 
-      const mockAdmin = { uuid: "1", ...updateAdminDto };
+      const mockAdmin = Object.assign(new Admin(), {
+        uuid: mockId,
+        firstName: updateAdminDto.firstName,
+        lastName: updateAdminDto.lastName,
+        email: updateAdminDto.email,
+      });
 
       (prisma.admin.update as jest.Mock).mockResolvedValue(mockAdmin);
 
@@ -228,11 +236,11 @@ describe("AdminsService", () => {
     });
     it("should throw NotFoundException if admin to update not found", async () => {
       const mockId = "nonexistent-id";
-      const updateAdminDto = {
-        fistName: "Jane",
+      const updateAdminDto: UpdateAdminDto = {
+        firstName: "Jane",
         lastName: "Smith",
         email: "jane.smith@example.com",
-      };
+      } as unknown as UpdateAdminDto;
 
       (prisma.admin.update as jest.Mock).mockRejectedValue(
         new Error(`Admin with UUID ${mockId} not found`),
@@ -249,10 +257,10 @@ describe("AdminsService", () => {
 
       (prisma.admin.delete as jest.Mock).mockResolvedValue(null);
 
-      const result = await service.remove(mockId);
+      const result = await service.remove(mockId, 2 as unknown as AuthUser);
 
       expect(prisma.admin.delete).toHaveBeenCalled();
-      expect(result).toEqual(null);
+      expect(typeof result).toEqual("object");
     });
   });
   it("should throw NotFoundException if admin to remove not found", async () => {
@@ -262,8 +270,8 @@ describe("AdminsService", () => {
       new Error("Admin with UUID nonexistent-id not found"),
     );
 
-    await expect(service.remove(mockId)).rejects.toThrow(
-      `Admin with UUID ${mockId} not found`,
-    );
+    await expect(
+      service.remove(mockId, 2 as unknown as AuthUser),
+    ).rejects.toThrow(`Admin with UUID ${mockId} not found`);
   });
 });

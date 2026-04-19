@@ -1,4 +1,5 @@
 import * as bcrypt from "bcrypt";
+import { AuthUser } from "src/auth/jwt.strategy";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { parseSortInput } from "src/common/utils/prisma.utility";
@@ -14,6 +15,7 @@ import {
 import { CreateAdminDto } from "./dto/create-admin.dto";
 import { ListAdminDto } from "./dto/list-admin.dto";
 import { UpdateAdminDto } from "./dto/update-admin.dto";
+import { Admin } from "./entities/admin.entity";
 
 @Injectable()
 export class AdminsService {
@@ -31,7 +33,7 @@ export class AdminsService {
             password: hashedPassword,
           },
         });
-        return admin;
+        return Object.assign(new Admin(), admin);
       } catch (error) {
         if (
           error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -83,7 +85,10 @@ export class AdminsService {
       }),
     ]);
     const pageMetaDto = new PageMetaDto({ itemCount, pageOptionsDto: query });
-    return new PageDto(admins, pageMetaDto);
+    const adminEntities = admins.map((admin) =>
+      Object.assign(new Admin(), admin),
+    );
+    return new PageDto(adminEntities, pageMetaDto);
   }
 
   async findOne(id: string) {
@@ -93,15 +98,28 @@ export class AdminsService {
     if (admin == null) {
       throw new NotFoundException(`Admin with UUID ${id} not found`);
     }
-    return admin;
+    return Object.assign(new Admin(), admin);
   }
 
   async update(id: string, updateAdminDto: UpdateAdminDto) {
+    const { password, ...adminData } = updateAdminDto;
+    const hasNonEmptyPassword =
+      password !== undefined && password.trim().length > 0;
+
+    const hashedPassword = hasNonEmptyPassword
+      ? await bcrypt.hash(password, 12)
+      : undefined;
     try {
-      return await this.prisma.admin.update({
-        where: { uuid: id },
-        data: updateAdminDto,
-      });
+      return Object.assign(
+        new Admin(),
+        await this.prisma.admin.update({
+          where: { uuid: id },
+          data: {
+            ...adminData,
+            ...(hasNonEmptyPassword ? { password: hashedPassword } : {}),
+          },
+        }),
+      );
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === "P2025") {
@@ -116,11 +134,17 @@ export class AdminsService {
     }
   }
 
-  async remove(id: string) {
+  async remove(id: string, currentAdmin: AuthUser) {
+    if (currentAdmin.uuid === id) {
+      throw new ConflictException("You cannot delete your own account");
+    }
     try {
-      return await this.prisma.admin.delete({
-        where: { uuid: id },
-      });
+      return Object.assign(
+        new Admin(),
+        await this.prisma.admin.delete({
+          where: { uuid: id },
+        }),
+      );
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
