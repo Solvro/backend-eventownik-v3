@@ -3,8 +3,12 @@ import { BlocksService } from "src/blocks/blocks.service";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { parseSortInput } from "src/common/utils/prisma.utility";
-import { OpenCondition, Prisma } from "src/generated/prisma/browser";
-import { Attribute, AttributeType } from "src/generated/prisma/client";
+import {
+  Attribute,
+  AttributeType,
+  OpenCondition,
+  Prisma,
+} from "src/generated/prisma/client";
 import { ParticipantAttributeDto } from "src/participants/dto/participant-create.dto";
 import { ParticipantUpdateDto } from "src/participants/dto/participant-update.dto";
 import { ParticipantsService } from "src/participants/participants.service";
@@ -65,6 +69,8 @@ export class FormsService {
           closeDate: createFormDto.closeDate,
           description: createFormDto.description,
           eventUuid: event.uuid,
+          openCondition: createFormDto.openCondition,
+          isOpen: createFormDto.isOpen,
         },
       });
       if (createFormDto.isFirstForm ?? false) {
@@ -256,6 +262,8 @@ export class FormsService {
           openDate: updateFormDto.openDate,
           closeDate: updateFormDto.closeDate,
           description: updateFormDto.description,
+          openCondition: updateFormDto.openCondition,
+          isOpen: updateFormDto.isOpen,
         },
         include: {
           formDefinitions: {

@@ -1,16 +1,24 @@
 import { Type } from "class-transformer";
-import { IsArray, IsOptional, IsString, ValidateNested } from "class-validator";
+import {
+  IsArray,
+  IsEmail,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateNested,
+} from "class-validator";
 
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class ParticipantAttributeDto {
   @ApiProperty()
   @IsString()
+  @IsUUID()
   attributeUuid: string;
 
   @ApiPropertyOptional({
     description:
-      "Value for the participant attribute: \n - For files: write the send filename \n -For multiselekt write options with ; as separator",
+      "Value for the participant attribute:\n - For files: provide the file name\n - For multiselect: write options separated by ;",
   })
   @IsOptional()
   @IsString()
@@ -21,11 +29,13 @@ export class FormSubmitionDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @IsEmail()
   email?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @IsUUID()
   participantId?: string;
 
   @ApiProperty({
