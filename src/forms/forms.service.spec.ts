@@ -92,6 +92,8 @@ describe("FormsService", () => {
       closeDate: dto.closeDate,
       description: dto.description,
       eventUuid,
+      isOpen: undefined,
+      openCondition: dto.openCondition,
     };
     mockPrismaService.form.create.mockResolvedValue(mockForm);
     mockPrismaService.attribute.count.mockResolvedValue(2);
@@ -120,6 +122,7 @@ describe("FormsService", () => {
         closeDate: dto.closeDate,
         description: dto.description,
         eventUuid,
+        openCondition: dto.openCondition,
       },
     });
     expect(mockPrismaService.attribute.count).toHaveBeenCalledTimes(1);
