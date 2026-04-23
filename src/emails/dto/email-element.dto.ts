@@ -5,8 +5,8 @@ export class EmailElementDto {
   eventId: string;
   name: string;
   trigger: EmailTrigger;
-  triggerValue: string;
-  triggerValue2: string;
+  triggerValue: string | null;
+  triggerValue2: string | null;
   createdAt: string;
   updatedAt: string;
 }

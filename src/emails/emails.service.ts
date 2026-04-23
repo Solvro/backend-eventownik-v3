@@ -4,9 +4,14 @@ import { parseSortInput } from "src/common/utils/prisma.utility";
 import { EmailStatus } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
-import { BadRequestException, Injectable } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 
 import { CreateEmailDto } from "./dto/create-email.dto";
+import { EmailCompleteElement } from "./dto/email-complete-element.dto";
 import { EmailListElementDto } from "./dto/email-list-element.dto";
 import { EmailListingDto } from "./dto/email-listing.dto";
 
@@ -18,6 +23,7 @@ export class EmailsService {
     return await this.prisma.$transaction(async (tx) => {
       const event = await tx.event.findUnique({
         where: { uuid: eventUuid },
+        select: { uuid: true },
       });
       if (event == null) {
         throw new BadRequestException(`Event with id: ${eventUuid} not found`);
@@ -125,8 +131,8 @@ export class EmailsService {
         eventId: record.eventUuid,
         name: record.name,
         trigger: record.trigger,
-        triggerValue: "",
-        triggerValue2: "",
+        triggerValue: record.triggerValue,
+        triggerValue2: record.triggerValue2,
         createdAt: record.createdAt.toISOString(),
         updatedAt: record.updatedAt.toISOString(),
         meta: counts,
@@ -135,5 +141,54 @@ export class EmailsService {
 
     const meta = new PageMetaDto({ itemCount, pageOptionsDto: query });
     return new PageDto(data, meta);
+  }
+
+  async findOne(eventUuid: string, emailUuid: string) {
+    const emailTemplate = await this.prisma.emailTemplate.findFirst({
+      where: {
+        uuid: emailUuid,
+        eventUuid,
+      },
+      include: {
+        participantEmails: {
+          include: {
+            participant: true,
+          },
+        },
+      },
+    });
+
+    if (emailTemplate === null) {
+      throw new NotFoundException("Email not found");
+    }
+
+    const formattedResponse: EmailCompleteElement = {
+      id: emailTemplate.uuid,
+      eventId: emailTemplate.eventUuid,
+      name: emailTemplate.name,
+      content: emailTemplate.content,
+      trigger: emailTemplate.trigger,
+      triggerValue: emailTemplate.triggerValue,
+      triggerValue2: emailTemplate.triggerValue2,
+      formId: emailTemplate.formUuid,
+      order: emailTemplate.order,
+      createdAt: emailTemplate.createdAt.toISOString(),
+      updatedAt: emailTemplate.updatedAt.toISOString(),
+      participants: emailTemplate.participantEmails
+        .filter((pivot) => pivot.participant !== null)
+        .map((pivot) => ({
+          id: pivot.participant?.uuid,
+          email: pivot.participant?.email,
+          createdAt: pivot.participant?.createdAt.toISOString(),
+          updatedAt: pivot.participant?.updatedAt.toISOString(),
+          meta: {
+            pivot_status: pivot.status,
+            pivot_send_at: pivot.sendAt.toISOString(),
+            pivot_send_by: pivot.sendBy,
+          },
+        })),
+    };
+
+    return formattedResponse;
   }
 }
