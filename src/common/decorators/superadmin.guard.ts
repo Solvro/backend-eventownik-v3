@@ -24,7 +24,7 @@ export class SuperAdminGuard implements CanActivate {
     }
 
     throw new ForbiddenException(
-      "Superadmin privileges are required to perform this action",
+      "Superadmin privileges and an active account are required to perform this action.",
     );
   }
 }

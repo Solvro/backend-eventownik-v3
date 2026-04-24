@@ -7,7 +7,7 @@ import {
   MaxLength,
   MinLength,
 } from "class-validator";
-import type { OrganizerType } from "src/generated/prisma/enums";
+import { OrganizerType } from "src/generated/prisma/enums";
 
 import { ApiProperty } from "@nestjs/swagger";
 
@@ -50,9 +50,9 @@ export class CreateAdminDto {
   @ApiProperty({
     description: "Type of the admin",
     example: "organizer",
-    enum: ["organizer", "superadmin"],
+    enum: OrganizerType,
   })
-  @IsEnum(["organizer", "superadmin"])
+  @IsEnum(OrganizerType)
   type!: OrganizerType;
 
   @ApiProperty({

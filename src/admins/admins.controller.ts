@@ -1,6 +1,7 @@
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { AuthUser } from "src/auth/jwt.strategy";
 import { SuperAdminGuard } from "src/common/decorators/superadmin.guard";
+import { PageDto } from "src/common/dto/page.dto";
 
 import {
   Body,
@@ -18,15 +19,36 @@ import {
   UseGuards,
   UseInterceptors,
 } from "@nestjs/common";
-import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBadRequestResponse,
+  ApiBearerAuth,
+  ApiConflictResponse,
+  ApiCreatedResponse,
+  ApiExtraModels,
+  ApiForbiddenResponse,
+  ApiNoContentResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from "@nestjs/swagger";
 
 import { AdminsService } from "./admins.service";
 import { CreateAdminDto } from "./dto/create-admin.dto";
 import { ListAdminDto } from "./dto/list-admin.dto";
 import { UpdateAdminDto } from "./dto/update-admin.dto";
 import { Admin } from "./entities/admin.entity";
+import {
+  adminConflictResponse,
+  adminForbiddenResponse,
+  adminNotFoundResponse,
+  createAdminBadRequestResponse,
+  listAdminResponse,
+} from "./utils/swagger-response-examples";
 
 @ApiTags("Admins")
+@ApiBearerAuth()
+@ApiForbiddenResponse(adminForbiddenResponse)
 @Controller("admins")
 @UseGuards(JwtAuthGuard, SuperAdminGuard)
 @UseInterceptors(ClassSerializerInterceptor)
@@ -34,29 +56,40 @@ export class AdminsController {
   constructor(private readonly adminsService: AdminsService) {}
 
   @Post()
-  @ApiOperation({ summary: "Create a new admin" })
-  @ApiResponse({
-    status: 201,
-    description: "The admin has been successfully created.",
+  @ApiOperation({
+    summary: "Create a new admin",
+    description:
+      "Retrives admin, only super admins can create new admins accounts.",
   })
-  @ApiResponse({ status: 403, description: "Invalid account type." })
+  @ApiCreatedResponse({
+    type: Admin,
+    description: "Returns the created admin.",
+  })
+  @ApiBadRequestResponse(createAdminBadRequestResponse)
+  @ApiConflictResponse(adminConflictResponse)
   async create(@Body() createAdminDto: CreateAdminDto) {
     return await this.adminsService.create(createAdminDto);
   }
 
   @Get()
-  @ApiOperation({ summary: "Get list of all admins" })
-  @ApiResponse({ status: 200, description: "List of admins." })
-  @ApiResponse({ status: 403, description: "Invalid account type." })
-  async findAll(@Query() dto: ListAdminDto) {
+  @ApiOperation({
+    summary: "Get list of all admins",
+    description:
+      "Retrieves list of all admins, supports pagination, filtering and sorting.",
+  })
+  @ApiExtraModels(PageDto, Admin)
+  @ApiOkResponse(listAdminResponse)
+  async findAll(@Query() dto: ListAdminDto): Promise<PageDto<Admin>> {
     return await this.adminsService.findAll(dto);
   }
 
   @Get(":adminId")
-  @ApiOperation({ summary: "Get a admin by id" })
-  @ApiResponse({ status: 200, description: "The admin." })
-  @ApiResponse({ status: 404, description: "Admin not found." })
-  @ApiResponse({ status: 403, description: "Invalid account type." })
+  @ApiOperation({
+    summary: "Get an Admin by id",
+    description: "Retrieves an Admin by its id.",
+  })
+  @ApiOkResponse({ type: Admin, description: "Returns the admin." })
+  @ApiNotFoundResponse(adminNotFoundResponse)
   async findOne(
     @Param("adminId", ParseUUIDPipe) adminId: string,
   ): Promise<Admin> {
@@ -64,10 +97,11 @@ export class AdminsController {
   }
 
   @Patch(":adminId")
-  @ApiOperation({ summary: "Update a admin by id" })
-  @ApiResponse({ status: 200, description: "The updated admin." })
-  @ApiResponse({ status: 404, description: "Admin not found." })
-  @ApiResponse({ status: 403, description: "Invalid account type." })
+  @ApiOperation({ summary: "Update an Admin by id" })
+  @ApiOkResponse({ type: Admin, description: "Returns the updated admin." })
+  @ApiBadRequestResponse(createAdminBadRequestResponse)
+  @ApiConflictResponse(adminConflictResponse)
+  @ApiNotFoundResponse(adminNotFoundResponse)
   async update(
     @Param("adminId", ParseUUIDPipe) adminId: string,
     @Body() updateAdminDto: UpdateAdminDto,
@@ -79,13 +113,11 @@ export class AdminsController {
   }
 
   @Delete(":adminId")
-  @ApiOperation({ summary: "Delete a admin by id" })
-  @ApiResponse({
-    status: 204,
-    description: "No content",
+  @ApiOperation({ summary: "Delete an Admin by id" })
+  @ApiNoContentResponse({
+    description: "Admin successfully deleted. *No content*",
   })
-  @ApiResponse({ status: 404, description: "Admin not found." })
-  @ApiResponse({ status: 403, description: "Invalid account type." })
+  @ApiNotFoundResponse(adminNotFoundResponse)
   @HttpCode(204)
   async remove(
     @Param("adminId", ParseUUIDPipe) adminId: string,

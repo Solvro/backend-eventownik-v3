@@ -162,7 +162,7 @@ describe("AdminsService", () => {
       (prisma.admin.findUnique as jest.Mock).mockResolvedValue(null);
 
       await expect(service.findOne(mockId)).rejects.toThrow(
-        `Admin with UUID ${mockId} not found`,
+        "Admin with given ID was not found.",
       );
       expect(prisma.admin.findUnique).toHaveBeenCalledWith({
         where: { uuid: mockId },

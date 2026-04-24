@@ -40,7 +40,7 @@ export class AdminsService {
           error.code === "P2002"
         ) {
           throw new ConflictException(
-            `Admin with email ${adminData.email} already exists`,
+            `Admin with the same email already exists.`,
           );
         }
         throw error;
@@ -96,7 +96,7 @@ export class AdminsService {
       where: { uuid: id },
     });
     if (admin == null) {
-      throw new NotFoundException(`Admin with UUID ${id} not found`);
+      throw new NotFoundException(`Admin with given ID was not found.`);
     }
     return Object.assign(new Admin(), admin);
   }
@@ -123,11 +123,13 @@ export class AdminsService {
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === "P2025") {
-          throw new NotFoundException(`Admin with UUID ${id} not found`);
+          throw new NotFoundException(`Admin with given ID was not found.`);
         }
 
         if (error.code === "P2002") {
-          throw new ConflictException("Email already in use");
+          throw new ConflictException(
+            "Admin with the same email already exists.",
+          );
         }
       }
       throw error;
@@ -150,7 +152,7 @@ export class AdminsService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2025"
       ) {
-        throw new NotFoundException(`Admin with UUID ${id} not found`);
+        throw new NotFoundException(`Admin with given ID was not found.`);
       }
       throw error;
     }
