@@ -7,7 +7,7 @@ import { EventListingDto } from "./dto/event-listing.dto";
 import { Event } from "./entities/event.entity";
 import { EventsService } from "./events.service";
 
-@ApiTags("Events")
+@ApiTags("Public")
 @Controller("public/events")
 export class PublicEventsController {
   constructor(private readonly eventsService: EventsService) {}

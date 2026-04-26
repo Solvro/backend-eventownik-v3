@@ -10,7 +10,7 @@ import {
 import { Participant } from "./entities/participant.entity";
 import { ParticipantsService } from "./participants.service";
 
-@ApiTags("Public Participants")
+@ApiTags("Public")
 @Controller("public/events/:eventId/participants")
 export class PublicParticipantsController {
   constructor(private readonly participantsService: ParticipantsService) {}

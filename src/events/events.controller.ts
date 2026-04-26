@@ -20,7 +20,12 @@ import {
   UploadedFile,
   UseGuards,
 } from "@nestjs/common";
-import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from "@nestjs/swagger";
 
 import { EventCreateDto } from "./dto/event-create.dto";
 import { EventListingDto } from "./dto/event-listing.dto";
@@ -29,6 +34,7 @@ import { EventsService } from "./events.service";
 import { UploadPhoto } from "./utils/upload-photo.decorator";
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
+@ApiBearerAuth()
 @ApiTags("Events")
 @Controller("events")
 export class EventsController {

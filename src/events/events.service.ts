@@ -162,11 +162,15 @@ export class EventsService {
     const event = await this.prisma.event.findUnique({
       where: {
         slug,
-        isVerified: true,
         isPublic: true,
       },
       include: {
         links: true,
+        registerForm: {
+          include: {
+            formDefinitions: true,
+          },
+        },
       },
     });
 

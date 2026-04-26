@@ -19,6 +19,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import {
+  ApiBearerAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiExtraModels,
@@ -39,6 +40,7 @@ import { ParticipantsService } from "./participants.service";
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @ApiTags("Participants")
+@ApiBearerAuth()
 @ApiExtraModels(PageDto, Participant)
 @Controller("events/:eventId/participants")
 export class ParticipantsController {

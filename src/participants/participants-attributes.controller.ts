@@ -21,6 +21,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import {
+  ApiBearerAuth,
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOperation,
@@ -32,6 +33,7 @@ import { ParticipantBulkUpdateDto } from "./dto/participant-bulk-update.dto";
 import { ParticipantsService } from "./participants.service";
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
+@ApiBearerAuth()
 @ApiTags("Participants Attributes")
 @Controller("events/:eventId/participants")
 export class ParticipantsAttributesController {
