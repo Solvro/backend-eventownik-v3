@@ -2,6 +2,7 @@ import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { AuthUser } from "src/auth/jwt.strategy";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
+import { ApiPaginatedResponse } from "src/common/decorators/api-paginated-response.decorator";
 import { PageDto } from "src/common/dto/page.dto";
 import { PermissionType } from "src/generated/prisma/enums";
 
@@ -42,7 +43,7 @@ export class EventsController {
 
   @Get()
   @ApiOperation({ summary: "Get list of events with pagination and filtering" })
-  @ApiOkResponse({ description: "List of events", type: PageDto<Event> })
+  @ApiPaginatedResponse(Event)
   async findAll(
     @Query() dto: EventListingDto,
     @Request() request: { user: AuthUser },
