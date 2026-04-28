@@ -30,11 +30,11 @@ export class AttributesService {
     const attribute = await prisma.attribute.create({
       data: {
         name: createAttributeDto.name,
-        options: createAttributeDto.options,
         order: createAttributeDto.order,
         showInList: createAttributeDto.showInList,
         type: createAttributeDto.type,
         eventUuid: eventId,
+        config: createAttributeDto.config,
       },
     });
 
@@ -153,10 +153,10 @@ export class AttributesService {
       where: { uuid: id, eventUuid: eventId },
       data: {
         name: updateAttributeDto.name,
-        options: updateAttributeDto.options,
         order: updateAttributeDto.order,
         showInList: updateAttributeDto.showInList,
         type: updateAttributeDto.type,
+        config: updateAttributeDto.config,
       },
     });
 

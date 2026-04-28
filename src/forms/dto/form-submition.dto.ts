@@ -18,11 +18,14 @@ export class ParticipantAttributeDto {
 
   @ApiPropertyOptional({
     description:
-      "Value for the participant attribute:\n - For files: provide the file name\n - For multiselect: write options separated by ;",
+      "The value must match the attribute type:\n" +
+      "- text/select: string\n" +
+      "- number: number\n" +
+      "- multiSelect/block: string[] (Array of UUIDs or options)\n" +
+      "- checkbox: boolean",
   })
   @IsOptional()
-  @IsString()
-  value?: string;
+  value?: any;
 }
 
 export class FormSubmitionDto {

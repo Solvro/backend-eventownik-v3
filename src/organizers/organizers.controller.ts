@@ -2,7 +2,6 @@ import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
 import { ApiPaginatedResponse } from "src/common/decorators/api-paginated-response.decorator";
-import { PageDto } from "src/common/dto/page.dto";
 import { PermissionType } from "src/generated/prisma/enums";
 
 import {
