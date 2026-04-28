@@ -23,9 +23,14 @@ import {
 } from "@nestjs/common";
 import {
   ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 
 import { EventCreateDto } from "./dto/event-create.dto";
@@ -36,6 +41,8 @@ import { UploadPhoto } from "./utils/upload-photo.decorator";
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @ApiBearerAuth()
+@ApiUnauthorizedResponse({ description: "Unauthorized" })
+@ApiForbiddenResponse({ description: "Forbidden - insufficient permissions" })
 @ApiTags("Events")
 @Controller("events")
 export class EventsController {
@@ -57,7 +64,7 @@ export class EventsController {
   @Post()
   @UploadPhoto()
   @ApiOperation({ summary: "Create a new event" })
-  @ApiOkResponse({ description: "The created event", type: Event })
+  @ApiCreatedResponse({ description: "The created event", type: Event })
   async create(
     @UploadedFile()
     photo: Express.Multer.File | undefined,
@@ -77,6 +84,7 @@ export class EventsController {
   @Get(":eventId")
   @RequirePermission(PermissionType.MANAGE_EVENT)
   @ApiOperation({ summary: "Get event by UUID" })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
   @ApiOkResponse({ description: "The event", type: Event })
   async findOne(
     @Param("eventId", ParseUUIDPipe) eventUUID: string,
@@ -88,6 +96,7 @@ export class EventsController {
   @RequirePermission(PermissionType.MANAGE_EVENT)
   @UploadPhoto()
   @ApiOperation({ summary: "Update event by UUID" })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
   @ApiOkResponse({ description: "The updated event", type: Event })
   async update(
     @Param("eventId", ParseUUIDPipe) eventUUID: string,
@@ -110,7 +119,8 @@ export class EventsController {
   // TODO: jakaś inna permisja jak będą współorganizatorzy
   @RequirePermission(PermissionType.MANAGE_EVENT)
   @ApiOperation({ summary: "Delete event by UUID" })
-  @ApiOkResponse({ description: "No content" })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiNoContentResponse({ description: "No content" })
   @HttpCode(204)
   async remove(
     @Param("eventId", ParseUUIDPipe) eventUUID: string,

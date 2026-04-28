@@ -23,12 +23,14 @@ import {
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiExtraModels,
+  ApiForbiddenResponse,
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 
 import { ParticipantCreateDto } from "./dto/participant-create.dto";
@@ -42,6 +44,8 @@ import { ParticipantsService } from "./participants.service";
 @ApiTags("Participants")
 @ApiBearerAuth()
 @ApiExtraModels(PageDto, Participant)
+@ApiUnauthorizedResponse({ description: "Unauthorized" })
+@ApiForbiddenResponse({ description: "Forbidden - insufficient permissions" })
 @Controller("events/:eventId/participants")
 export class ParticipantsController {
   constructor(private readonly participantsService: ParticipantsService) {}

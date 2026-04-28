@@ -1,6 +1,7 @@
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
+import { ApiPaginatedResponse } from "src/common/decorators/api-paginated-response.decorator";
 import { PageDto } from "src/common/dto/page.dto";
 import { PermissionType } from "src/generated/prisma/enums";
 
@@ -21,9 +22,15 @@ import {
 } from "@nestjs/common";
 import {
   ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiNoContentResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
   ApiOperation,
-  ApiResponse,
+  ApiParam,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 
 import { AttributesService } from "./attributes.service";
@@ -37,6 +44,8 @@ import { Attribute } from "./entities/attribute.entity";
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @RequirePermission(PermissionType.MANAGE_EVENT)
+@ApiUnauthorizedResponse({ description: "Unauthorized" })
+@ApiForbiddenResponse({ description: "Forbidden - insufficient permissions" })
 @ApiTags("Attributes")
 export class AttributesController {
   constructor(private attributesService: AttributesService) {}
@@ -44,12 +53,12 @@ export class AttributesController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: "Create a new attribute" })
-  @ApiResponse({
-    status: 201,
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiCreatedResponse({
     description: "The attribute has been successfully created.",
     type: Attribute,
   })
-  @ApiResponse({ status: 404, description: "Event not found." })
+  @ApiNotFoundResponse({ description: "Event not found." })
   async create(
     @Body() createAttributeDto: CreateAttributeDto,
     @Param("eventId", ParseUUIDPipe) eventId: string,
@@ -61,13 +70,13 @@ export class AttributesController {
   @ApiOperation({
     summary: "Create/update many attributes (single transaction)",
   })
-  @ApiResponse({
-    status: 200,
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiOkResponse({
     description: "Attributes successfully processed.",
     type: Attribute,
     isArray: true,
   })
-  @ApiResponse({ status: 404, description: "Event or attribute not found." })
+  @ApiNotFoundResponse({ description: "Event or attribute not found." })
   async bulkUpdate(
     @Body(new ParseArrayPipe({ items: BulkUpdateAttributeDto }))
     attributes: BulkUpdateAttributeDto[],
@@ -78,12 +87,9 @@ export class AttributesController {
 
   @Get()
   @ApiOperation({ summary: "Get a list of attributes for an event" })
-  @ApiResponse({
-    status: 200,
-    description: "The list of attributes has been successfully retrieved.",
-    type: PageDto<Attribute>,
-  })
-  @ApiResponse({ status: 404, description: "Event not found." })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiPaginatedResponse(Attribute)
+  @ApiNotFoundResponse({ description: "Event not found." })
   async findAll(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Query() query: AttributeListingDto,
@@ -93,12 +99,13 @@ export class AttributesController {
 
   @Get(":id")
   @ApiOperation({ summary: "Get an attribute by id" })
-  @ApiResponse({
-    status: 200,
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "id", description: "UUID of the attribute" })
+  @ApiOkResponse({
     description: "The attribute has been successfully retrieved.",
     type: Attribute,
   })
-  @ApiResponse({ status: 404, description: "Event or attribute not found." })
+  @ApiNotFoundResponse({ description: "Event or attribute not found." })
   async findOne(
     @Param("id", ParseUUIDPipe) id: string,
     @Param("eventId", ParseUUIDPipe) eventId: string,
@@ -108,12 +115,13 @@ export class AttributesController {
 
   @Patch(":id")
   @ApiOperation({ summary: "Update an attribute by id" })
-  @ApiResponse({
-    status: 200,
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "id", description: "UUID of the attribute" })
+  @ApiOkResponse({
     description: "The attribute has been successfully updated.",
     type: Attribute,
   })
-  @ApiResponse({ status: 404, description: "Event or attribute not found." })
+  @ApiNotFoundResponse({ description: "Event or attribute not found." })
   async update(
     @Param("id", ParseUUIDPipe) id: string,
     @Param("eventId", ParseUUIDPipe) eventId: string,
@@ -125,11 +133,12 @@ export class AttributesController {
   @Delete(":id")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "Delete an attribute by id" })
-  @ApiResponse({
-    status: 204,
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "id", description: "UUID of the attribute" })
+  @ApiNoContentResponse({
     description: "The attribute has been successfully deleted.",
   })
-  @ApiResponse({ status: 404, description: "Event or attribute not found." })
+  @ApiNotFoundResponse({ description: "Event or attribute not found." })
   async remove(
     @Param("id", ParseUUIDPipe) id: string,
     @Param("eventId", ParseUUIDPipe) eventId: string,
