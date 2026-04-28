@@ -1,3 +1,5 @@
+import { Prisma } from "src/generated/prisma/client";
+
 import { ApiProperty } from "@nestjs/swagger";
 
 export class ParticipantAttribute {
@@ -11,7 +13,7 @@ export class ParticipantAttribute {
     description: "Value of the attribute",
     nullable: true,
   })
-  value: string | null;
+  value: Prisma.JsonValue | null;
 
   @ApiProperty({ description: "Creation date" })
   createdAt: Date;

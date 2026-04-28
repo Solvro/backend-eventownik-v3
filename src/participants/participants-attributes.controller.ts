@@ -70,7 +70,10 @@ export class ParticipantsAttributesController {
         },
       });
 
-    if (participantAttribute?.value == null) {
+    if (
+      participantAttribute?.value == null ||
+      typeof participantAttribute.value !== "string"
+    ) {
       throw new NotFoundException("Attribute doesn't have a file");
     }
 

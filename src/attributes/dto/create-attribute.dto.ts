@@ -1,13 +1,10 @@
 import {
-  ArrayMinSize,
-  IsArray,
   IsBoolean,
   IsEnum,
   IsInt,
   IsObject,
   IsOptional,
   IsString,
-  ValidateIf,
 } from "class-validator";
 import { IsConfigValidForAttributeType } from "src/common/decorators/valid-config-for-attribute-type.decorator";
 import { AttributeType } from "src/generated/prisma/client";
@@ -39,5 +36,5 @@ export class CreateAttributeDto {
   @IsOptional()
   @IsObject()
   @IsConfigValidForAttributeType()
-  config?: Record<string, any>;
+  config?: Record<string, unknown>;
 }

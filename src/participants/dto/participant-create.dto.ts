@@ -4,7 +4,6 @@ import {
   IsEmail,
   IsNotEmpty,
   IsOptional,
-  IsString,
   IsUUID,
   ValidateNested,
 } from "class-validator";
@@ -25,9 +24,8 @@ export class ParticipantAttributeDto {
     nullable: true,
     example: "John Doe",
   })
-  @IsString()
   @IsOptional()
-  value?: string | null;
+  value?: unknown;
 }
 
 export class ParticipantCreateDto {

@@ -34,6 +34,31 @@ export class FormsService {
     private blocksService: BlocksService,
   ) {}
 
+  private getStringConfigValues(config: Prisma.JsonValue | null, key: string) {
+    if (config == null || typeof config !== "object" || Array.isArray(config)) {
+      return [] as string[];
+    }
+
+    const values = (config as Record<string, unknown>)[key];
+    if (!Array.isArray(values)) {
+      return [] as string[];
+    }
+
+    return values.filter(
+      (value): value is string =>
+        typeof value === "string" && value.trim().length > 0,
+    );
+  }
+
+  private isMissingAttributeValue(value: unknown) {
+    return (
+      value === undefined ||
+      value === null ||
+      value === "" ||
+      (Array.isArray(value) && value.length === 0)
+    );
+  }
+
   async create(eventUuid: string, createFormDto: CreateFormDto) {
     if (
       createFormDto.openDate != null &&
@@ -367,11 +392,11 @@ export class FormsService {
         );
       }
 
-      const normalizedAttributes: Record<string, string | null | undefined> =
+      const normalizedAttributes: Record<string, unknown> =
         submissionData.attributes
           .flat()
           .reduce<
-            Record<string, string | null | undefined>
+            Record<string, unknown>
           >((accumulator, attribute: ParticipantAttributeDto) => {
             accumulator[attribute.attributeUuid] = attribute.value;
             return accumulator;
@@ -408,24 +433,63 @@ export class FormsService {
         } else if (
           (foundAttribute.attribute?.type === AttributeType.multiSelect ||
             foundAttribute.attribute?.type === AttributeType.select) &&
-          isString(attributeValue)
+          (isString(attributeValue) || Array.isArray(attributeValue))
         ) {
-          //Select and multiselect handling
-          const options = foundAttribute.attribute.options;
+          const options = this.getStringConfigValues(
+            foundAttribute.attribute.config,
+            "options",
+          );
+          const allowOther =
+            foundAttribute.attribute.config != null &&
+            typeof foundAttribute.attribute.config === "object" &&
+            !Array.isArray(foundAttribute.attribute.config) &&
+            (foundAttribute.attribute.config as Record<string, unknown>)
+              .allowOther === true;
+
           if (foundAttribute.attribute.type === AttributeType.select) {
-            if (!options.includes(attributeValue)) {
+            if (!isString(attributeValue)) {
+              throw new BadRequestException(
+                `Attribute with id: ${attribute} must be a string value.`,
+              );
+            }
+
+            if (
+              !allowOther &&
+              options.length > 0 &&
+              !options.includes(attributeValue)
+            ) {
               throw new BadRequestException(
                 `Invalid value for attribute with id: ${attribute}. Allowed values are: ${options.join(", ")}`,
               );
             }
           } else {
-            const values = attributeValue.split(";");
-            for (const value of values) {
-              if (!options.includes(value)) {
+            const values = isString(attributeValue)
+              ? attributeValue.split(";")
+              : attributeValue;
+            const normalizedValues = values.map((value) => {
+              if (!isString(value)) {
                 throw new BadRequestException(
-                  `Invalid value for attribute with id: ${attribute}. Allowed values are: ${options.join(", ")}`,
+                  `Attribute with id: ${attribute} must contain only string values.`,
                 );
               }
+
+              return value.trim();
+            });
+
+            if (normalizedValues.some((value) => value.length === 0)) {
+              throw new BadRequestException(
+                `Attribute with id: ${attribute} cannot contain empty values.`,
+              );
+            }
+
+            if (
+              !allowOther &&
+              options.length > 0 &&
+              normalizedValues.some((value) => !options.includes(value))
+            ) {
+              throw new BadRequestException(
+                `Invalid value for attribute with id: ${attribute}. Allowed values are: ${options.join(", ")}`,
+              );
             }
           }
         }
@@ -440,8 +504,7 @@ export class FormsService {
 
       for (const attribute of requiredAttributes) {
         if (
-          normalizedAttributes[attribute.uuid] === undefined ||
-          normalizedAttributes[attribute.uuid] === null
+          this.isMissingAttributeValue(normalizedAttributes[attribute.uuid])
         ) {
           throw new BadRequestException(
             `Missing required attribute with id: ${attribute.uuid}`,

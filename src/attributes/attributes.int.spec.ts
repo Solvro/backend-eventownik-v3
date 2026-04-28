@@ -62,7 +62,7 @@ describe("Attributes Integration", () => {
   it("should create an attribute", async () => {
     const dto: CreateAttributeDto = {
       name: "Test Attribute",
-      options: ["Option 1", "Option 2"],
+      config: { maxSelections: 2, customValue: "ignored" },
       order: 1,
       showInList: true,
       type: AttributeType.block,
@@ -79,7 +79,7 @@ describe("Attributes Integration", () => {
     mockPrismaService.attribute.create.mockResolvedValue({
       uuid: attributeId,
       name: dto.name,
-      options: dto.options,
+      config: { maxSelections: 2 },
       order: dto.order,
       showInList: dto.showInList,
       type: dto.type,
@@ -89,7 +89,7 @@ describe("Attributes Integration", () => {
     expect(result).toEqual({
       uuid: attributeId,
       name: dto.name,
-      options: dto.options,
+      config: { maxSelections: 2 },
       order: dto.order,
       showInList: dto.showInList,
       type: dto.type,
@@ -101,7 +101,7 @@ describe("Attributes Integration", () => {
     expect(mockPrismaService.attribute.create).toHaveBeenCalledWith({
       data: {
         name: dto.name,
-        options: dto.options,
+        config: { maxSelections: 2 },
         order: dto.order,
         showInList: dto.showInList,
         type: dto.type,
@@ -119,7 +119,7 @@ describe("Attributes Integration", () => {
   it("should throw NotFoundException if event is not found when creating an attribute", async () => {
     const dto: CreateAttributeDto = {
       name: "Test Attribute",
-      options: ["Option 1", "Option 2"],
+      config: { maxSelections: 2 },
       order: 1,
       showInList: true,
       type: AttributeType.block,
@@ -140,7 +140,7 @@ describe("Attributes Integration", () => {
       {
         uuid: "test-attribute-id-1",
         name: "Test Attribute 1",
-        options: ["Option 1", "Option 2"],
+        config: { maxSelections: 2 },
         order: 1,
         showInList: true,
         type: AttributeType.block,
@@ -149,7 +149,7 @@ describe("Attributes Integration", () => {
       {
         uuid: "test-attribute-id-2",
         name: "Test Attribute 2",
-        options: ["Option A", "Option B"],
+        config: {},
         order: 2,
         showInList: false,
         type: AttributeType.text,
@@ -179,7 +179,7 @@ describe("Attributes Integration", () => {
     const mockAttribute = {
       uuid: attributeId,
       name: "Test Attribute",
-      options: ["Option 1", "Option 2"],
+      config: { maxSelections: 2 },
       order: 1,
       showInList: true,
       type: AttributeType.block,
@@ -210,7 +210,7 @@ describe("Attributes Integration", () => {
     const attributeId = "test-attribute-id";
     const dto: UpdateAttributeDto = {
       name: "Updated Test Attribute",
-      options: ["Updated Option 1", "Updated Option 2"],
+      config: { customValue: "ignored" },
       order: 2,
       showInList: false,
       type: AttributeType.text,
@@ -225,7 +225,7 @@ describe("Attributes Integration", () => {
     mockPrismaService.attribute.findFirst.mockResolvedValue({
       uuid: attributeId,
       name: "Test Attribute",
-      options: ["Option 1", "Option 2"],
+      config: { maxSelections: 2 },
       order: 1,
       showInList: true,
       type: AttributeType.block,
@@ -234,7 +234,7 @@ describe("Attributes Integration", () => {
     mockPrismaService.attribute.update.mockResolvedValue({
       uuid: attributeId,
       name: dto.name,
-      options: dto.options,
+      config: {},
       order: dto.order,
       showInList: dto.showInList,
       type: dto.type,
@@ -245,7 +245,7 @@ describe("Attributes Integration", () => {
     expect(result).toEqual({
       uuid: attributeId,
       name: dto.name,
-      options: dto.options,
+      config: {},
       order: dto.order,
       showInList: dto.showInList,
       type: dto.type,

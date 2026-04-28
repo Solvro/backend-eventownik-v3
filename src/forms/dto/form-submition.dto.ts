@@ -25,7 +25,7 @@ export class ParticipantAttributeDto {
       "- checkbox: boolean",
   })
   @IsOptional()
-  value?: any;
+  value?: unknown;
 }
 
 export class FormSubmitionDto {

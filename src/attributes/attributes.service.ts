@@ -22,6 +22,50 @@ export class AttributesService {
     private blocksService: BlocksService,
   ) {}
 
+  private sanitizeConfig(
+    type: CreateAttributeDto["type"],
+    config?: Record<string, unknown>,
+  ): Prisma.InputJsonValue | undefined {
+    if (config == null || typeof config !== "object" || Array.isArray(config)) {
+      return undefined;
+    }
+
+    if (type === "select" || type === "multiSelect") {
+      const options = Array.isArray(config.options)
+        ? config.options.filter(
+            (option): option is string =>
+              typeof option === "string" && option.trim().length > 0,
+          )
+        : [];
+
+      const sanitizedConfig: Record<string, unknown> = {
+        options,
+      };
+
+      if (typeof config.allowOther === "boolean") {
+        sanitizedConfig.allowOther = config.allowOther;
+      }
+
+      if (type === "multiSelect" && typeof config.maxSelections === "number") {
+        sanitizedConfig.maxSelections = config.maxSelections;
+      }
+
+      return sanitizedConfig as Prisma.InputJsonValue;
+    }
+
+    if (type === "block") {
+      const sanitizedConfig: Record<string, unknown> = {};
+
+      if (typeof config.maxSelections === "number") {
+        sanitizedConfig.maxSelections = config.maxSelections;
+      }
+
+      return sanitizedConfig as Prisma.InputJsonValue;
+    }
+
+    return {};
+  }
+
   private async createTx(
     prisma: Prisma.TransactionClient,
     createAttributeDto: CreateAttributeDto,
@@ -34,7 +78,10 @@ export class AttributesService {
         showInList: createAttributeDto.showInList,
         type: createAttributeDto.type,
         eventUuid: eventId,
-        config: createAttributeDto.config,
+        config: this.sanitizeConfig(
+          createAttributeDto.type,
+          createAttributeDto.config,
+        ),
       },
     });
 
@@ -156,7 +203,7 @@ export class AttributesService {
         order: updateAttributeDto.order,
         showInList: updateAttributeDto.showInList,
         type: updateAttributeDto.type,
-        config: updateAttributeDto.config,
+        config: this.sanitizeConfig(nextType, updateAttributeDto.config),
       },
     });
 
