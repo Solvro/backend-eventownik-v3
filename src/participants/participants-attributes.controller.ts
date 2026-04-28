@@ -21,18 +21,25 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import {
+  ApiBearerAuth,
+  ApiForbiddenResponse,
   ApiNoContentResponse,
   ApiNotFoundResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 
 import { ParticipantBulkUpdateDto } from "./dto/participant-bulk-update.dto";
 import { ParticipantsService } from "./participants.service";
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
+@ApiBearerAuth()
 @ApiTags("Participants Attributes")
+@ApiUnauthorizedResponse({ description: "Unauthorized" })
+@ApiForbiddenResponse({ description: "Forbidden - insufficient permissions" })
 @Controller("events/:eventId/participants")
 export class ParticipantsAttributesController {
   constructor(
@@ -46,6 +53,7 @@ export class ParticipantsAttributesController {
   @ApiParam({ name: "eventId", description: "UUID of the event" })
   @ApiParam({ name: "participantId", description: "UUID of the participant" })
   @ApiParam({ name: "attributeId", description: "UUID of the attribute" })
+  @ApiOkResponse({ description: "The requested file" })
   @ApiNotFoundResponse({ description: "Attribute file not found" })
   async downloadFile(
     @Param("eventId", ParseUUIDPipe) eventUuid: string,

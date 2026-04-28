@@ -2,6 +2,7 @@ import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { AuthUser } from "src/auth/jwt.strategy";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
+import { ApiPaginatedResponse } from "src/common/decorators/api-paginated-response.decorator";
 import { PageDto } from "src/common/dto/page.dto";
 import { PermissionType } from "src/generated/prisma/enums";
 
@@ -20,7 +21,17 @@ import {
   UploadedFile,
   UseGuards,
 } from "@nestjs/common";
-import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiNoContentResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from "@nestjs/swagger";
 
 import { EventCreateDto } from "./dto/event-create.dto";
 import { EventListingDto } from "./dto/event-listing.dto";
@@ -29,6 +40,9 @@ import { EventsService } from "./events.service";
 import { UploadPhoto } from "./utils/upload-photo.decorator";
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
+@ApiBearerAuth()
+@ApiUnauthorizedResponse({ description: "Unauthorized" })
+@ApiForbiddenResponse({ description: "Forbidden - insufficient permissions" })
 @ApiTags("Events")
 @Controller("events")
 export class EventsController {
@@ -36,7 +50,7 @@ export class EventsController {
 
   @Get()
   @ApiOperation({ summary: "Get list of events with pagination and filtering" })
-  @ApiOkResponse({ description: "List of events", type: PageDto<Event> })
+  @ApiPaginatedResponse(Event)
   async findAll(
     @Query() dto: EventListingDto,
     @Request() request: { user: AuthUser },
@@ -50,7 +64,7 @@ export class EventsController {
   @Post()
   @UploadPhoto()
   @ApiOperation({ summary: "Create a new event" })
-  @ApiOkResponse({ description: "The created event", type: Event })
+  @ApiCreatedResponse({ description: "The created event", type: Event })
   async create(
     @UploadedFile()
     photo: Express.Multer.File | undefined,
@@ -70,6 +84,7 @@ export class EventsController {
   @Get(":eventId")
   @RequirePermission(PermissionType.MANAGE_EVENT)
   @ApiOperation({ summary: "Get event by UUID" })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
   @ApiOkResponse({ description: "The event", type: Event })
   async findOne(
     @Param("eventId", ParseUUIDPipe) eventUUID: string,
@@ -81,6 +96,7 @@ export class EventsController {
   @RequirePermission(PermissionType.MANAGE_EVENT)
   @UploadPhoto()
   @ApiOperation({ summary: "Update event by UUID" })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
   @ApiOkResponse({ description: "The updated event", type: Event })
   async update(
     @Param("eventId", ParseUUIDPipe) eventUUID: string,
@@ -103,7 +119,8 @@ export class EventsController {
   // TODO: jakaś inna permisja jak będą współorganizatorzy
   @RequirePermission(PermissionType.MANAGE_EVENT)
   @ApiOperation({ summary: "Delete event by UUID" })
-  @ApiOkResponse({ description: "No content" })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiNoContentResponse({ description: "No content" })
   @HttpCode(204)
   async remove(
     @Param("eventId", ParseUUIDPipe) eventUUID: string,
