@@ -327,6 +327,23 @@ export class FormsService {
           `Attribute with id: ${attribute.uuid} must be a string value.`,
         );
       }
+      case AttributeType.text:
+      case AttributeType.textArea:
+      case AttributeType.drawing:
+      case AttributeType.select:
+      case AttributeType.block:
+      case AttributeType.time:
+      case AttributeType.multiSelect:
+      case AttributeType.email:
+      case AttributeType.tel:
+      case AttributeType.color: {
+        if (isString(value)) {
+          return value;
+        }
+        throw new BadRequestException(
+          `Attribute with id: ${attribute.uuid} must be a string value.`,
+        );
+      }
       default: {
         if (isString(value)) {
           return value;
