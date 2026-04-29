@@ -17,7 +17,6 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
-  Logger,
   NotFoundException,
   NotImplementedException,
 } from "@nestjs/common";
@@ -30,8 +29,6 @@ import { UpdateFormDto } from "./dto/update-form.dto";
 
 @Injectable()
 export class FormsService {
-  private readonly logger = new Logger(FormsService.name);
-
   constructor(
     private prisma: PrismaService,
     private participantService: ParticipantsService,
@@ -77,10 +74,9 @@ export class FormsService {
     }
 
     if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
-      this.logger.warn(
-        `Attribute config field ${key} is invalid, using fallback value ${fallback ?? "undefined"}.`,
+      throw new BadRequestException(
+        `Attribute config field ${key} must be a positive integer.`,
       );
-      return fallback;
     }
 
     return value;
@@ -89,25 +85,28 @@ export class FormsService {
   private normalizeSelectValue(attribute: Attribute, value: unknown) {
     const config = this.getConfigObject(attribute.config);
     const options = this.getStringArray(config, "options");
-
-    if (options.length === 0) {
-      if (!this.isMissingAttributeValue(value)) {
-        this.logger.warn(
-          `Attribute ${attribute.uuid} has no valid select options; using empty value.`,
-        );
-      }
-      return Prisma.JsonNull;
-    }
+    const allowOther = config?.allowOther === true;
 
     if (this.isMissingAttributeValue(value)) {
       return Prisma.JsonNull;
     }
 
-    if (!isString(value) || !options.includes(value)) {
-      this.logger.warn(
-        `Attribute ${attribute.uuid} received an invalid select value; defaulting to the first configured option.`,
+    if (options.length === 0) {
+      throw new BadRequestException(
+        `Attribute with id: ${attribute.uuid} has no selectable options.`,
       );
-      return options[0] ?? Prisma.JsonNull;
+    }
+
+    if (!isString(value)) {
+      throw new BadRequestException(
+        `Attribute with id: ${attribute.uuid} must be a string value.`,
+      );
+    }
+
+    if (!allowOther && !options.includes(value)) {
+      throw new BadRequestException(
+        `Invalid value for attribute with id: ${attribute.uuid}. Allowed values are: ${options.join(", ")}`,
+      );
     }
 
     return value;
@@ -116,19 +115,17 @@ export class FormsService {
   private normalizeMultiSelectValue(attribute: Attribute, value: unknown) {
     const config = this.getConfigObject(attribute.config);
     const options = this.getStringArray(config, "options");
+    const allowOther = config?.allowOther === true;
     const maxSelections = this.getPositiveIntegerValue(config, "maxSelections");
-
-    if (options.length === 0) {
-      if (!this.isMissingAttributeValue(value)) {
-        this.logger.warn(
-          `Attribute ${attribute.uuid} has no valid multiSelect options; using empty selection.`,
-        );
-      }
-      return [] as string[];
-    }
 
     if (this.isMissingAttributeValue(value)) {
       return [] as string[];
+    }
+
+    if (options.length === 0) {
+      throw new BadRequestException(
+        `Attribute with id: ${attribute.uuid} has no selectable options.`,
+      );
     }
 
     const rawValues = Array.isArray(value)
@@ -138,39 +135,51 @@ export class FormsService {
         : null;
 
     if (rawValues == null) {
-      this.logger.warn(
-        `Attribute ${attribute.uuid} received an invalid multiSelect value; using empty selection.`,
+      throw new BadRequestException(
+        `Attribute with id: ${attribute.uuid} must be a string array or a semicolon-separated string.`,
       );
-      return [] as string[];
     }
 
-    const normalizedValues = rawValues
-      .filter((item): item is string => typeof item === "string")
-      .map((item) => item.trim())
-      .filter((item) => item.length > 0)
-      .filter((item) => options.includes(item));
+    const normalizedValues = rawValues.map((item) => {
+      if (!isString(item)) {
+        throw new BadRequestException(
+          `Attribute with id: ${attribute.uuid} must contain only string values.`,
+        );
+      }
 
-    if (normalizedValues.length === 0) {
-      this.logger.warn(
-        `Attribute ${attribute.uuid} received no valid multiSelect values; using empty selection.`,
+      return item.trim();
+    });
+
+    if (normalizedValues.some((item) => item.length === 0)) {
+      throw new BadRequestException(
+        `Attribute with id: ${attribute.uuid} cannot contain empty values.`,
       );
-      return [] as string[];
+    }
+
+    if (!allowOther) {
+      const invalidValue = normalizedValues.find(
+        (item) => !options.includes(item),
+      );
+      if (invalidValue !== undefined) {
+        throw new BadRequestException(
+          `Invalid value for attribute with id: ${attribute.uuid}. Allowed values are: ${options.join(", ")}`,
+        );
+      }
     }
 
     if (
       maxSelections !== undefined &&
       normalizedValues.length > maxSelections
     ) {
-      this.logger.warn(
-        `Attribute ${attribute.uuid} exceeded maxSelections; trimming the selection to ${maxSelections}.`,
+      throw new BadRequestException(
+        `Attribute with id: ${attribute.uuid} cannot contain more than ${String(maxSelections)} selections.`,
       );
-      return normalizedValues.slice(0, maxSelections);
     }
 
     return normalizedValues;
   }
 
-  private normalizeBlockValue(attribute: Attribute, value: unknown) {
+  private async normalizeBlockValue(attribute: Attribute, value: unknown) {
     const config = this.getConfigObject(attribute.config);
     const maxSelections =
       this.getPositiveIntegerValue(config, "maxSelections", 1) ?? 1;
@@ -186,40 +195,56 @@ export class FormsService {
         : null;
 
     if (rawValues == null) {
-      this.logger.warn(
-        `Attribute ${attribute.uuid} received an invalid block value; using empty selection.`,
+      throw new BadRequestException(
+        `Attribute with id: ${attribute.uuid} must be an array of block UUIDs.`,
       );
-      return Prisma.JsonNull;
     }
 
-    const normalizedValues = rawValues
-      .filter((item): item is string => typeof item === "string")
-      .map((item) => item.trim())
-      .filter((item) => item.length > 0);
+    const normalizedValues = rawValues.map((item) => {
+      if (!isString(item)) {
+        throw new BadRequestException(
+          `Attribute with id: ${attribute.uuid} must contain only string values.`,
+        );
+      }
 
-    if (
-      normalizedValues.some(
-        (item) =>
-          !item.match(
-            /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-          ),
-      )
-    ) {
-      this.logger.warn(
-        `Attribute ${attribute.uuid} received invalid block UUIDs; using empty selection.`,
-      );
-      return Prisma.JsonNull;
-    }
+      const trimmedValue = item.trim();
+      if (
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          trimmedValue,
+        )
+      ) {
+        throw new BadRequestException(
+          `Attribute with id: ${attribute.uuid} must contain valid block UUIDs.`,
+        );
+      }
+
+      return trimmedValue;
+    });
 
     if (normalizedValues.length === 0) {
-      return Prisma.JsonNull;
+      throw new BadRequestException(
+        `Attribute with id: ${attribute.uuid} must contain at least one block UUID.`,
+      );
     }
 
     if (normalizedValues.length > maxSelections) {
-      this.logger.warn(
-        `Attribute ${attribute.uuid} exceeded maxSelections; trimming the selection to ${maxSelections}.`,
+      throw new BadRequestException(
+        `Attribute with id: ${attribute.uuid} cannot contain more than ${String(maxSelections)} selections.`,
       );
-      return normalizedValues.slice(0, maxSelections);
+    }
+
+    const existingBlocks = await this.prisma.block.findMany({
+      where: {
+        uuid: { in: normalizedValues },
+        attributeUuid: attribute.uuid,
+      },
+      select: { uuid: true },
+    });
+
+    if (existingBlocks.length !== normalizedValues.length) {
+      throw new BadRequestException(
+        `One or more block UUIDs are invalid for attribute with id: ${attribute.uuid}.`,
+      );
     }
 
     return normalizedValues;
@@ -238,10 +263,9 @@ export class FormsService {
 
         const parsedValue = isString(value) ? Number(value) : Number.NaN;
         if (Number.isNaN(parsedValue)) {
-          this.logger.warn(
-            `Attribute ${attribute.uuid} received an invalid number; defaulting to 0.`,
+          throw new BadRequestException(
+            `Attribute with id: ${attribute.uuid} must be a valid number.`,
           );
-          return 0;
         }
 
         return parsedValue;
@@ -270,10 +294,9 @@ export class FormsService {
           }
         }
 
-        this.logger.warn(
-          `Attribute ${attribute.uuid} received an invalid checkbox value; defaulting to false.`,
+        throw new BadRequestException(
+          `Attribute with id: ${attribute.uuid} must be a boolean value.`,
         );
-        return false;
       }
       case AttributeType.date:
       case AttributeType.datetime: {
@@ -288,10 +311,9 @@ export class FormsService {
           normalizedValue == null ||
           Number.isNaN(Date.parse(normalizedValue))
         ) {
-          this.logger.warn(
-            `Attribute ${attribute.uuid} received an invalid date value; using empty value.`,
+          throw new BadRequestException(
+            `Attribute with id: ${attribute.uuid} must be a valid date/time format.`,
           );
-          return Prisma.JsonNull;
         }
 
         return normalizedValue;
@@ -301,25 +323,23 @@ export class FormsService {
           return value;
         }
 
-        this.logger.warn(
-          `Attribute ${attribute.uuid} received an invalid file value; using empty value.`,
+        throw new BadRequestException(
+          `Attribute with id: ${attribute.uuid} must be a string value.`,
         );
-        return Prisma.JsonNull;
       }
       default: {
         if (isString(value)) {
           return value;
         }
 
-        this.logger.warn(
-          `Attribute ${attribute.uuid} received an invalid text value; using empty value.`,
+        throw new BadRequestException(
+          `Attribute with id: ${attribute.uuid} must be a string value.`,
         );
-        return Prisma.JsonNull;
       }
     }
   }
 
-  private normalizeSubmissionAttributeValue(
+  private async normalizeSubmissionAttributeValue(
     attribute: Attribute,
     value: unknown,
   ) {
@@ -685,9 +705,7 @@ export class FormsService {
       const normalizedAttributes: Record<string, unknown> =
         submissionData.attributes
           .flat()
-          .reduce<
-            Record<string, unknown>
-          >((accumulator, attribute: ParticipantAttributeDto) => {
+          .reduce<Record<string, unknown>>((accumulator, attribute) => {
             accumulator[attribute.attributeUuid] = attribute.value;
             return accumulator;
           }, {});
@@ -698,12 +716,12 @@ export class FormsService {
         const foundAttribute = form.formDefinitions.find(
           (formDefinition) => formDefinition.attributeUuid === attributeUuid,
         );
-        if (foundAttribute == null || foundAttribute.attribute == null) {
+        if (foundAttribute?.attribute == null) {
           throw new BadRequestException(
             `Attribute with id: ${attributeUuid} is not part of the form`,
           );
         }
-        const normalizedValue = this.normalizeSubmissionAttributeValue(
+        const normalizedValue = await this.normalizeSubmissionAttributeValue(
           foundAttribute.attribute,
           attributeValue,
         );

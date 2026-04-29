@@ -54,7 +54,7 @@ export class AttributesService {
   ) {
     const value = config[key];
     if (value === undefined) {
-      return undefined;
+      return;
     }
 
     if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
