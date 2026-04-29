@@ -1,10 +1,19 @@
-import { IsOptional, IsUUID } from "class-validator";
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateIf,
+} from "class-validator";
+import { IsConfigValidForAttributeType } from "src/common/decorators/valid-config-for-attribute-type.decorator";
+import { AttributeType } from "src/generated/prisma/client";
 
-import { ApiPropertyOptional, PartialType } from "@nestjs/swagger";
+import { ApiPropertyOptional } from "@nestjs/swagger";
 
-import { CreateAttributeDto } from "./create-attribute.dto";
-
-export class BulkUpdateAttributeDto extends PartialType(CreateAttributeDto) {
+export class BulkUpdateAttributeDto {
   @ApiPropertyOptional({
     description:
       "If provided, updates an existing attribute; otherwise creates.",
@@ -13,4 +22,33 @@ export class BulkUpdateAttributeDto extends PartialType(CreateAttributeDto) {
   @IsOptional()
   @IsUUID()
   uuid?: string;
+
+  @ApiPropertyOptional()
+  @ValidateIf((attribute) => attribute.uuid == null)
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional()
+  @ValidateIf((attribute) => attribute.uuid == null)
+  @IsInt()
+  order?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  showInList?: boolean;
+
+  @ApiPropertyOptional({
+    description: "The type of the attribute",
+    enum: AttributeType,
+  })
+  @ValidateIf((attribute) => attribute.uuid == null)
+  @IsEnum(AttributeType)
+  type?: AttributeType;
+
+  @ApiPropertyOptional({})
+  @IsOptional()
+  @IsObject()
+  @IsConfigValidForAttributeType()
+  config?: Record<string, unknown>;
 }

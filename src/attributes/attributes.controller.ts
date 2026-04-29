@@ -21,7 +21,9 @@ import {
 } from "@nestjs/common";
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiCreatedResponse,
+  ApiExtraModels,
   ApiForbiddenResponse,
   ApiNoContentResponse,
   ApiNotFoundResponse,
@@ -30,6 +32,7 @@ import {
   ApiParam,
   ApiTags,
   ApiUnauthorizedResponse,
+  getSchemaPath,
 } from "@nestjs/swagger";
 
 import { AttributesService } from "./attributes.service";
@@ -46,6 +49,7 @@ import { Attribute } from "./entities/attribute.entity";
 @ApiUnauthorizedResponse({ description: "Unauthorized" })
 @ApiForbiddenResponse({ description: "Forbidden - insufficient permissions" })
 @ApiTags("Attributes")
+@ApiExtraModels(BulkUpdateAttributeDto)
 export class AttributesController {
   constructor(private attributesService: AttributesService) {}
 
@@ -70,6 +74,12 @@ export class AttributesController {
     summary: "Create/update many attributes (single transaction)",
   })
   @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiBody({
+    schema: {
+      type: "array",
+      items: { $ref: getSchemaPath(BulkUpdateAttributeDto) },
+    },
+  })
   @ApiOkResponse({
     description: "Attributes successfully processed.",
     type: Attribute,
