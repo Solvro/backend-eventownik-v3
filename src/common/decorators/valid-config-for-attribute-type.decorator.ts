@@ -73,6 +73,16 @@ export class IsConfigValidForAttributeTypeConstraint implements ValidatorConstra
         return false;
       }
 
+      const participantFields = getConfigValue(config, "participantFields");
+      if (participantFields !== undefined) {
+        if (
+          !Array.isArray(participantFields) ||
+          !participantFields.every((f) => typeof f === "string")
+        ) {
+          return false;
+        }
+      }
+
       return true;
     }
 

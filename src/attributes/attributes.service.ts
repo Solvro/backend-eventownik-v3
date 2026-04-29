@@ -60,6 +60,13 @@ export class AttributesService {
         sanitizedConfig.maxSelections = config.maxSelections;
       }
 
+      if (Array.isArray(config.participantFields)) {
+        sanitizedConfig.participantFields = config.participantFields.filter(
+          (uuid): uuid is string =>
+            typeof uuid === "string" && uuid.trim().length > 0,
+        );
+      }
+
       return sanitizedConfig as Prisma.InputJsonValue;
     }
 
