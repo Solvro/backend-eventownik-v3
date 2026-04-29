@@ -24,12 +24,12 @@ export class BulkUpdateAttributeDto {
   uuid?: string;
 
   @ApiPropertyOptional()
-  @ValidateIf((attribute) => attribute.uuid == null)
+  @ValidateIf((attribute: BulkUpdateAttributeDto) => attribute.uuid == null)
   @IsString()
   name?: string;
 
   @ApiPropertyOptional()
-  @ValidateIf((attribute) => attribute.uuid == null)
+  @ValidateIf((attribute: BulkUpdateAttributeDto) => attribute.uuid == null)
   @IsInt()
   order?: number;
 
@@ -42,7 +42,7 @@ export class BulkUpdateAttributeDto {
     description: "The type of the attribute",
     enum: AttributeType,
   })
-  @ValidateIf((attribute) => attribute.uuid == null)
+  @ValidateIf((attribute: BulkUpdateAttributeDto) => attribute.uuid == null)
   @IsEnum(AttributeType)
   type?: AttributeType;
 
