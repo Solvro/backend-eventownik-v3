@@ -2,7 +2,7 @@ import { plainToInstance } from "class-transformer";
 import { validateSync } from "class-validator";
 import { AttributeType } from "src/generated/prisma/client";
 
-import { BulkUpdateAttributeDto } from "./bulk-update-attribute.dto";
+import { BulkUpdateAttributeDto } from "./dto/bulk-update-attribute.dto";
 
 describe("BulkUpdateAttributeDto", () => {
   it("requires create fields when uuid is missing", () => {

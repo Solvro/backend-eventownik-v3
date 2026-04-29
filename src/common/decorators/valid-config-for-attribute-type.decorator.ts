@@ -96,7 +96,7 @@ export class IsConfigValidForAttributeTypeConstraint implements ValidatorConstra
     }
 
     if (type === AttributeType.block) {
-      return "Config for block type can optionally include maxSelections (number)";
+      return "Config for block type can optionally include maxSelections (number) and participantFields (array of attribute uuids as strings)";
     }
 
     return "Invalid config for the given attribute type";
