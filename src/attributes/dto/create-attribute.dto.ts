@@ -1,13 +1,12 @@
 import {
-  ArrayMinSize,
-  IsArray,
   IsBoolean,
   IsEnum,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
-  ValidateIf,
 } from "class-validator";
+import { IsConfigValidForAttributeType } from "src/common/decorators/valid-config-for-attribute-type.decorator";
 import { AttributeType } from "src/generated/prisma/client";
 
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
@@ -15,20 +14,11 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 export class CreateAttributeDto {
   @ApiProperty()
   @IsString()
-  name: string;
-
-  @ApiPropertyOptional({ isArray: true, type: String })
-  @ValidateIf((o: CreateAttributeDto) =>
-    ["select", "multiSelect"].includes(o.type),
-  )
-  @IsArray()
-  @ArrayMinSize(1)
-  @IsString({ each: true })
-  options?: string[];
+  name!: string;
 
   @ApiProperty()
   @IsInt()
-  order: number;
+  order!: number;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -40,5 +30,11 @@ export class CreateAttributeDto {
     enum: AttributeType,
   })
   @IsEnum(AttributeType)
-  type: AttributeType;
+  type!: AttributeType;
+
+  @ApiPropertyOptional({})
+  @IsOptional()
+  @IsObject()
+  @IsConfigValidForAttributeType()
+  config?: Record<string, unknown>;
 }

@@ -1,5 +1,5 @@
 import { Controller, Get } from "@nestjs/common";
-import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { AppService } from "./app.service";
 
@@ -10,7 +10,7 @@ export class AppController {
 
   @Get()
   @ApiOperation({ summary: "Health check" })
-  @ApiResponse({ status: 200, description: 'Return "Hello World!"' })
+  @ApiOkResponse({ description: 'Return "Hello World!"' })
   getHello(): string {
     return this.appService.getHello();
   }

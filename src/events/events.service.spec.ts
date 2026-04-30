@@ -253,10 +253,16 @@ describe("EventsService", () => {
       expect(prisma.event.findUnique).toHaveBeenCalledWith({
         where: {
           slug: mockEvent.slug,
-          isVerified: true,
           isPublic: true,
         },
-        include: { links: true },
+        include: {
+          links: true,
+          registerForm: {
+            include: {
+              formDefinitions: true,
+            },
+          },
+        },
       });
     });
 
@@ -272,10 +278,16 @@ describe("EventsService", () => {
       expect(prisma.event.findUnique).toHaveBeenCalledWith({
         where: {
           slug,
-          isVerified: true,
           isPublic: true,
         },
-        include: { links: true },
+        include: {
+          links: true,
+          registerForm: {
+            include: {
+              formDefinitions: true,
+            },
+          },
+        },
       });
     });
   });

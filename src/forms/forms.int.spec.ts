@@ -1,3 +1,5 @@
+import { BlocksService } from "src/blocks/blocks.service";
+import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import type { TestingModule } from "@nestjs/testing";
@@ -45,6 +47,8 @@ describe("Forms Integration", () => {
           provide: PrismaService,
           useValue: mockPrismaService,
         },
+        ParticipantsService,
+        BlocksService,
       ],
     }).compile();
     formsController = module.get<FormsController>(FormsController);

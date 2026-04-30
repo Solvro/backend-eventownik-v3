@@ -30,6 +30,6 @@ export class Attribute implements PrismaAttribute {
   @ApiProperty()
   order: number;
 
-  @ApiProperty({ isArray: true, type: String })
-  options: string[];
+  @ApiProperty({ nullable: true })
+  config: PrismaAttribute["config"];
 }

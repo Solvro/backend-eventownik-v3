@@ -18,10 +18,14 @@ import {
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiNoContentResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 
 import { BlocksService } from "./blocks.service";
@@ -33,12 +37,16 @@ import { Block } from "./entities/block.entity";
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @RequirePermission(PermissionType.MANAGE_EVENT)
 @ApiBearerAuth()
+@ApiUnauthorizedResponse({ description: "Unauthorized" })
+@ApiForbiddenResponse({ description: "Forbidden - insufficient permissions" })
 @Controller("events/:eventId/attributes/:attributeId/blocks")
 export class BlocksController {
   constructor(private readonly blocksService: BlocksService) {}
 
   @Post()
   @ApiOperation({ summary: "Create a block" })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "attributeId", description: "UUID of the attribute" })
   @ApiCreatedResponse({ description: "The created block", type: Block })
   async create(
     @Param("eventId", ParseUUIDPipe) eventId: string,
@@ -50,6 +58,8 @@ export class BlocksController {
 
   @Get()
   @ApiOperation({ summary: "Get all blocks for the attribute" })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "attributeId", description: "UUID of the attribute" })
   @ApiOkResponse({
     description: "Tree of blocks starting from the root",
     type: Block,
@@ -63,7 +73,11 @@ export class BlocksController {
 
   @Get(":id")
   @ApiOperation({ summary: "Get block by ID" })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "attributeId", description: "UUID of the attribute" })
+  @ApiParam({ name: "id", description: "UUID of the block" })
   @ApiOkResponse({ description: "The block", type: Block })
+  @ApiNotFoundResponse({ description: "Block not found" })
   async findOne(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("attributeId", ParseUUIDPipe) attributeId: string,
@@ -74,7 +88,11 @@ export class BlocksController {
 
   @Patch(":id")
   @ApiOperation({ summary: "Update block" })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "attributeId", description: "UUID of the attribute" })
+  @ApiParam({ name: "id", description: "UUID of the block" })
   @ApiOkResponse({ description: "The updated block", type: Block })
+  @ApiNotFoundResponse({ description: "Block not found" })
   async update(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("attributeId", ParseUUIDPipe) attributeId: string,
@@ -92,7 +110,11 @@ export class BlocksController {
   @Delete(":id")
   @HttpCode(204)
   @ApiOperation({ summary: "Delete block" })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "attributeId", description: "UUID of the attribute" })
+  @ApiParam({ name: "id", description: "UUID of the block" })
   @ApiNoContentResponse({ description: "Block successfully deleted" })
+  @ApiNotFoundResponse({ description: "Block not found" })
   async remove(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("attributeId", ParseUUIDPipe) attributeId: string,
