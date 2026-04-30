@@ -1,7 +1,8 @@
 import { BlocksService } from "src/blocks/blocks.service";
+import { AttributeType } from "src/generated/prisma/client";
 import { ParticipantsService } from "src/participants/participants.service";
 
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, NotImplementedException } from "@nestjs/common";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
@@ -27,6 +28,9 @@ describe("FormsService", () => {
     attribute: {
       findFirst: jest.fn(),
       count: jest.fn(),
+    },
+    block: {
+      findMany: jest.fn(),
     },
     event: {
       findUnique: jest.fn(),
@@ -348,6 +352,216 @@ describe("FormsService", () => {
           { attributes: [] } as FormSubmitionDto,
           [],
         ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("should reject select values that are not allowed", async () => {
+      const submissionData = {
+        email: "test@example.com",
+        attributes: [[{ attributeUuid: "attr-select", value: "choice-1" }]],
+      } as unknown as FormSubmitionDto;
+
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
+        registerFormUuid: formUuid,
+        participants: [],
+        participantsLimit: 10,
+      });
+      mockPrismaService.form.findUnique.mockResolvedValue({
+        uuid: formUuid,
+        formDefinitions: [
+          {
+            attributeUuid: "attr-select",
+            isRequired: true,
+            attribute: {
+              uuid: "attr-select",
+              type: AttributeType.select,
+              config: {
+                options: ["choice-2"],
+                allowOther: false,
+              },
+            },
+          },
+        ],
+      });
+      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+
+      await expect(
+        service.formSubmit(eventUuid, formUuid, submissionData, []),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("should reject multiSelect values that are not allowed by config", async () => {
+      const submissionData = {
+        email: "test@example.com",
+        attributes: [[{ attributeUuid: "attr-multi", value: ["invalid"] }]],
+      } as unknown as FormSubmitionDto;
+
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
+        registerFormUuid: formUuid,
+        participants: [],
+        participantsLimit: 10,
+      });
+      mockPrismaService.form.findUnique.mockResolvedValue({
+        uuid: formUuid,
+        formDefinitions: [
+          {
+            attributeUuid: "attr-multi",
+            isRequired: true,
+            attribute: {
+              uuid: "attr-multi",
+              type: AttributeType.multiSelect,
+              config: {
+                options: ["allowed-1", "allowed-2"],
+                maxSelections: 2,
+              },
+            },
+          },
+        ],
+      });
+      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+
+      await expect(
+        service.formSubmit(eventUuid, formUuid, submissionData, []),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("should reject multiSelect values that exceed maxSelections", async () => {
+      const submissionData = {
+        email: "test@example.com",
+        attributes: [
+          [
+            {
+              attributeUuid: "attr-multi",
+              value: ["allowed-1", "allowed-2", "allowed-3"],
+            },
+          ],
+        ],
+      } as unknown as FormSubmitionDto;
+
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
+        registerFormUuid: formUuid,
+        participants: [],
+        participantsLimit: 10,
+      });
+      mockPrismaService.form.findUnique.mockResolvedValue({
+        uuid: formUuid,
+        formDefinitions: [
+          {
+            attributeUuid: "attr-multi",
+            isRequired: true,
+            attribute: {
+              uuid: "attr-multi",
+              type: AttributeType.multiSelect,
+              config: {
+                options: ["allowed-1", "allowed-2", "allowed-3"],
+                maxSelections: 2,
+              },
+            },
+          },
+        ],
+      });
+      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+
+      await expect(
+        service.formSubmit(eventUuid, formUuid, submissionData, []),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("should validate block submissions and then throw NotImplementedException", async () => {
+      const submissionData = {
+        email: "test@example.com",
+        attributes: [
+          [
+            {
+              attributeUuid: "attr-block",
+              value: [
+                "550e8400-e29b-41d4-a716-446655440000",
+                "550e8400-e29b-41d4-a716-446655440001",
+              ],
+            },
+          ],
+        ],
+      } as unknown as FormSubmitionDto;
+
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
+        registerFormUuid: formUuid,
+        participants: [],
+        participantsLimit: 10,
+      });
+      mockPrismaService.form.findUnique.mockResolvedValue({
+        uuid: formUuid,
+        formDefinitions: [
+          {
+            attributeUuid: "attr-block",
+            isRequired: true,
+            attribute: {
+              uuid: "attr-block",
+              type: AttributeType.block,
+              config: {
+                maxSelections: 2,
+              },
+            },
+          },
+        ],
+      });
+      mockPrismaService.block.findMany.mockResolvedValue([
+        { uuid: "550e8400-e29b-41d4-a716-446655440000" },
+        { uuid: "550e8400-e29b-41d4-a716-446655440001" },
+      ]);
+      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+
+      await expect(
+        service.formSubmit(eventUuid, formUuid, submissionData, []),
+      ).rejects.toThrow(NotImplementedException);
+    });
+
+    it("should reject block selections that exceed maxSelections", async () => {
+      const submissionData = {
+        email: "test@example.com",
+        attributes: [
+          [
+            {
+              attributeUuid: "attr-block",
+              value: [
+                "550e8400-e29b-41d4-a716-446655440000",
+                "550e8400-e29b-41d4-a716-446655440001",
+                "550e8400-e29b-41d4-a716-446655440002",
+              ],
+            },
+          ],
+        ],
+      } as unknown as FormSubmitionDto;
+
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
+        registerFormUuid: formUuid,
+        participants: [],
+        participantsLimit: 10,
+      });
+      mockPrismaService.form.findUnique.mockResolvedValue({
+        uuid: formUuid,
+        formDefinitions: [
+          {
+            attributeUuid: "attr-block",
+            isRequired: true,
+            attribute: {
+              uuid: "attr-block",
+              type: AttributeType.block,
+              config: {
+                maxSelections: 2,
+              },
+            },
+          },
+        ],
+      });
+      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+
+      await expect(
+        service.formSubmit(eventUuid, formUuid, submissionData, []),
       ).rejects.toThrow(BadRequestException);
     });
 
