@@ -32,6 +32,7 @@ import { PrismaModule } from "./prisma/prisma.module";
     AttributesModule,
     BlocksModule,
     AdminsModule,
+    ParticipantsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
