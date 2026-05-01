@@ -11,7 +11,7 @@ import {
 } from "@nestjs/common";
 
 import { CreateEmailDto } from "./dto/create-email.dto";
-import { EmailCompleteElement } from "./dto/email-complete-element.dto";
+import { EmailCompleteElementDto } from "./dto/email-complete-element.dto";
 import { EmailListElementDto } from "./dto/email-list-element.dto";
 import { EmailListingDto } from "./dto/email-listing.dto";
 import { EmailResponseDto } from "./dto/email-response.dto";
@@ -157,7 +157,7 @@ export class EmailsService {
   async findOne(
     eventUuid: string,
     emailUuid: string,
-  ): Promise<EmailCompleteElement> {
+  ): Promise<EmailCompleteElementDto> {
     const emailTemplate = await this.prisma.emailTemplate.findFirst({
       where: {
         uuid: emailUuid,
@@ -176,7 +176,7 @@ export class EmailsService {
       throw new NotFoundException("Email not found");
     }
 
-    const formattedResponse: EmailCompleteElement = {
+    const formattedResponse: EmailCompleteElementDto = {
       id: emailTemplate.uuid,
       eventId: emailTemplate.eventUuid,
       name: emailTemplate.name,
@@ -250,7 +250,7 @@ export class EmailsService {
     });
   }
 
-  async delete(eventUuid: string, emailUuid: string): Promise<void> {
+  async remove(eventUuid: string, emailUuid: string): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const existingEmail = await tx.emailTemplate.findFirst({
         where: {

@@ -2,7 +2,7 @@ import type { EmailStatus } from "src/generated/prisma/enums";
 
 import { EmailElementDto } from "./email-element.dto";
 
-export class EmailCompleteElement extends EmailElementDto {
+export class EmailCompleteElementDto extends EmailElementDto {
   content: string;
   formId: string | null;
   order: number | null;

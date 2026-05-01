@@ -476,7 +476,7 @@ describe("EmailsService", () => {
 
       // Check whether delete() returns undefined.
       // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
-      const result = await service.delete(mockEventId, mockEmailId);
+      const result = await service.remove(mockEventId, mockEmailId);
 
       expect(mockPrismaService.emailTemplate.findFirst).toHaveBeenCalledWith({
         where: {
@@ -497,7 +497,7 @@ describe("EmailsService", () => {
       mockTransaction(mockPrismaService);
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue(null);
 
-      await expect(service.delete(mockEventId, mockEmailId)).rejects.toThrow(
+      await expect(service.remove(mockEventId, mockEmailId)).rejects.toThrow(
         NotFoundException,
       );
       expect(mockPrismaService.emailTemplate.delete).not.toHaveBeenCalled();
