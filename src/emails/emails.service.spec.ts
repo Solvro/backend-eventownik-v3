@@ -7,6 +7,7 @@ import { Test } from "@nestjs/testing";
 
 import type { CreateEmailDto } from "./dto/create-email.dto";
 import type { EmailListingDto } from "./dto/email-listing.dto";
+import type { UpdateEmailDto } from "./dto/update-email.dto";
 import { EmailsService } from "./emails.service";
 
 describe("EmailsService", () => {
@@ -56,7 +57,7 @@ describe("EmailsService", () => {
 
   describe("create", () => {
     it("should create a new email template", async () => {
-      const dto = {
+      const dto: CreateEmailDto = {
         name: "Name",
         content: "Content",
         trigger: EmailTrigger.MANUAL,
@@ -73,9 +74,12 @@ describe("EmailsService", () => {
         name: dto.name,
         content: dto.content,
         trigger: dto.trigger,
+        eventId: mockEventId,
+        createdAt: new Date("2025-02-22T19:13:10.471Z"),
+        updatedAt: new Date("2025-02-22T19:13:10.471Z"),
       });
 
-      const result = await service.create(mockEventId, dto as CreateEmailDto);
+      const result = await service.create(mockEventId, dto);
 
       expect(mockPrismaService.emailTemplate.create).toHaveBeenCalledWith({
         data: {
@@ -388,6 +392,115 @@ describe("EmailsService", () => {
       await expect(service.findOne(mockEventId, mockEmailId)).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe("update", () => {
+    it("should update email template and return it", async () => {
+      const updateEmailDto: UpdateEmailDto = {
+        name: "test2",
+        content: "<p>test2</p>",
+      };
+
+      const mockPrismaOutput = {
+        uuid: mockEmailId,
+        eventUuid: mockEventId,
+        name: "test",
+        content: "<p>test2</p>",
+        trigger: EmailTrigger.MANUAL,
+        triggerValue: "",
+        triggerValue2: "",
+        formUuid: null,
+        order: 0,
+        createdAt: new Date("2025-02-22T19:13:10.471Z"),
+        updatedAt: new Date("2025-02-22T19:13:10.471Z"),
+      };
+      mockTransaction(mockPrismaService);
+      mockPrismaService.emailTemplate.findFirst.mockResolvedValue({
+        uuid: mockEmailId,
+      });
+      mockPrismaService.emailTemplate.update.mockResolvedValue(
+        mockPrismaOutput,
+      );
+      const result = await service.update(
+        mockEventId,
+        mockEmailId,
+        updateEmailDto,
+      );
+
+      expect(mockPrismaService.emailTemplate.update).toHaveBeenCalledWith({
+        where: {
+          uuid: mockEmailId,
+        },
+        data: {
+          name: "test2",
+          content: "<p>test2</p>",
+        },
+      });
+      expect(result).toEqual({
+        id: mockEmailId,
+        name: "test",
+        content: "<p>test2</p>",
+        trigger: EmailTrigger.MANUAL,
+        eventId: mockEventId,
+        createdAt: "2025-02-22T19:13:10.471Z",
+        updatedAt: "2025-02-22T19:13:10.471Z",
+      });
+    });
+    it("should throw NotFoundException when event with provided eventId does not exist.", async () => {
+      mockTransaction(mockPrismaService);
+      mockPrismaService.emailTemplate.findFirst.mockResolvedValue(null);
+      await expect(
+        service.update(mockEventId, mockEmailId, {} as UpdateEmailDto),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("should throw NotFoundException when email with provided emailId does not exist.", async () => {
+      mockTransaction(mockPrismaService);
+      mockPrismaService.emailTemplate.findFirst.mockResolvedValue(null);
+      await expect(
+        service.update(mockEventId, mockEmailId, {} as UpdateEmailDto),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe("delete", () => {
+    it("should delete the email template and return nothing.", async () => {
+      mockTransaction(mockPrismaService);
+      mockPrismaService.emailTemplate.findFirst.mockResolvedValue({
+        uuid: mockEmailId,
+      });
+      mockPrismaService.emailTemplate.delete.mockResolvedValue({
+        uuid: mockEmailId,
+      });
+
+      // Check whether delete() returns undefined.
+      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
+      const result = await service.delete(mockEventId, mockEmailId);
+
+      expect(mockPrismaService.emailTemplate.findFirst).toHaveBeenCalledWith({
+        where: {
+          uuid: mockEmailId,
+          eventUuid: mockEventId,
+        },
+        select: { uuid: true },
+      });
+
+      expect(mockPrismaService.emailTemplate.delete).toHaveBeenCalledWith({
+        where: { uuid: mockEmailId },
+      });
+
+      expect(result).toBeUndefined();
+    });
+
+    it("should throw NotFoundException when email or/and event does not exist.", async () => {
+      mockTransaction(mockPrismaService);
+      mockPrismaService.emailTemplate.findFirst.mockResolvedValue(null);
+
+      await expect(service.delete(mockEventId, mockEmailId)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(mockPrismaService.emailTemplate.delete).not.toHaveBeenCalled();
     });
   });
 });

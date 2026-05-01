@@ -14,13 +14,18 @@ import { CreateEmailDto } from "./dto/create-email.dto";
 import { EmailCompleteElement } from "./dto/email-complete-element.dto";
 import { EmailListElementDto } from "./dto/email-list-element.dto";
 import { EmailListingDto } from "./dto/email-listing.dto";
+import { EmailResponseDto } from "./dto/email-response.dto";
+import { UpdateEmailDto } from "./dto/update-email.dto";
 
 @Injectable()
 export class EmailsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(eventUuid: string, query: CreateEmailDto) {
-    return await this.prisma.$transaction(async (tx) => {
+  async create(
+    eventUuid: string,
+    query: CreateEmailDto,
+  ): Promise<EmailResponseDto> {
+    return this.prisma.$transaction(async (tx) => {
       const event = await tx.event.findUnique({
         where: { uuid: eventUuid },
         select: { uuid: true },
@@ -58,11 +63,17 @@ export class EmailsService {
         name: emailTemplate.name,
         content: emailTemplate.content,
         trigger: emailTemplate.trigger,
+        eventId: emailTemplate.eventUuid,
+        createdAt: emailTemplate.createdAt.toISOString(),
+        updatedAt: emailTemplate.updatedAt.toISOString(),
       };
     });
   }
 
-  async findAll(eventUuid: string, query: EmailListingDto) {
+  async findAll(
+    eventUuid: string,
+    query: EmailListingDto,
+  ): Promise<PageDto<EmailListElementDto>> {
     const event = await this.prisma.event.findUnique({
       where: { uuid: eventUuid },
     });
@@ -143,7 +154,10 @@ export class EmailsService {
     return new PageDto(data, meta);
   }
 
-  async findOne(eventUuid: string, emailUuid: string) {
+  async findOne(
+    eventUuid: string,
+    emailUuid: string,
+  ): Promise<EmailCompleteElement> {
     const emailTemplate = await this.prisma.emailTemplate.findFirst({
       where: {
         uuid: emailUuid,
@@ -190,5 +204,70 @@ export class EmailsService {
     };
 
     return formattedResponse;
+  }
+
+  async update(
+    eventUuid: string,
+    emailUuid: string,
+    query: UpdateEmailDto,
+  ): Promise<EmailResponseDto> {
+    return this.prisma.$transaction(async (tx) => {
+      const existingEmail = await tx.emailTemplate.findFirst({
+        where: {
+          uuid: emailUuid,
+          eventUuid,
+        },
+        select: { uuid: true },
+      });
+      if (existingEmail == null) {
+        throw new NotFoundException("Email template or event does not exist");
+      }
+
+      const emailTemplate = await tx.emailTemplate.update({
+        where: {
+          uuid: emailUuid,
+        },
+        data: {
+          name: query.name,
+          content: query.content,
+          trigger: query.trigger,
+          triggerValue: query.triggerValue,
+          triggerValue2: query.triggerValue2,
+          order: query.order,
+          formUuid: query.formId,
+        },
+      });
+
+      return {
+        id: emailTemplate.uuid,
+        name: emailTemplate.name,
+        content: emailTemplate.content,
+        trigger: emailTemplate.trigger,
+        eventId: emailTemplate.eventUuid,
+        createdAt: emailTemplate.createdAt.toISOString(),
+        updatedAt: emailTemplate.updatedAt.toISOString(),
+      };
+    });
+  }
+
+  async delete(eventUuid: string, emailUuid: string): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const existingEmail = await tx.emailTemplate.findFirst({
+        where: {
+          uuid: emailUuid,
+          eventUuid,
+        },
+        select: { uuid: true },
+      });
+      if (existingEmail == null) {
+        throw new NotFoundException("Email template or event does not exist");
+      }
+
+      await tx.emailTemplate.delete({
+        where: {
+          uuid: emailUuid,
+        },
+      });
+    });
   }
 }
