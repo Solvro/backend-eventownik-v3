@@ -547,7 +547,10 @@ export class FormsService {
       if (event == null) {
         throw new NotFoundException(`Event with id: ${eventUuid} not found`);
       }
-      if (updateFormDto.isFirstForm ?? false) {
+      if (
+        updateFormDto.isFirstForm !== undefined &&
+        updateFormDto.isFirstForm
+      ) {
         if (
           event.registerFormUuid !== null &&
           event.registerFormUuid !== formUuid
