@@ -201,7 +201,7 @@ export class ParticipantsService {
         );
       }
 
-      const configObj =
+      const configObject =
         attribute.config != null &&
         typeof attribute.config === "object" &&
         !Array.isArray(attribute.config)
@@ -209,11 +209,11 @@ export class ParticipantsService {
           : null;
 
       const maxSelections =
-        configObj?.maxSelections !== undefined &&
-        typeof configObj.maxSelections === "number" &&
-        Number.isInteger(configObj.maxSelections) &&
-        configObj.maxSelections > 0
-          ? configObj.maxSelections
+        configObject?.maxSelections !== undefined &&
+        typeof configObject.maxSelections === "number" &&
+        Number.isInteger(configObject.maxSelections) &&
+        configObject.maxSelections > 0
+          ? configObject.maxSelections
           : 1;
 
       if (normalizedValues.length > maxSelections) {

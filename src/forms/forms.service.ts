@@ -18,7 +18,6 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
-  NotImplementedException,
 } from "@nestjs/common";
 
 import { PrismaService } from "../prisma/prisma.service";
@@ -767,16 +766,20 @@ export class FormsService {
 
           let previousBlockIds: string[] = [];
           if (submissionData.participantId !== undefined) {
-            const existingAttr = await prisma.participantAttribute.findUnique({
-              where: {
-                participantUuid_attributeUuid: {
-                  participantUuid: submissionData.participantId,
-                  attributeUuid: attributeUuid,
+            const existingAttribute =
+              await prisma.participantAttribute.findUnique({
+                where: {
+                  participantUuid_attributeUuid: {
+                    participantUuid: submissionData.participantId,
+                    attributeUuid,
+                  },
                 },
-              },
-            });
-            if (existingAttr && Array.isArray(existingAttr.value)) {
-              previousBlockIds = existingAttr.value as string[];
+              });
+            if (
+              existingAttribute !== null &&
+              Array.isArray(existingAttribute.value)
+            ) {
+              previousBlockIds = existingAttribute.value as string[];
             }
           }
 
