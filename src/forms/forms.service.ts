@@ -763,9 +763,39 @@ export class FormsService {
           foundAttribute.attribute.type === AttributeType.block &&
           normalizedValue !== Prisma.JsonNull
         ) {
-          throw new NotImplementedException(
-            "Block registration is not implemented yet.",
-          );
+          const blockIds = normalizedValue as string[];
+
+          let previousBlockIds: string[] = [];
+          if (submissionData.participantId !== undefined) {
+            const existingAttr = await prisma.participantAttribute.findUnique({
+              where: {
+                participantUuid_attributeUuid: {
+                  participantUuid: submissionData.participantId,
+                  attributeUuid: attributeUuid,
+                },
+              },
+            });
+            if (existingAttr && Array.isArray(existingAttr.value)) {
+              previousBlockIds = existingAttr.value as string[];
+            }
+          }
+
+          for (const blockId of blockIds) {
+            if (previousBlockIds.includes(blockId)) {
+              continue;
+            }
+            const canSignIn = await this.blocksService.canSignInToBlock(
+              eventUuid,
+              attributeUuid,
+              blockId,
+              prisma,
+            );
+            if (!canSignIn) {
+              throw new BadRequestException(
+                `Cannot sign in to block ${blockId} because it is at full capacity, is a root block, or does not belong to the correct event/attribute.`,
+              );
+            }
+          }
         }
       }
 
@@ -780,9 +810,20 @@ export class FormsService {
         if (
           this.isMissingAttributeValue(normalizedAttributes[attribute.uuid])
         ) {
-          throw new BadRequestException(
-            `Missing required attribute with id: ${attribute.uuid}`,
-          );
+          if (attribute.type === AttributeType.block) {
+            const selectableBlocksCount = await prisma.block.count({
+              where: { attributeUuid: attribute.uuid, isRootBlock: false },
+            });
+            if (selectableBlocksCount > 0) {
+              throw new BadRequestException(
+                `Missing required attribute with id: ${attribute.uuid}`,
+              );
+            }
+          } else {
+            throw new BadRequestException(
+              `Missing required attribute with id: ${attribute.uuid}`,
+            );
+          }
         }
       }
 
