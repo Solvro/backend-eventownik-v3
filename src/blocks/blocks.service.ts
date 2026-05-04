@@ -225,4 +225,47 @@ export class BlocksService {
       where: { uuid: id },
     });
   }
+
+  async getBlockParticipantsCount(
+    blockId: string,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const prisma = this.getClient(tx);
+    return prisma.participantAttribute.count({
+      where: {
+        value: {
+          array_contains: blockId,
+        },
+      },
+    });
+  }
+
+  async canSignInToBlock(
+    eventId: string,
+    attributeId: string,
+    blockId: string,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const prisma = this.getClient(tx);
+    const block = await prisma.block.findFirst({
+      where: {
+        uuid: blockId,
+        attributeUuid: attributeId,
+        attribute: {
+          eventUuid: eventId,
+        },
+      },
+    });
+
+    if (block == null || block.isRootBlock) {
+      return false;
+    }
+
+    if (block.capacity === null) {
+      return true;
+    }
+
+    const count = await this.getBlockParticipantsCount(blockId, tx);
+    return count < block.capacity;
+  }
 }
