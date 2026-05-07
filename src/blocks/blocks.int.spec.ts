@@ -4,6 +4,7 @@ import { NotFoundException } from "@nestjs/common";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
+import { BlocksPublicController } from "./block-public.controller";
 import { BlocksController } from "./blocks.controller";
 import { BlocksService } from "./blocks.service";
 import type { CreateBlockDto } from "./dto/create-block.dto";
@@ -12,6 +13,8 @@ import type { Block } from "./entities/block.entity";
 
 describe("Blocks Integration", () => {
   let blocksController: BlocksController;
+  let blocksPublicController: BlocksPublicController;
+  let blocksService: BlocksService;
 
   const mockPrismaService = {
     block: {
@@ -23,8 +26,14 @@ describe("Blocks Integration", () => {
       delete: jest.fn(),
       count: jest.fn(),
     },
+    participantAttribute: {
+      count: jest.fn(),
+    },
     attribute: {
       findFirst: jest.fn(),
+    },
+    event: {
+      findUnique: jest.fn(),
     },
     $transaction: jest.fn(),
   };
@@ -35,9 +44,9 @@ describe("Blocks Integration", () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      controllers: [BlocksController, BlocksPublicController],
       providers: [
         BlocksService,
-        BlocksController,
         {
           provide: PrismaService,
           useValue: mockPrismaService,
@@ -46,6 +55,10 @@ describe("Blocks Integration", () => {
     }).compile();
 
     blocksController = module.get<BlocksController>(BlocksController);
+    blocksService = module.get<BlocksService>(BlocksService);
+    blocksPublicController = module.get<BlocksPublicController>(
+      BlocksPublicController,
+    );
 
     jest.clearAllMocks();
   });
@@ -213,6 +226,165 @@ describe("Blocks Integration", () => {
       expect(mockPrismaService.block.delete).toHaveBeenCalledWith({
         where: { uuid: blockId },
       });
+    });
+  });
+
+  describe("getBlockTree", () => {
+    const eventSlug = "sample-event";
+    const eventUuid = "event-uuid";
+
+    const rootBlock = {
+      uuid: "root-block",
+      name: "Root",
+      parentUuid: null,
+      attributeUuid: "attr-uuid",
+      isRootBlock: true,
+      capacity: null,
+      order: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const childBlock = {
+      uuid: "child-block",
+      name: "Child",
+      parentUuid: "root-block",
+      attributeUuid: "attr-uuid",
+      isRootBlock: false,
+      capacity: 10,
+      order: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const nestedBlock = {
+      uuid: "nested-block",
+      name: "Nested",
+      parentUuid: "child-block",
+      attributeUuid: "attr-uuid",
+      isRootBlock: false,
+      capacity: 5,
+      order: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    it("should return block tree with participant counts", async () => {
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
+        slug: eventSlug,
+      });
+
+      mockPrismaService.block.findMany.mockResolvedValue([
+        rootBlock,
+        childBlock,
+        nestedBlock,
+      ]);
+
+      jest
+        .spyOn(blocksService, "getBlockParticipantsCount")
+        .mockImplementation(async (blockUuid: string) => {
+          if (blockUuid === "child-block") {
+            return await new Promise((resolve) => {
+              resolve(3);
+            });
+          }
+          if (blockUuid === "nested-block") {
+            return await new Promise((resolve) => {
+              resolve(1);
+            });
+          }
+          return await new Promise((resolve) => {
+            resolve(0);
+          });
+        });
+
+      const result = await blocksPublicController.getBlockTree(
+        eventSlug,
+        "attr-uuid",
+      );
+
+      expect(mockPrismaService.event.findUnique).toHaveBeenCalledWith({
+        where: { slug: eventSlug },
+      });
+
+      expect(mockPrismaService.block.findMany).toHaveBeenCalledWith({
+        where: {
+          attributeUuid: "attr-uuid",
+          attribute: {
+            eventUuid,
+          },
+        },
+      });
+
+      expect(result).toMatchObject({
+        uuid: "root-block",
+        children: [
+          {
+            uuid: "child-block",
+            blockParticipantCount: 3,
+            children: [
+              {
+                uuid: "nested-block",
+                blockParticipantCount: 1,
+                children: [],
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    it("should throw when root block does not exist", async () => {
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
+        slug: eventSlug,
+      });
+
+      mockPrismaService.block.findMany.mockResolvedValue([
+        {
+          ...childBlock,
+          isRootBlock: false,
+        },
+      ]);
+
+      await expect(
+        blocksPublicController.getBlockTree(eventSlug, "attr-uuid"),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("should return root block with empty children array", async () => {
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
+        slug: eventSlug,
+      });
+
+      mockPrismaService.block.findMany.mockResolvedValue([rootBlock]);
+
+      const result = await blocksPublicController.getBlockTree(
+        eventSlug,
+        "attr-uuid",
+      );
+
+      expect(result).toMatchObject({
+        uuid: "root-block",
+        children: [],
+      });
+    });
+
+    it("should not calculate participant count for blocks without capacity", async () => {
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
+        slug: eventSlug,
+      });
+
+      mockPrismaService.block.findMany.mockResolvedValue([rootBlock]);
+
+      const countSpy = jest.spyOn(blocksService, "getBlockParticipantsCount");
+
+      await blocksService.getBlockTree(eventSlug, "attr-uuid");
+
+      expect(countSpy).not.toHaveBeenCalled();
     });
   });
 });

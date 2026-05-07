@@ -262,10 +262,66 @@ export class BlocksService {
     }
 
     if (block.capacity === null) {
-      return true;
+      return false;
     }
 
     const count = await this.getBlockParticipantsCount(blockId, tx);
     return count < block.capacity;
+  }
+
+  async getBlockTree(eventSlug: string, attributeUuid: string): Promise<Block> {
+    const event = await this.prisma.event.findUnique({
+      where: { slug: eventSlug },
+    });
+
+    const blocks = await this.prisma.block.findMany({
+      where: {
+        attributeUuid,
+        attribute: {
+          eventUuid: event?.uuid,
+        },
+      },
+    });
+
+    const blockMap = new Map<
+      string,
+      Block & { blockParticipantCount?: number; children: Block[] }
+    >();
+
+    for (const block of blocks) {
+      let blockParticipantCount: number | undefined;
+
+      if (block.capacity !== null) {
+        blockParticipantCount = await this.getBlockParticipantsCount(
+          block.uuid,
+        );
+      }
+
+      blockMap.set(block.uuid, {
+        ...block,
+        blockParticipantCount,
+        children: [],
+      });
+    }
+
+    let root: Block | null = null;
+
+    for (const block of blockMap.values()) {
+      if (block.isRootBlock) {
+        root = block;
+      }
+
+      if (block.parentUuid !== null) {
+        blockMap.get(block.parentUuid)?.children.push(block);
+      }
+    }
+
+    if (root === null) {
+      throw new NotFoundException(
+        `Attribute with UUID ${attributeUuid} doesn't have a block tree`,
+      );
+    }
+
+    return root;
   }
 }
