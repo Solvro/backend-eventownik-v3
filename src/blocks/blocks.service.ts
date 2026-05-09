@@ -1,4 +1,5 @@
 import { Prisma } from "src/generated/prisma/client";
+import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import {
@@ -13,7 +14,10 @@ import { Block } from "./entities/block.entity";
 
 @Injectable()
 export class BlocksService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly participantsService: ParticipantsService,
+  ) {}
 
   private getClient(tx?: Prisma.TransactionClient) {
     return tx ?? this.prisma;
@@ -323,5 +327,60 @@ export class BlocksService {
     }
 
     return root;
+  }
+
+  async getBlockParticipants(
+    eventSlug: string,
+    attributeUuid: string,
+    blockUuid: string,
+  ) {
+    const event = await this.prisma.event.findUnique({
+      where: { slug: eventSlug },
+      select: { uuid: true },
+    });
+
+    if (event === null) {
+      throw new NotFoundException(`Event with slug ${eventSlug} doesn't exist`);
+    }
+
+    const block = await this.prisma.block.findUnique({
+      where: {
+        uuid: blockUuid,
+        attributeUuid,
+        attribute: {
+          eventUuid: event.uuid,
+        },
+      },
+      select: { uuid: true, attribute: { select: { config: true } } },
+    });
+
+    if (block?.attribute == null) {
+      throw new NotFoundException(`Block with UUID ${blockUuid} doesn't exist`);
+    }
+
+    const config = block.attribute.config;
+
+    let bonusAttributes = "";
+
+    if (config !== null && typeof config === "object") {
+      const configJson = config as Prisma.JsonObject;
+
+      const participantFields: unknown = configJson.participantFields;
+
+      if (
+        Array.isArray(participantFields) &&
+        participantFields.every((item) => typeof item === "string")
+      ) {
+        bonusAttributes = participantFields.join(",");
+      }
+    }
+
+    const participants = await this.participantsService.findAll(event.uuid, {
+      skip: 0,
+      filters: { attributeUuid: blockUuid },
+      bonusAttributes,
+    });
+
+    return participants;
   }
 }

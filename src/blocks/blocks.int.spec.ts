@@ -1,3 +1,4 @@
+import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import { NotFoundException } from "@nestjs/common";
@@ -38,6 +39,10 @@ describe("Blocks Integration", () => {
     $transaction: jest.fn(),
   };
 
+  const mockParticipantService = {
+    findAll: jest.fn(),
+  };
+
   const eventId = "3fa85f64-5717-4562-b3fc-2c963f66afa6";
   const attributeId = "3fa85f64-5717-4562-b3fc-2c963f66afa7";
   const blockId = "3fa85f64-5717-4562-b3fc-2c963f66afa8";
@@ -47,6 +52,10 @@ describe("Blocks Integration", () => {
       controllers: [BlocksController, BlocksPublicController],
       providers: [
         BlocksService,
+        {
+          provide: ParticipantsService,
+          useValue: mockParticipantService,
+        },
         {
           provide: PrismaService,
           useValue: mockPrismaService,
@@ -385,6 +394,148 @@ describe("Blocks Integration", () => {
       await blocksService.getBlockTree(eventSlug, "attr-uuid");
 
       expect(countSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("getBlockParticipants", () => {
+    it("throws if event does not exist", async () => {
+      mockPrismaService.event.findUnique.mockResolvedValue(null);
+
+      await expect(
+        blocksPublicController.getBlockParticipants(
+          "event-slug",
+          "attr-uuid",
+          "block-uuid",
+        ),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(mockPrismaService.block.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("throws if block does not exist", async () => {
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: "event-uuid",
+      });
+      mockPrismaService.block.findUnique.mockResolvedValue(null);
+
+      await expect(
+        blocksPublicController.getBlockParticipants(
+          "event-slug",
+          "attr-uuid",
+          "block-uuid",
+        ),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(mockParticipantService.findAll).not.toHaveBeenCalled();
+    });
+
+    it("throws if block attribute is missing", async () => {
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: "event-uuid",
+      });
+
+      mockPrismaService.block.findUnique.mockResolvedValue({
+        uuid: "block-uuid",
+        attribute: null,
+      });
+
+      await expect(
+        blocksPublicController.getBlockParticipants(
+          "event-slug",
+          "attr-uuid",
+          "block-uuid",
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("returns participants without bonus attributes", async () => {
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: "event-uuid",
+      });
+
+      mockPrismaService.block.findUnique.mockResolvedValue({
+        uuid: "block-uuid",
+        attribute: { config: null },
+      });
+
+      mockParticipantService.findAll.mockResolvedValue(["p1", "p2"]);
+
+      const result = await blocksPublicController.getBlockParticipants(
+        "event-slug",
+        "attr-uuid",
+        "block-uuid",
+      );
+
+      expect(mockParticipantService.findAll).toHaveBeenCalledWith(
+        "event-uuid",
+        {
+          skip: 0,
+          filters: { attributeUuid: "block-uuid" },
+          bonusAttributes: "",
+        },
+      );
+
+      expect(result).toEqual(["p1", "p2"]);
+    });
+
+    it("extracts participantFields from config", async () => {
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: "event-uuid",
+      });
+
+      mockPrismaService.block.findUnique.mockResolvedValue({
+        uuid: "block-uuid",
+        attribute: {
+          config: {
+            participantFields: ["a", "b", "c"],
+          },
+        },
+      });
+
+      mockParticipantService.findAll.mockResolvedValue(["p1"]);
+
+      await blocksPublicController.getBlockParticipants(
+        "event-slug",
+        "attr-uuid",
+        "block-uuid",
+      );
+
+      expect(mockParticipantService.findAll).toHaveBeenCalledWith(
+        "event-uuid",
+        expect.objectContaining({
+          bonusAttributes: "a,b,c",
+        }),
+      );
+    });
+
+    it("ignores invalid participantFields", async () => {
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: "event-uuid",
+      });
+
+      mockPrismaService.block.findUnique.mockResolvedValue({
+        uuid: "block-uuid",
+        attribute: {
+          config: {
+            participantFields: ["valid", 123, null],
+          },
+        },
+      });
+
+      mockParticipantService.findAll.mockResolvedValue([]);
+
+      await blocksPublicController.getBlockParticipants(
+        "event-slug",
+        "attr-uuid",
+        "block-uuid",
+      );
+
+      expect(mockParticipantService.findAll).toHaveBeenCalledWith(
+        "event-uuid",
+        expect.objectContaining({
+          bonusAttributes: "",
+        }),
+      );
     });
   });
 });
