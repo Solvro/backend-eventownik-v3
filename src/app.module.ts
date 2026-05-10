@@ -1,6 +1,7 @@
+import { HcaptchaModule } from "@gvrs/nestjs-hcaptcha";
 import * as Joi from "joi";
 
-import { Module } from "@nestjs/common";
+import { InternalServerErrorException, Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 
 import { AdminsModule } from "./admins/admins.module";
@@ -33,6 +34,15 @@ import { PrismaModule } from "./prisma/prisma.module";
     BlocksModule,
     AdminsModule,
     ParticipantsModule,
+    HcaptchaModule.forRoot({
+      secret:
+        process.env.HCAPTCHA_SECRET ??
+        (() => {
+          throw new InternalServerErrorException(
+            "HCAPTCHA_SECRET is not defined in environment variables",
+          );
+        })(),
+    }),
   ],
   controllers: [AppController],
   providers: [AppService],
