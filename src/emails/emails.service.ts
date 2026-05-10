@@ -1,7 +1,7 @@
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { parseSortInput } from "src/common/utils/prisma.utility";
-import { EmailStatus } from "src/generated/prisma/enums";
+import { AttributeType, EmailStatus } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import {
@@ -269,5 +269,121 @@ export class EmailsService {
         },
       });
     });
+  }
+
+  async parseEmailTemplateContent(emailUuid: string, participantUuid: string) {
+    const emailTemplate = await this.prisma.emailTemplate.findUnique({
+      where: { uuid: emailUuid },
+      include: {
+        event: {
+          include: {
+            attributes: true,
+            forms: true,
+          },
+        },
+      },
+    });
+    if (emailTemplate == null) {
+      throw new NotFoundException(
+        `Email template with id: ${emailUuid} not found`,
+      );
+    }
+
+    const participant = await this.prisma.participant.findUnique({
+      where: { uuid: participantUuid },
+      include: {
+        attributes: true,
+      },
+    });
+
+    if (participant == null) {
+      throw new NotFoundException(
+        `Participant with id: ${participantUuid} not found`,
+      );
+    }
+
+    let content = emailTemplate.content;
+    const tagRegex = /<span[^>]*data-id="([^"]+)"[^>]*>.*?<\/span>/g;
+
+    // static tags replacement
+    content = content.replace(tagRegex, (match, dataId) => {
+      switch (dataId) {
+        case "/event_name":
+          return emailTemplate.event.name;
+        case "/event_start_date":
+          return emailTemplate.event.startDate.toISOString();
+        case "/event_end_date":
+          return emailTemplate.event.endDate.toISOString();
+        case "/event_slug":
+          return emailTemplate.event.slug;
+        case "/event_primary_color":
+          return emailTemplate.event.primaryColor || "";
+        case "/event_location":
+          return emailTemplate.event.location || "";
+        case "/participant_id":
+          return participant.uuid;
+        case "/participant_email":
+          return participant.email;
+        case "participant_created_at":
+          return participant.createdAt.toISOString();
+        case "participant_updated_at":
+          return participant.updatedAt.toISOString();
+        default:
+          return dataId;
+      }
+    });
+
+    // dynamic tags replacement
+    // very simillar as before, but now we can have /participant_{attributeUUID} which will be replaced with the value of that attribute for the given participant
+    for (const participantAttribute of participant.attributes) {
+      const attribute = emailTemplate.event.attributes.find(
+        (attr) => attr.uuid === participantAttribute.attributeUuid,
+      );
+
+      if (attribute) {
+        const dynamicTag = `<span data-id="/participant_${attribute.uuid}"></span>`;
+        const rawValue = participantAttribute.value;
+
+        if (attribute.type === AttributeType.multiSelect) {
+          try {
+            const value = rawValue as string[];
+            const optionNames = (
+              (attribute.config as { options: string[] }).options as string[]
+            ).filter((option) => value.includes(option));
+            content = content.replace(
+              new RegExp(dynamicTag, "g"),
+              optionNames.join(", "),
+            );
+          } catch (error) {
+            // If parsing fails, replace with raw value
+            content = content.replace(
+              new RegExp(dynamicTag, "g"),
+              rawValue as string,
+            );
+          }
+        } else if (attribute.type == AttributeType.block) {
+          // TODO: implement block name replacement by uuids
+        } else {
+          content = content.replace(
+            new RegExp(dynamicTag, "g"),
+            rawValue as string,
+          );
+        }
+      }
+    }
+
+    // TODO: a tag replacement etc.
+    // form links replacement eg /form_{formUuid} will be replaced with {APP_DOMAIN}/{eventSlug}/{formUuid}/{participantUuid}
+    const formLinkRegex = /<span[^>]*data-id="\/form_([^"]+)"[^>]*><\/span>/g;
+    content = content.replace(formLinkRegex, (match, formUuid) => {
+      const form = emailTemplate.event.forms.find((f) => f.uuid === formUuid);
+      if (form) {
+        const appDomain = process.env.APP_DOMAIN || "http://localhost:3000";
+        return `${appDomain}/${emailTemplate.event.slug}/${form.uuid}/${participant.uuid}`;
+      }
+      return match; // if form not found, return the original tag
+    });
+
+    return content;
   }
 }

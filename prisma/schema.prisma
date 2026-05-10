@@ -184,7 +184,7 @@ model EmailTemplate {
   eventUuid     String       @db.Uuid
   formUuid      String?      @db.Uuid
 
-  event             Event?                   @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+  event             Event                   @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
   form              Form?                    @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
   participantEmails ParticipantEmailStatus[]
   participantForms  ParticipantFormLog[]
