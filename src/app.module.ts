@@ -10,6 +10,7 @@ import { AppService } from "./app.service";
 import { AttributesModule } from "./attributes/attributes.module";
 import { AuthModule } from "./auth/auth.module";
 import { BlocksModule } from "./blocks/blocks.module";
+import { EmailsModule } from "./emails/emails.module";
 import { EventsModule } from "./events/events.module";
 import { FormsModule } from "./forms/forms.module";
 import { OrganizersModule } from "./organizers/organizers.module";
@@ -41,6 +42,7 @@ import { PrismaModule } from "./prisma/prisma.module";
           throw new Error("HCAPTCHA_SECRET environment variable is not set");
         })(),
     }),
+    EmailsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

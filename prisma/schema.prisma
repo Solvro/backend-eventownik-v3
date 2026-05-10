@@ -179,7 +179,8 @@ model EmailTemplate {
   updatedAt     DateTime     @updatedAt
   triggerValue  String?
   triggerValue2 String?
-  eventUuid     String?      @db.Uuid
+  order         Int?
+  eventUuid     String       @db.Uuid
   formUuid      String?      @db.Uuid
 
   event             Event?                   @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
