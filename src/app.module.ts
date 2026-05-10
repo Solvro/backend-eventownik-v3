@@ -24,6 +24,12 @@ import { PrismaModule } from "./prisma/prisma.module";
     ConfigModule.forRoot({
       validationSchema: Joi.object({
         DATABASE_URL: Joi.string().required(),
+        SMTP_HOST: Joi.string().required(),
+        SMTP_PORT: Joi.number().required(),
+        SMTP_SECURE: Joi.boolean().default(false),
+        SMTP_USER: Joi.string().required(),
+        SMTP_PASS: Joi.string().required(),
+        SMTP_FROM: Joi.string().required(),
         PORT: Joi.number().default(3000),
       }),
       isGlobal: true,
