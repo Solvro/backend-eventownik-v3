@@ -154,28 +154,75 @@ export class ParticipantsService {
     }
 
     if (attribute.type === AttributeType.block) {
-      if (value == null || value === "null" || value === "") {
+      if (
+        value == null ||
+        value === "null" ||
+        value === "" ||
+        (Array.isArray(value) && value.length === 0)
+      ) {
         return Prisma.JsonNull;
       }
-      if (typeof value !== "string") {
+
+      const rawValues = Array.isArray(value)
+        ? value
+        : typeof value === "string"
+          ? value.split(";")
+          : null;
+
+      if (rawValues == null) {
         throw new BadRequestException(
-          `Attribute ${attribute.attributeUuid} must be a block UUID string.`,
+          `Attribute ${attribute.attributeUuid} must be an array of block UUIDs.`,
         );
       }
 
-      const block = await this.prisma.block.findFirst({
+      const normalizedValues = rawValues.map((item) => {
+        if (typeof item !== "string") {
+          throw new BadRequestException(
+            `Attribute ${attribute.attributeUuid} must contain only string values.`,
+          );
+        }
+        return item.trim();
+      });
+
+      if (normalizedValues.length === 0) {
+        return Prisma.JsonNull;
+      }
+
+      const blocksCount = await this.prisma.block.count({
         where: {
-          uuid: value,
+          uuid: { in: normalizedValues },
           attribute: { eventUuid },
         },
       });
-      if (block == null) {
+
+      if (blocksCount !== normalizedValues.length) {
         throw new BadRequestException(
-          `Block with UUID ${value} does not exist.`,
+          `One or more block UUIDs are invalid or do not exist for attribute ${attribute.attributeUuid}.`,
         );
       }
 
-      return value;
+      const configObject =
+        attribute.config != null &&
+        typeof attribute.config === "object" &&
+        !Array.isArray(attribute.config)
+          ? (attribute.config as Record<string, unknown>)
+          : null;
+
+      const maxSelections =
+        configObject?.maxSelections !== undefined &&
+        typeof configObject.maxSelections === "number" &&
+        Number.isInteger(configObject.maxSelections) &&
+        configObject.maxSelections > 0
+          ? configObject.maxSelections
+          : 1;
+
+      if (normalizedValues.length > maxSelections) {
+        throw new BadRequestException(
+          `Attribute ${attribute.attributeUuid} cannot contain more than ${String(maxSelections)} selections.`,
+        );
+      }
+
+      return normalizedValues;
     }
 
     if (attribute.type === AttributeType.number) {

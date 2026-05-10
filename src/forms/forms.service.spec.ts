@@ -2,7 +2,7 @@ import { BlocksService } from "src/blocks/blocks.service";
 import { AttributeType } from "src/generated/prisma/client";
 import { ParticipantsService } from "src/participants/participants.service";
 
-import { BadRequestException, NotImplementedException } from "@nestjs/common";
+import { BadRequestException } from "@nestjs/common";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
@@ -31,6 +31,7 @@ describe("FormsService", () => {
     },
     block: {
       findMany: jest.fn(),
+      count: jest.fn(),
     },
     event: {
       findUnique: jest.fn(),
@@ -47,7 +48,7 @@ describe("FormsService", () => {
     register: jest.fn(),
   };
   const mockBlocksService = {
-    canSignToBlock: jest.fn(),
+    canSignInToBlock: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -470,7 +471,7 @@ describe("FormsService", () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it("should validate block submissions and then throw NotImplementedException", async () => {
+    it("should validate block submissions and save successfully", async () => {
       const submissionData = {
         email: "test@example.com",
         attributes: [
@@ -512,11 +513,35 @@ describe("FormsService", () => {
         { uuid: "550e8400-e29b-41d4-a716-446655440000" },
         { uuid: "550e8400-e29b-41d4-a716-446655440001" },
       ]);
+      mockPrismaService.block.count.mockResolvedValue(2);
+      mockBlocksService.canSignInToBlock.mockResolvedValue(true);
       jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockParticipantsService.register.mockResolvedValue({
+        id: 1,
+        email: submissionData.email,
+      });
 
-      await expect(
-        service.formSubmit(eventUuid, formUuid, submissionData, []),
-      ).rejects.toThrow(NotImplementedException);
+      const result = await service.formSubmit(
+        eventUuid,
+        formUuid,
+        submissionData,
+        [],
+      );
+
+      expect(mockParticipantsService.register).toHaveBeenCalledWith(
+        eventUuid,
+        submissionData.email,
+        [
+          {
+            attributeUuid: "attr-block",
+            value: [
+              "550e8400-e29b-41d4-a716-446655440000",
+              "550e8400-e29b-41d4-a716-446655440001",
+            ],
+          },
+        ],
+      );
+      expect(result).toBeDefined();
     });
 
     it("should reject block selections that exceed maxSelections", async () => {
