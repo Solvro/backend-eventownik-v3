@@ -13,6 +13,7 @@ export class HcaptchaExceptionFilter implements ExceptionFilter {
     response.status(status).json({
       statusCode: status,
       message: "Invalid h-captcha-response",
+      error: "Bad Request",
     });
   }
 }

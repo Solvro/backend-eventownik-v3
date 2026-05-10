@@ -7,7 +7,7 @@ import { NestFactory } from "@nestjs/core";
 import { SwaggerModule } from "@nestjs/swagger";
 
 import { AppModule } from "./app.module";
-import { HcaptchaExceptionFilter } from "./common/exceception-filters/hcaptcha.exception";
+import { HcaptchaExceptionFilter } from "./common/exception-filters/hcaptcha.exception";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

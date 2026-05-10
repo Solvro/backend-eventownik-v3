@@ -1,7 +1,7 @@
 import { HcaptchaModule } from "@gvrs/nestjs-hcaptcha";
 import * as Joi from "joi";
 
-import { InternalServerErrorException, Module } from "@nestjs/common";
+import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 
 import { AdminsModule } from "./admins/admins.module";
@@ -38,9 +38,7 @@ import { PrismaModule } from "./prisma/prisma.module";
       secret:
         process.env.HCAPTCHA_SECRET ??
         (() => {
-          throw new InternalServerErrorException(
-            "HCAPTCHA_SECRET is not defined in environment variables",
-          );
+          throw new Error("HCAPTCHA_SECRET environment variable is not set");
         })(),
     }),
   ],
