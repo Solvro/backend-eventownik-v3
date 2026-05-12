@@ -1,7 +1,8 @@
+import { HcaptchaModule } from "@gvrs/nestjs-hcaptcha";
 import * as Joi from "joi";
 
 import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
+import { ConfigModule, ConfigService } from "@nestjs/config";
 
 import { AdminsModule } from "./admins/admins.module";
 import { AppController } from "./app.controller";
@@ -34,6 +35,12 @@ import { PrismaModule } from "./prisma/prisma.module";
     BlocksModule,
     AdminsModule,
     ParticipantsModule,
+    HcaptchaModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.getOrThrow<string>("HCAPTCHA_SECRET"),
+      }),
+    }),
     EmailsModule,
   ],
   controllers: [AppController],
