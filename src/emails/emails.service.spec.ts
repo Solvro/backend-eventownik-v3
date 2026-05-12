@@ -451,7 +451,7 @@ describe("EmailsService", () => {
       mockTransaction(mockPrismaService);
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue(null);
       await expect(
-        service.update(mockEventId, mockEmailId, {} as UpdateEmailDto),
+        service.update(mockEventId, mockEmailId, {}),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -459,7 +459,7 @@ describe("EmailsService", () => {
       mockTransaction(mockPrismaService);
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue(null);
       await expect(
-        service.update(mockEventId, mockEmailId, {} as UpdateEmailDto),
+        service.update(mockEventId, mockEmailId, {}),
       ).rejects.toThrow(NotFoundException);
     });
   });
