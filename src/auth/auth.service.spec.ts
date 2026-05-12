@@ -30,7 +30,7 @@ describe("AuthService", () => {
       findUnique: jest.fn(),
       create: jest.fn(),
     },
-    authAccessToken: {
+    refreshToken: {
       create: jest.fn(),
       findUnique: jest.fn(),
       delete: jest.fn(),
@@ -142,18 +142,17 @@ describe("AuthService", () => {
 
   describe("login", () => {
     it("should return access and refresh tokens (securely)", async () => {
-      mockPrisma.authAccessToken.create.mockResolvedValue({ id: 1 });
+      mockPrisma.refreshToken.create.mockResolvedValue({ id: 1 });
 
       const result = await service.login(mockAdmin);
 
       expect(mockJwtService.sign).toHaveBeenCalled();
 
-      expect(mockPrisma.authAccessToken.create).toHaveBeenCalledWith({
+      expect(mockPrisma.refreshToken.create).toHaveBeenCalledWith({
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data: expect.objectContaining({
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           token: expect.any(String),
-          type: "refresh_token",
         }),
       });
       expect(result).toHaveProperty("access_token");
@@ -162,7 +161,7 @@ describe("AuthService", () => {
 
       const storedToken =
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        mockPrisma.authAccessToken.create.mock.calls[0][0].data.token as string;
+        mockPrisma.refreshToken.create.mock.calls[0][0].data.token as string;
       const expectedHash = createHash("sha256")
         .update(result.refresh_token)
         .digest("hex");
@@ -175,13 +174,13 @@ describe("AuthService", () => {
       const plainToken = "valid-token";
       const hashedToken = createHash("sha256").update(plainToken).digest("hex");
       const storedToken = {
-        id: 1,
+        uuid: "3e19d992-2ea5-4ed3-9245-6691c41f4f06",
         token: hashedToken,
         expiresAt: new Date(Date.now() + 10_000),
         admin: mockAdmin,
       };
-      mockPrisma.authAccessToken.findUnique.mockResolvedValue(storedToken);
-      mockPrisma.authAccessToken.delete.mockResolvedValue(storedToken);
+      mockPrisma.refreshToken.findUnique.mockResolvedValue(storedToken);
+      mockPrisma.refreshToken.delete.mockResolvedValue(storedToken);
       const loginSpy = jest.spyOn(service, "login").mockResolvedValue({
         access_token: "new",
         refresh_token: "new-refresh",
@@ -189,12 +188,12 @@ describe("AuthService", () => {
 
       const result = await service.refreshTokens(plainToken);
 
-      expect(mockPrisma.authAccessToken.findUnique).toHaveBeenCalledWith({
+      expect(mockPrisma.refreshToken.findUnique).toHaveBeenCalledWith({
         where: { token: hashedToken },
         include: { admin: true },
       });
-      expect(mockPrisma.authAccessToken.delete).toHaveBeenCalledWith({
-        where: { id: 1 },
+      expect(mockPrisma.refreshToken.delete).toHaveBeenCalledWith({
+        where: { uuid: "3e19d992-2ea5-4ed3-9245-6691c41f4f06" },
       });
       expect(loginSpy).toHaveBeenCalledWith(mockAdmin);
       expect(result).toEqual({
@@ -204,7 +203,7 @@ describe("AuthService", () => {
     });
 
     it("should throw UnauthorizedException if token not found", async () => {
-      mockPrisma.authAccessToken.findUnique.mockResolvedValue(null);
+      mockPrisma.refreshToken.findUnique.mockResolvedValue(null);
 
       await expect(service.refreshTokens("invalid")).rejects.toThrow(
         UnauthorizedException,
@@ -213,17 +212,17 @@ describe("AuthService", () => {
 
     it("should throw and delete if token expired", async () => {
       const storedToken = {
-        id: 1,
+        uuid: "3e19d992-2ea5-4ed3-9245-6691c41f4f06",
         token: "expired-token",
         expiresAt: new Date(Date.now() - 10_000),
       };
-      mockPrisma.authAccessToken.findUnique.mockResolvedValue(storedToken);
+      mockPrisma.refreshToken.findUnique.mockResolvedValue(storedToken);
 
       await expect(service.refreshTokens("expired-token")).rejects.toThrow(
         UnauthorizedException,
       );
-      expect(mockPrisma.authAccessToken.delete).toHaveBeenCalledWith({
-        where: { id: 1 },
+      expect(mockPrisma.refreshToken.delete).toHaveBeenCalledWith({
+        where: { uuid: "3e19d992-2ea5-4ed3-9245-6691c41f4f06" },
       });
     });
   });

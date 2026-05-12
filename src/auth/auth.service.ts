@@ -74,13 +74,10 @@ export class AuthService {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
 
-    await this.prisma.authAccessToken.create({
+    await this.prisma.refreshToken.create({
       data: {
-        tokenableId: adminUuid,
-        type: "refresh_token",
+        adminUuid,
         token: hashedToken,
-        abilities: "*",
-        updatedAt: new Date(),
         expiresAt,
       },
     });
@@ -90,7 +87,7 @@ export class AuthService {
 
   async refreshTokens(token: string) {
     const hashedToken = createHash("sha256").update(token).digest("hex");
-    const storedToken = await this.prisma.authAccessToken.findUnique({
+    const storedToken = await this.prisma.refreshToken.findUnique({
       where: { token: hashedToken },
       include: { admin: true },
     });
@@ -100,13 +97,15 @@ export class AuthService {
     }
 
     if (storedToken.expiresAt < new Date()) {
-      await this.prisma.authAccessToken.delete({
-        where: { id: storedToken.id },
+      await this.prisma.refreshToken.delete({
+        where: { uuid: storedToken.uuid },
       });
       throw new UnauthorizedException("Expired refresh token");
     }
 
-    await this.prisma.authAccessToken.delete({ where: { id: storedToken.id } });
+    await this.prisma.refreshToken.delete({
+      where: { uuid: storedToken.uuid },
+    });
     return this.login(storedToken.admin);
   }
 }
