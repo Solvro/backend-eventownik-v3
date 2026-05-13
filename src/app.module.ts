@@ -1,7 +1,9 @@
+import { MailerModule } from "@nestjs-modules/mailer";
 import * as Joi from "joi";
 
 import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { EventEmitterModule } from "@nestjs/event-emitter";
 
 import { AdminsModule } from "./admins/admins.module";
 import { AppController } from "./app.controller";
@@ -18,9 +20,6 @@ import { PrismaModule } from "./prisma/prisma.module";
 
 @Module({
   imports: [
-    PrismaModule,
-    EventsModule,
-    FormsModule,
     ConfigModule.forRoot({
       validationSchema: Joi.object({
         DATABASE_URL: Joi.string().required(),
@@ -34,6 +33,29 @@ import { PrismaModule } from "./prisma/prisma.module";
       }),
       isGlobal: true,
     }),
+    MailerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        transport: {
+          host: configService.getOrThrow<string>("SMTP_HOST"),
+          port: configService.getOrThrow<number>("SMTP_PORT"),
+          secure: configService.getOrThrow<boolean>("SMTP_SECURE"),
+          auth: {
+            user: configService.getOrThrow<string>("SMTP_USER"),
+            pass: configService.getOrThrow<string>("SMTP_PASS"),
+          },
+        },
+        defaults: {
+          from: configService.getOrThrow<string>("SMTP_FROM"),
+        },
+      }),
+    }),
+    EventEmitterModule.forRoot({
+      wildcard: true,
+    }),
+    PrismaModule,
+    EventsModule,
+    FormsModule,
     OrganizersModule,
     AuthModule,
     AttributesModule,
