@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Post,
   Request,
   UnauthorizedException,
@@ -25,6 +27,7 @@ import { RegisterDto } from "./dto/register.dto";
 import { TokenResponseDto } from "./dto/token-response.dto";
 import { JwtAuthGuard } from "./jwt-auth.guard";
 import { AuthUser } from "./jwt.strategy";
+import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 
 @ApiTags("Auth")
 @Controller("auth")
@@ -81,5 +84,18 @@ export class AuthController {
       ...user
     } = request.user;
     return user;
+  }
+
+  @Post("forgot-password")
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({
+    description: "If the email exists, a reset link has been sent",
+  })
+  @ApiOperation({ summary: "Generate password reset token and send an email" })
+  async forgotPassword(@Body() body: ForgotPasswordDto) {
+    await this.authService.forgotPassword(body.email);
+    return {
+      message: "If the email exists, a reset link has been sent",
+    };
   }
 }

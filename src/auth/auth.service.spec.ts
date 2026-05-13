@@ -35,6 +35,9 @@ describe("AuthService", () => {
       findUnique: jest.fn(),
       delete: jest.fn(),
     },
+    passwordResetToken: {
+      create: jest.fn(),
+    },
   };
 
   const mockJwtService = {
@@ -224,6 +227,33 @@ describe("AuthService", () => {
       expect(mockPrisma.refreshToken.delete).toHaveBeenCalledWith({
         where: { uuid: "3e19d992-2ea5-4ed3-9245-6691c41f4f06" },
       });
+    });
+  });
+  describe("passwordResetTokens", () => {
+    it("Should create a token if admin exists", async () => {
+      mockPrisma.admin.findUnique.mockResolvedValue({
+        uuid: "admin-uuid-123",
+      });
+
+      await service.forgotPassword("abc@example.com");
+
+      expect(mockPrisma.passwordResetToken.create).toHaveBeenCalledWith({
+        data: {
+          adminUuid: "admin-uuid-123",
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          token: expect.any(String),
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          expiresAt: expect.any(Date),
+        },
+      });
+    });
+
+    it("Shouldn't create a token if admin does not exist", async () => {
+      mockPrisma.admin.findUnique.mockResolvedValue(null);
+
+      await service.forgotPassword("abc@example.com");
+
+      expect(mockPrisma.passwordResetToken.create).toHaveBeenCalledTimes(0);
     });
   });
 });

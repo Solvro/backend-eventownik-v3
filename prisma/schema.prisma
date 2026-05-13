@@ -35,6 +35,7 @@ model Admin {
   events           Event[]           @relation("Organizer")
   permissions      EventPermission[]
   refreshToken     RefreshToken[]
+  passwordResetToken PasswordResetToken[]
 
   @@map("Admins")
 }
@@ -331,4 +332,16 @@ model RefreshToken {
 
   @@map("RefreshTokens")
   @@index(fields: [adminUuid])
+}
+
+model PasswordResetToken {
+  uuid      String @id @default(uuid()) @db.Uuid
+  adminUuid String @db.Uuid
+  token     String @unique
+  createdAt   DateTime  @default(now()) @map("created_at")
+  expiresAt   DateTime  @map("expires_at")
+
+  admin Admin @relation(fields: [adminUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("PasswordResetTokens")
 }

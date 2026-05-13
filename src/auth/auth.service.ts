@@ -108,4 +108,23 @@ export class AuthService {
     });
     return this.login(storedToken.admin);
   }
+
+  async forgotPassword(email: string) {
+    const admin = await this.prisma.admin.findUnique({
+      where: { email },
+    });
+    if (admin !== null) {
+      const resetToken = randomBytes(64).toString("hex");
+      const hashedToken = createHash("sha256").update(resetToken).digest("hex");
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+      await this.prisma.passwordResetToken.create({
+        data: {
+          adminUuid: admin.uuid,
+          expiresAt,
+          token: hashedToken,
+        },
+      });
+      // !!! TODO: ADD EMAIL SENDING !!!
+    }
+  }
 }
