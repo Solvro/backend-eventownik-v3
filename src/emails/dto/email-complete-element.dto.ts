@@ -4,7 +4,6 @@ import { EmailElementDto } from "./email-element.dto";
 
 export class EmailCompleteElementDto extends EmailElementDto {
   content: string;
-  formId: string | null;
   order: number | null;
   participants: EmailParticipant[];
 }

@@ -34,17 +34,6 @@ export class EmailsService {
         throw new BadRequestException(`Event with id: ${eventUuid} not found`);
       }
 
-      if (query.formId !== undefined) {
-        const form = await tx.form.findUnique({
-          where: { uuid: query.formId },
-        });
-        if (form == null) {
-          throw new BadRequestException(
-            `Form with id: ${query.formId} not found`,
-          );
-        }
-      }
-
       const emailTemplate = await tx.emailTemplate.create({
         data: {
           name: query.name,
@@ -54,7 +43,6 @@ export class EmailsService {
           triggerValue2: query.triggerValue2,
           order: query.order,
           eventUuid,
-          formUuid: query.formId,
         },
       });
 
@@ -184,7 +172,6 @@ export class EmailsService {
       trigger: emailTemplate.trigger,
       triggerValue: emailTemplate.triggerValue,
       triggerValue2: emailTemplate.triggerValue2,
-      formId: emailTemplate.formUuid,
       order: emailTemplate.order,
       createdAt: emailTemplate.createdAt.toISOString(),
       updatedAt: emailTemplate.updatedAt.toISOString(),
@@ -234,7 +221,6 @@ export class EmailsService {
           triggerValue: query.triggerValue,
           triggerValue2: query.triggerValue2,
           order: query.order,
-          formUuid: query.formId,
         },
       });
 

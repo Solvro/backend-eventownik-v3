@@ -51,9 +51,4 @@ export class CreateEmailDto {
   @IsNotEmpty()
   @IsString()
   triggerValue2?: string;
-
-  @ApiPropertyOptional({ example: "test-form-uuid" })
-  @IsUUID("4", { each: true })
-  @IsOptional()
-  formId?: string;
 }
