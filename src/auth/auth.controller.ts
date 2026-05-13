@@ -22,14 +22,14 @@ import {
 
 import { AuthService } from "./auth.service";
 import { AdminDto } from "./dto/auth-user.dto";
+import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { LoginDto } from "./dto/login.dto";
 import { RefreshTokenDto } from "./dto/refresh-token.dto";
 import { RegisterDto } from "./dto/register.dto";
+import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { TokenResponseDto } from "./dto/token-response.dto";
 import { JwtAuthGuard } from "./jwt-auth.guard";
 import { AuthUser } from "./jwt.strategy";
-import { ForgotPasswordDto } from "./dto/forgot-password.dto";
-import { ResetPasswordDto } from "./dto/reset-password.dto";
 
 @ApiTags("Auth")
 @Controller("auth")
