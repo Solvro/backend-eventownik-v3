@@ -2,7 +2,11 @@ import * as bcrypt from "bcrypt";
 import { createHash } from "node:crypto";
 import type { Admin } from "src/generated/prisma/client";
 
-import { ConflictException, UnauthorizedException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
@@ -29,15 +33,20 @@ describe("AuthService", () => {
     admin: {
       findUnique: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
     },
     refreshToken: {
       create: jest.fn(),
       findUnique: jest.fn(),
       delete: jest.fn(),
+      deleteMany: jest.fn(),
     },
     passwordResetToken: {
       create: jest.fn(),
+      findUnique: jest.fn(),
+      deleteMany: jest.fn(),
     },
+    $transaction: jest.fn(),
   };
 
   const mockJwtService = {
@@ -229,7 +238,7 @@ describe("AuthService", () => {
       });
     });
   });
-  describe("passwordResetTokens", () => {
+  describe("forgotPassword", () => {
     it("Should create a token if admin exists", async () => {
       mockPrisma.admin.findUnique.mockResolvedValue({
         uuid: "admin-uuid-123",
@@ -254,6 +263,55 @@ describe("AuthService", () => {
       await service.forgotPassword("abc@example.com");
 
       expect(mockPrisma.passwordResetToken.create).toHaveBeenCalledTimes(0);
+    });
+  });
+  describe("resetPassword", () => {
+    it("Should reset password", async () => {
+      mockPrisma.passwordResetToken.findUnique.mockResolvedValue({
+        adminUuid: "admin-uuid",
+        expiresAt: new Date(Date.now() + 100_000_000),
+      });
+
+      jest
+        .spyOn(bcrypt, "hash")
+        .mockImplementation(() => "hashed-password-123");
+
+      mockPrisma.$transaction.mockResolvedValue([]);
+
+      await service.resetPassword("token-123", "Password123!?");
+
+      expect(bcrypt.hash).toHaveBeenCalledWith("Password123!?", 12);
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.$transaction).toHaveBeenCalledWith(expect.any(Array));
+      expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
+        where: { adminUuid: "admin-uuid" },
+      });
+      expect(mockPrisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({
+        where: { adminUuid: "admin-uuid" },
+      });
+      expect(mockPrisma.admin.update).toHaveBeenCalledWith({
+        where: { uuid: "admin-uuid" },
+        data: { password: "hashed-password-123" },
+      });
+    });
+    it("Should throw BadRequestException if token doesn't exist", async () => {
+      mockPrisma.passwordResetToken.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.resetPassword("bad-token-123", "newPassword22"),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(0);
+    });
+    it("Should throw BadRequestException if token expired", async () => {
+      mockPrisma.passwordResetToken.findUnique.mockResolvedValue({
+        adminUuid: "admin-uuid",
+        expiresAt: new Date(Date.now() - 100_000_000),
+      });
+
+      await expect(
+        service.resetPassword("token-123", "new-pass-123"),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(0);
     });
   });
 });

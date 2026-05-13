@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { Admin } from "src/generated/prisma/client";
 
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
@@ -125,6 +126,32 @@ export class AuthService {
         },
       });
       // !!! TODO: ADD EMAIL SENDING !!!
+      console.warn(resetToken);
     }
+  }
+
+  async resetPassword(token: string, password: string) {
+    const hashedToken = createHash("sha256").update(token).digest("hex");
+    const resetToken = await this.prisma.passwordResetToken.findUnique({
+      where: { token: hashedToken },
+    });
+
+    if (resetToken === null || resetToken.expiresAt.getTime() < Date.now()) {
+      throw new BadRequestException("Invalid or expired token");
+    }
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    await this.prisma.$transaction([
+      this.prisma.admin.update({
+        where: { uuid: resetToken.adminUuid },
+        data: { password: hashedPassword },
+      }),
+      this.prisma.refreshToken.deleteMany({
+        where: { adminUuid: resetToken.adminUuid },
+      }),
+      this.prisma.passwordResetToken.deleteMany({
+        where: { adminUuid: resetToken.adminUuid },
+      }),
+    ]);
   }
 }

@@ -29,6 +29,7 @@ describe("AuthController integration tests", () => {
     login: jest.fn(),
     refreshTokens: jest.fn(),
     forgotPassword: jest.fn(),
+    resetPassword: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -129,6 +130,24 @@ describe("AuthController integration tests", () => {
       expect(result).toEqual({
         message: "If the email exists, a reset link has been sent",
       });
+    });
+  });
+
+  describe("resetPassword", () => {
+    it("should call authService.resetPassword and return default message", async () => {
+      const dto = { token: "abc-token", password: "abc-password" };
+
+      mockAuthService.resetPassword.mockResolvedValue(true);
+
+      const result = await controller.resetPassword(dto);
+
+      expect(result).toEqual({
+        message: "Password has been reset",
+      });
+      expect(mockAuthService.resetPassword).toHaveBeenCalledWith(
+        dto.token,
+        dto.password,
+      );
     });
   });
 });
