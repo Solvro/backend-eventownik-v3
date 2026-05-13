@@ -126,7 +126,6 @@ export class AuthService {
         },
       });
       // !!! TODO: ADD EMAIL SENDING !!!
-      console.warn(resetToken);
     }
   }
 
