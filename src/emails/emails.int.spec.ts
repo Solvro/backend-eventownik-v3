@@ -1,6 +1,7 @@
 import { EmailStatus, EmailTrigger } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
+import { getQueueToken } from "@nestjs/bullmq";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
@@ -38,7 +39,16 @@ describe("EmailsController", () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [EmailsService, PrismaService],
+      providers: [
+        EmailsService,
+        PrismaService,
+        {
+          provide: getQueueToken("automatic-emails"),
+          useValue: {
+            add: jest.fn(),
+          },
+        },
+      ],
       controllers: [EmailsController],
     })
       .overrideProvider(PrismaService)
