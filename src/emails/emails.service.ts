@@ -1,9 +1,11 @@
+import { Queue } from "bullmq";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { parseSortInput } from "src/common/utils/prisma.utility";
 import { EmailStatus } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
+import { InjectQueue } from "@nestjs/bullmq";
 import {
   BadRequestException,
   Injectable,
@@ -19,7 +21,10 @@ import { UpdateEmailDto } from "./dto/update-email.dto";
 
 @Injectable()
 export class EmailsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @InjectQueue("automatic-emails") private readonly emailQueue: Queue,
+  ) {}
 
   async create(
     eventUuid: string,
