@@ -10,8 +10,8 @@ export function UploadFiles(fieldName = "files", maxCount = 10) {
       FilesInterceptor(fieldName, maxCount, {
         storage: diskStorage({
           destination: (request, _file, callback) => {
-            const eventId = request.params.eventId;
-            const formId = request.params.id;
+            const eventId = request.params.eventId as string;
+            const formId = request.params.id as string;
             const uploadPath = `./uploads/forms/${eventId}/${formId}`;
             if (!existsSync(uploadPath)) {
               mkdirSync(uploadPath, { recursive: true });
