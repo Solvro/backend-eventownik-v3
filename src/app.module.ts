@@ -1,6 +1,7 @@
 import { HcaptchaModule } from "@gvrs/nestjs-hcaptcha";
 import * as Joi from "joi";
 
+import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 
@@ -41,6 +42,15 @@ import { PrismaModule } from "./prisma/prisma.module";
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         secret: configService.getOrThrow<string>("HCAPTCHA_SECRET"),
+      }),
+    }),
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          host: configService.getOrThrow<string>("REDIS_HOST"),
+          port: configService.getOrThrow<number>("REDIS_PORT"),
+        },
       }),
     }),
     EmailsModule,

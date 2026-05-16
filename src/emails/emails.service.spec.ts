@@ -1,6 +1,7 @@
 import { EmailStatus, EmailTrigger } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
+import { getQueueToken } from "@nestjs/bullmq";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
@@ -37,7 +38,14 @@ describe("EmailsService", () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [EmailsService, PrismaService],
+      providers: [
+        EmailsService,
+        PrismaService,
+        {
+          provide: getQueueToken("automatic-emails"),
+          useValue: { add: jest.fn() },
+        },
+      ],
     })
       .overrideProvider(PrismaService)
       .useValue(mockPrismaService)
@@ -451,7 +459,7 @@ describe("EmailsService", () => {
       mockTransaction(mockPrismaService);
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue(null);
       await expect(
-        service.update(mockEventId, mockEmailId, {} as UpdateEmailDto),
+        service.update(mockEventId, mockEmailId, {}),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -459,7 +467,7 @@ describe("EmailsService", () => {
       mockTransaction(mockPrismaService);
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue(null);
       await expect(
-        service.update(mockEventId, mockEmailId, {} as UpdateEmailDto),
+        service.update(mockEventId, mockEmailId, {}),
       ).rejects.toThrow(NotFoundException);
     });
   });
