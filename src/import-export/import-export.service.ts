@@ -17,11 +17,11 @@ import {
 } from "./exporters/participants-exporter.interface";
 import { ParticipantsXlsxExporter } from "./exporters/participants-xlsx.exporter";
 
-export type ExportedFile = {
+export interface ExportedFile {
   fileName: string;
   mimeType: string;
   content: Buffer;
-};
+}
 
 @Injectable()
 export class ImportExportService {
@@ -60,7 +60,7 @@ export class ImportExportService {
     const participants = await this.prisma.participant.findMany({
       where: {
         eventUuid: eventId,
-        ...(participantIds != null ? { uuid: { in: participantIds } } : {}),
+        ...(participantIds == null ? {} : { uuid: { in: participantIds } }),
       },
       orderBy: { email: "asc" },
       select: {
@@ -150,7 +150,7 @@ export class ImportExportService {
   ): Promise<{ uuid: string; name: string }[]> {
     const where: Prisma.AttributeWhereInput = {
       eventUuid: eventId,
-      ...(attributeIds != null ? { uuid: { in: attributeIds } } : {}),
+      ...(attributeIds == null ? {} : { uuid: { in: attributeIds } }),
     };
 
     const attributes = await this.prisma.attribute.findMany({

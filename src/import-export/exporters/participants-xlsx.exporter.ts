@@ -37,9 +37,9 @@ export class ParticipantsXlsxExporter implements ParticipantsExporter {
 
     const firstRow = worksheet.getRow(1);
     firstRow.font = { bold: true };
-    worksheet.columns.forEach((column) => {
+    for (const column of worksheet.columns) {
       column.width = 25;
-    });
+    }
 
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
