@@ -10,7 +10,6 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check .",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "loadtest:export": "tsx scripts/large-event-export-test.ts",
     "prepare": "husky || true",
     "seed:dev": "ts-node --transpile-only prisma/seed.development.ts",
     "start": "nest start",
