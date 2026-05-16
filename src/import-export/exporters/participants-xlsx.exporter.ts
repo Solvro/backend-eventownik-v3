@@ -2,6 +2,7 @@ import * as ExcelJS from "exceljs";
 
 import { Injectable } from "@nestjs/common";
 
+import { ParticipantsExportFormat } from "../dto/export-participants-query.dto";
 import {
   ParticipantsExportPayload,
   ParticipantsExporter,
@@ -9,7 +10,7 @@ import {
 
 @Injectable()
 export class ParticipantsXlsxExporter implements ParticipantsExporter {
-  readonly format = "xlsx" as const;
+  readonly format = ParticipantsExportFormat.xlsx;
   readonly mimeType =
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
   readonly fileExtension = "xlsx";

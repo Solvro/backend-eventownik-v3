@@ -34,7 +34,7 @@ export class ImportExportService {
     private readonly prisma: PrismaService,
     participantsXlsxExporter: ParticipantsXlsxExporter,
   ) {
-    this.exporters = new Map([
+    this.exporters = new Map<ParticipantsExportFormat, ParticipantsExporter>([
       [participantsXlsxExporter.format, participantsXlsxExporter],
     ]);
   }
@@ -101,7 +101,7 @@ export class ImportExportService {
       })),
     };
 
-    const format = query.format ?? "xlsx";
+    const format = query.format ?? ParticipantsExportFormat.xlsx;
     const exporter = this.exporters.get(format);
     if (exporter == null) {
       throw new BadRequestException(`Export format ${format} is not supported`);
