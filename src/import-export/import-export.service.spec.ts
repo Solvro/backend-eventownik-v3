@@ -81,9 +81,7 @@ describe("ImportExportService", () => {
       expect(mockPrismaService.participant.count).not.toHaveBeenCalled();
       expect(mockPrismaService.participant.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({
-            eventUuid: eventId,
-          }),
+          where: { eventUuid: eventId },
         }),
       );
       expect(mockXlsxExporter.build).toHaveBeenCalledWith({
