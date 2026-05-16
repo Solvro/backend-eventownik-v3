@@ -347,12 +347,7 @@ describe("FormsService", () => {
       jest.spyOn(service, "isOpen").mockResolvedValue(false);
 
       await expect(
-        service.formSubmit(
-          eventUuid,
-          formUuid,
-          { attributes: [] } as FormSubmitionDto,
-          [],
-        ),
+        service.formSubmit(eventUuid, formUuid, { attributes: [] }, []),
       ).rejects.toThrow(BadRequestException);
     });
 
