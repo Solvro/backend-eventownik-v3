@@ -1,4 +1,5 @@
 import { MailerService } from "@nestjs-modules/mailer";
+import { Queue } from "bullmq";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { parseSortInput } from "src/common/utils/prisma.utility";
@@ -10,6 +11,7 @@ import {
 } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
+import { InjectQueue } from "@nestjs/bullmq";
 import {
   BadRequestException,
   Injectable,
@@ -60,6 +62,7 @@ export class EmailsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailerService: MailerService,
+    @InjectQueue("automatic-emails") private readonly emailQueue: Queue,
   ) {}
 
   private isJsonObject(

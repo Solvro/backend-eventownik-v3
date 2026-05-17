@@ -125,7 +125,7 @@ export class BlocksService {
     const blocksMap = new Map<string, Block>();
 
     for (const block of blocks) {
-      blocksMap.set(block.uuid, { ...block, children: [] } as Block);
+      blocksMap.set(block.uuid, { ...block, children: [] });
     }
 
     let rootBlock: Block | null = null;

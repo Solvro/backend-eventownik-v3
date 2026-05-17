@@ -1,6 +1,8 @@
+import { HcaptchaModule } from "@gvrs/nestjs-hcaptcha";
 import { MailerModule } from "@nestjs-modules/mailer";
 import * as Joi from "joi";
 
+import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { EventEmitterModule } from "@nestjs/event-emitter";
@@ -14,6 +16,7 @@ import { BlocksModule } from "./blocks/blocks.module";
 import { EmailsModule } from "./emails/emails.module";
 import { EventsModule } from "./events/events.module";
 import { FormsModule } from "./forms/forms.module";
+import { ImportExportModule } from "./import-export/import-export.module";
 import { OrganizersModule } from "./organizers/organizers.module";
 import { ParticipantsModule } from "./participants/participants.module";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -63,6 +66,22 @@ import { PrismaModule } from "./prisma/prisma.module";
     BlocksModule,
     AdminsModule,
     ParticipantsModule,
+    ImportExportModule,
+    HcaptchaModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.getOrThrow<string>("HCAPTCHA_SECRET"),
+      }),
+    }),
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          host: configService.getOrThrow<string>("REDIS_HOST"),
+          port: configService.getOrThrow<number>("REDIS_PORT"),
+        },
+      }),
+    }),
     EmailsModule,
   ],
   controllers: [AppController],

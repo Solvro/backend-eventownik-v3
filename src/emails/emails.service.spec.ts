@@ -2,6 +2,7 @@ import { MailerService } from "@nestjs-modules/mailer";
 import { EmailStatus, EmailTrigger } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
+import { getQueueToken } from "@nestjs/bullmq";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
@@ -465,7 +466,7 @@ describe("EmailsService", () => {
       mockTransaction(mockPrismaService);
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue(null);
       await expect(
-        service.update(mockEventId, mockEmailId, {} as UpdateEmailDto),
+        service.update(mockEventId, mockEmailId, {}),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -473,7 +474,7 @@ describe("EmailsService", () => {
       mockTransaction(mockPrismaService);
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue(null);
       await expect(
-        service.update(mockEventId, mockEmailId, {} as UpdateEmailDto),
+        service.update(mockEventId, mockEmailId, {}),
       ).rejects.toThrow(NotFoundException);
     });
   });
