@@ -1,4 +1,5 @@
 import { MailerService } from "@nestjs-modules/mailer";
+import { getQueueToken } from "@nestjs/bullmq";
 import { EmailStatus, EmailTrigger } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -48,6 +49,10 @@ describe("EmailsService", () => {
         {
           provide: MailerService,
           useValue: mockMailerService,
+        },
+        {
+          provide: getQueueToken("automatic-emails"),
+          useValue: {},
         },
       ],
     })
