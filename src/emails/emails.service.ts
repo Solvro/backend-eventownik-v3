@@ -2,7 +2,11 @@ import { MailerService } from "@nestjs-modules/mailer";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { parseSortInput } from "src/common/utils/prisma.utility";
-import { AttributeType, EmailStatus } from "src/generated/prisma/enums";
+import {
+  AttributeType,
+  EmailStatus,
+  EmailTrigger,
+} from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import {
@@ -37,6 +41,13 @@ export class EmailsService {
       if (event == null) {
         throw new BadRequestException(`Event with id: ${eventUuid} not found`);
       }
+
+      await this.validateTriggerConfig(
+        tx,
+        eventUuid,
+        query.trigger,
+        query.triggerConfig,
+      );
 
       const emailTemplate = await tx.emailTemplate.create({
         data: {
@@ -210,6 +221,15 @@ export class EmailsService {
         throw new NotFoundException("Email template or event does not exist");
       }
 
+      if (query.trigger) {
+        await this.validateTriggerConfig(
+          tx,
+          eventUuid,
+          query.trigger,
+          query.triggerConfig,
+        );
+      }
+
       const emailTemplate = await tx.emailTemplate.update({
         where: {
           uuid: emailUuid,
@@ -235,6 +255,63 @@ export class EmailsService {
     });
   }
 
+  private async validateTriggerConfig(
+    tx: any,
+    eventUuid: string,
+    trigger: EmailTrigger,
+    config?: any,
+  ) {
+    if (trigger === EmailTrigger.FORM_FILLED) {
+      if (!config || typeof config.formUuid !== "string") {
+        throw new BadRequestException(
+          "triggerConfig must contain formUuid for FORM_FILLED trigger",
+        );
+      }
+      if (Object.keys(config).length > 1) {
+        throw new BadRequestException(
+          "triggerConfig contains extra properties",
+        );
+      }
+      const form = await tx.form.findFirst({
+        where: { uuid: config.formUuid, eventUuid },
+      });
+      if (!form) {
+        throw new BadRequestException(
+          "Form not found or does not belong to this event",
+        );
+      }
+    } else if (trigger === EmailTrigger.ATTRIBUTE_CHANGED) {
+      if (
+        !config ||
+        typeof config.attributeUuid !== "string" ||
+        typeof config.expectedValue === "undefined"
+      ) {
+        throw new BadRequestException(
+          "triggerConfig must contain attributeUuid and expectedValue for ATTRIBUTE_CHANGED trigger",
+        );
+      }
+      if (Object.keys(config).length > 2) {
+        throw new BadRequestException(
+          "triggerConfig contains extra properties",
+        );
+      }
+      const attribute = await tx.attribute.findFirst({
+        where: { uuid: config.attributeUuid, eventUuid },
+      });
+      if (!attribute) {
+        throw new BadRequestException(
+          "Attribute not found or does not belong to this event",
+        );
+      }
+    } else {
+      if (config && Object.keys(config).length > 0) {
+        throw new BadRequestException(
+          "triggerConfig is not expected for this trigger type",
+        );
+      }
+    }
+  }
+
   async remove(eventUuid: string, emailUuid: string): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const existingEmail = await tx.emailTemplate.findFirst({
@@ -256,37 +333,7 @@ export class EmailsService {
     });
   }
 
-  async parseEmailTemplateContent(emailUuid: string, participantUuid: string) {
-    const emailTemplate = await this.prisma.emailTemplate.findUnique({
-      where: { uuid: emailUuid },
-      include: {
-        event: {
-          include: {
-            attributes: true,
-            forms: true,
-          },
-        },
-      },
-    });
-    if (emailTemplate == null) {
-      throw new NotFoundException(
-        `Email template with id: ${emailUuid} not found`,
-      );
-    }
-
-    const participant = await this.prisma.participant.findUnique({
-      where: { uuid: participantUuid },
-      include: {
-        attributes: true,
-      },
-    });
-
-    if (participant == null) {
-      throw new NotFoundException(
-        `Participant with id: ${participantUuid} not found`,
-      );
-    }
-
+  parseEmailContent(emailTemplate: any, participant: any): string {
     let content = emailTemplate.content;
     const tagRegex = /<span[^>]*data-id="([^"]+)"[^>]*>.*?<\/span>/g;
 
@@ -379,7 +426,10 @@ export class EmailsService {
       where: { uuid: emailUuid },
       include: {
         event: {
-          select: { contactEmail: true, name: true },
+          include: {
+            attributes: true,
+            forms: true,
+          },
         },
       },
     });
@@ -392,14 +442,14 @@ export class EmailsService {
 
     const participants = await this.prisma.participant.findMany({
       where: { uuid: { in: participantUuids } },
-      select: { uuid: true, email: true },
+      include: { attributes: true },
     });
 
     for (const participant of participants) {
       try {
-        const parsedContent = await this.parseEmailTemplateContent(
-          emailUuid,
-          participant.uuid,
+        const parsedContent = this.parseEmailContent(
+          emailTemplate,
+          participant,
         );
 
         await this.mailerService.sendMail({

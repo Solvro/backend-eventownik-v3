@@ -155,8 +155,6 @@ async function main() {
       name: "Welcome",
       content: "Welcome to the event!",
       trigger: EmailTrigger.PARTICIPANT_REGISTERED,
-      triggerValue: null,
-      triggerValue2: null,
     },
   });
 
