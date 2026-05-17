@@ -2,11 +2,12 @@ import {
   IsEnum,
   IsNotEmpty,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
-  IsUUID,
   ValidateIf,
 } from "class-validator";
+import type { Prisma } from "src/generated/prisma/client";
 import { EmailTrigger } from "src/generated/prisma/enums";
 
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
@@ -36,6 +37,7 @@ export class CreateEmailDto {
       o.trigger === EmailTrigger.FORM_FILLED ||
       o.trigger === EmailTrigger.ATTRIBUTE_CHANGED,
   )
+  @IsObject()
   @IsNotEmpty()
-  triggerConfig?: any;
+  triggerConfig?: Prisma.JsonObject;
 }

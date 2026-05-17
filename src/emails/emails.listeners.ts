@@ -2,6 +2,7 @@ import { AttributeChangedEvent } from "src/common/events/attribute-changed.event
 import { FormFilledEvent } from "src/common/events/form-filled.event";
 import { ParticipantDeletedEvent } from "src/common/events/participant-deleted.event";
 import { ParticipantRegisteredEvent } from "src/common/events/participant-registered.event";
+import type { Prisma } from "src/generated/prisma/client";
 import { EmailTrigger } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -16,6 +17,16 @@ export class EmailsListeners {
     private readonly emailsService: EmailsService,
     private readonly prisma: PrismaService,
   ) {}
+
+  private getTriggerConfig(
+    value: Prisma.JsonValue | null,
+  ): Prisma.JsonObject | null {
+    if (value == null || typeof value !== "object" || Array.isArray(value)) {
+      return null;
+    }
+
+    return value;
+  }
 
   @OnEvent("participant.registered")
   async handleParticipantRegisteredEvent(event: ParticipantRegisteredEvent) {
@@ -59,7 +70,7 @@ export class EmailsListeners {
     });
 
     for (const template of templates) {
-      const config = template.triggerConfig as any;
+      const config = this.getTriggerConfig(template.triggerConfig);
       if (config?.formUuid === event.formUuid) {
         await this.emailsService.sendEmailToParticipants(template.uuid, [
           event.participantUuid,
@@ -78,10 +89,10 @@ export class EmailsListeners {
     });
 
     for (const template of templates) {
-      const config = template.triggerConfig as any;
+      const config = this.getTriggerConfig(template.triggerConfig);
       if (
         config?.attributeUuid === event.attributeUuid &&
-        config?.expectedValue === event.newValue
+        config.expectedValue === event.newValue
       ) {
         await this.emailsService.sendEmailToParticipants(template.uuid, [
           event.participantUuid,

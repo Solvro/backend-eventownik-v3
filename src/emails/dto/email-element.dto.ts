@@ -1,3 +1,4 @@
+import type { Prisma } from "src/generated/prisma/client";
 import type { EmailTrigger } from "src/generated/prisma/enums";
 
 export class EmailElementDto {
@@ -5,7 +6,7 @@ export class EmailElementDto {
   eventId: string;
   name: string;
   trigger: EmailTrigger;
-  triggerConfig: any;
+  triggerConfig: Prisma.JsonValue | null;
   createdAt: string;
   updatedAt: string;
 }

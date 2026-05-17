@@ -3,31 +3,35 @@ import { ParticipantRegisteredEvent } from "src/common/events/participant-regist
 import { EmailTrigger } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
-import { Test, TestingModule } from "@nestjs/testing";
+import type { TestingModule } from "@nestjs/testing";
+import { Test } from "@nestjs/testing";
 
 import { EmailsListeners } from "./emails.listeners";
 import { EmailsService } from "./emails.service";
 
 describe("EmailsListeners", () => {
   let listeners: EmailsListeners;
-  let emailsService: EmailsService;
-  let prisma: PrismaService;
+  let findManyMock: jest.Mock;
+  let sendEmailMock: jest.Mock;
 
   beforeEach(async () => {
+    findManyMock = jest.fn();
+    sendEmailMock = jest.fn();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EmailsListeners,
         {
           provide: EmailsService,
           useValue: {
-            sendEmailToParticipants: jest.fn(),
+            sendEmailToParticipants: sendEmailMock,
           },
         },
         {
           provide: PrismaService,
           useValue: {
             emailTemplate: {
-              findMany: jest.fn(),
+              findMany: findManyMock,
             },
           },
         },
@@ -35,8 +39,6 @@ describe("EmailsListeners", () => {
     }).compile();
 
     listeners = module.get<EmailsListeners>(EmailsListeners);
-    emailsService = module.get<EmailsService>(EmailsService);
-    prisma = module.get<PrismaService>(PrismaService);
   });
 
   it("should be defined", () => {
@@ -51,22 +53,21 @@ describe("EmailsListeners", () => {
       );
       const templateUuid = "template-uuid";
 
-      (prisma.emailTemplate.findMany as jest.Mock).mockResolvedValue([
+      findManyMock.mockResolvedValue([
         { uuid: templateUuid, trigger: EmailTrigger.PARTICIPANT_REGISTERED },
       ]);
 
       await listeners.handleParticipantRegisteredEvent(event);
 
-      expect(prisma.emailTemplate.findMany).toHaveBeenCalledWith({
+      expect(findManyMock).toHaveBeenCalledWith({
         where: {
           eventUuid: event.eventUuid,
           trigger: EmailTrigger.PARTICIPANT_REGISTERED,
         },
       });
-      expect(emailsService.sendEmailToParticipants).toHaveBeenCalledWith(
-        templateUuid,
-        [event.participantUuid],
-      );
+      expect(sendEmailMock).toHaveBeenCalledWith(templateUuid, [
+        event.participantUuid,
+      ]);
     });
   });
 
@@ -79,7 +80,7 @@ describe("EmailsListeners", () => {
       );
       const templateUuid = "template-uuid";
 
-      (prisma.emailTemplate.findMany as jest.Mock).mockResolvedValue([
+      findManyMock.mockResolvedValue([
         {
           uuid: templateUuid,
           trigger: EmailTrigger.FORM_FILLED,
@@ -89,10 +90,9 @@ describe("EmailsListeners", () => {
 
       await listeners.handleFormFilledEvent(event);
 
-      expect(emailsService.sendEmailToParticipants).toHaveBeenCalledWith(
-        templateUuid,
-        [event.participantUuid],
-      );
+      expect(sendEmailMock).toHaveBeenCalledWith(templateUuid, [
+        event.participantUuid,
+      ]);
     });
 
     it("should not send email if config formUuid does not match", async () => {
@@ -103,7 +103,7 @@ describe("EmailsListeners", () => {
       );
       const templateUuid = "template-uuid";
 
-      (prisma.emailTemplate.findMany as jest.Mock).mockResolvedValue([
+      findManyMock.mockResolvedValue([
         {
           uuid: templateUuid,
           trigger: EmailTrigger.FORM_FILLED,
@@ -113,7 +113,7 @@ describe("EmailsListeners", () => {
 
       await listeners.handleFormFilledEvent(event);
 
-      expect(emailsService.sendEmailToParticipants).not.toHaveBeenCalled();
+      expect(sendEmailMock).not.toHaveBeenCalled();
     });
   });
 });

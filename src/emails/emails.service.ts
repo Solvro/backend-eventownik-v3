@@ -2,6 +2,7 @@ import { MailerService } from "@nestjs-modules/mailer";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { parseSortInput } from "src/common/utils/prisma.utility";
+import type { Prisma } from "src/generated/prisma/client";
 import {
   AttributeType,
   EmailStatus,
@@ -22,12 +23,96 @@ import { EmailListingDto } from "./dto/email-listing.dto";
 import { EmailResponseDto } from "./dto/email-response.dto";
 import { UpdateEmailDto } from "./dto/update-email.dto";
 
+interface EmailTemplateForParsing {
+  content: string;
+  event: {
+    name: string;
+    startDate: Date;
+    endDate: Date;
+    slug: string;
+    primaryColor: string | null;
+    location: string | null;
+    contactEmail: string | null;
+    attributes: {
+      uuid: string;
+      type: AttributeType;
+      config: Prisma.JsonValue | null;
+    }[];
+    forms: {
+      uuid: string;
+    }[];
+  };
+}
+
+interface ParticipantForParsing {
+  uuid: string;
+  email: string;
+  createdAt: Date;
+  updatedAt: Date;
+  attributes: {
+    attributeUuid: string;
+    value: Prisma.JsonValue | null;
+  }[];
+}
+
 @Injectable()
 export class EmailsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailerService: MailerService,
   ) {}
+
+  private isJsonObject(
+    value: Prisma.JsonValue | null,
+  ): value is Prisma.JsonObject {
+    return value != null && typeof value === "object" && !Array.isArray(value);
+  }
+
+  private getJsonObject(
+    value: Prisma.JsonValue | null,
+  ): Prisma.JsonObject | null {
+    if (!this.isJsonObject(value)) {
+      return null;
+    }
+
+    return value;
+  }
+
+  private getStringArray(
+    value: Prisma.JsonValue | null,
+    key: string,
+  ): string[] {
+    const config = this.getJsonObject(value);
+    if (config == null) {
+      return [];
+    }
+
+    const rawValues = config[key];
+    if (!Array.isArray(rawValues)) {
+      return [];
+    }
+
+    return rawValues.filter(
+      (rawValue): rawValue is string =>
+        typeof rawValue === "string" && rawValue.trim().length > 0,
+    );
+  }
+
+  private stringifyJsonValue(value: Prisma.JsonValue | null): string {
+    if (value == null) {
+      return "";
+    }
+
+    if (typeof value === "string") {
+      return value;
+    }
+
+    if (typeof value === "number" || typeof value === "boolean") {
+      return String(value);
+    }
+
+    return JSON.stringify(value);
+  }
 
   async create(
     eventUuid: string,
@@ -256,13 +341,13 @@ export class EmailsService {
   }
 
   private async validateTriggerConfig(
-    tx: any,
+    tx: Prisma.TransactionClient,
     eventUuid: string,
     trigger: EmailTrigger,
-    config?: any,
+    config?: Prisma.JsonObject,
   ) {
     if (trigger === EmailTrigger.FORM_FILLED) {
-      if (!config || typeof config.formUuid !== "string") {
+      if (config == null || typeof config.formUuid !== "string") {
         throw new BadRequestException(
           "triggerConfig must contain formUuid for FORM_FILLED trigger",
         );
@@ -275,16 +360,16 @@ export class EmailsService {
       const form = await tx.form.findFirst({
         where: { uuid: config.formUuid, eventUuid },
       });
-      if (!form) {
+      if (form == null) {
         throw new BadRequestException(
           "Form not found or does not belong to this event",
         );
       }
     } else if (trigger === EmailTrigger.ATTRIBUTE_CHANGED) {
       if (
-        !config ||
+        config == null ||
         typeof config.attributeUuid !== "string" ||
-        typeof config.expectedValue === "undefined"
+        config.expectedValue === undefined
       ) {
         throw new BadRequestException(
           "triggerConfig must contain attributeUuid and expectedValue for ATTRIBUTE_CHANGED trigger",
@@ -298,13 +383,13 @@ export class EmailsService {
       const attribute = await tx.attribute.findFirst({
         where: { uuid: config.attributeUuid, eventUuid },
       });
-      if (!attribute) {
+      if (attribute == null) {
         throw new BadRequestException(
           "Attribute not found or does not belong to this event",
         );
       }
     } else {
-      if (config && Object.keys(config).length > 0) {
+      if (config != null && Object.keys(config).length > 0) {
         throw new BadRequestException(
           "triggerConfig is not expected for this trigger type",
         );
@@ -333,35 +418,49 @@ export class EmailsService {
     });
   }
 
-  parseEmailContent(emailTemplate: any, participant: any): string {
+  parseEmailContent(
+    emailTemplate: EmailTemplateForParsing,
+    participant: ParticipantForParsing,
+  ): string {
     let content = emailTemplate.content;
     const tagRegex = /<span[^>]*data-id="([^"]+)"[^>]*>.*?<\/span>/g;
 
     // static tags replacement
-    content = content.replace(tagRegex, (match, dataId) => {
+    content = content.replaceAll(tagRegex, (_match: string, dataId: string) => {
       switch (dataId) {
-        case "/event_name":
+        case "/event_name": {
           return emailTemplate.event.name;
-        case "/event_start_date":
+        }
+        case "/event_start_date": {
           return emailTemplate.event.startDate.toISOString();
-        case "/event_end_date":
+        }
+        case "/event_end_date": {
           return emailTemplate.event.endDate.toISOString();
-        case "/event_slug":
+        }
+        case "/event_slug": {
           return emailTemplate.event.slug;
-        case "/event_primary_color":
-          return emailTemplate.event.primaryColor || "";
-        case "/event_location":
-          return emailTemplate.event.location || "";
-        case "/participant_id":
+        }
+        case "/event_primary_color": {
+          return emailTemplate.event.primaryColor ?? "";
+        }
+        case "/event_location": {
+          return emailTemplate.event.location ?? "";
+        }
+        case "/participant_id": {
           return participant.uuid;
-        case "/participant_email":
+        }
+        case "/participant_email": {
           return participant.email;
-        case "participant_created_at":
+        }
+        case "participant_created_at": {
           return participant.createdAt.toISOString();
-        case "participant_updated_at":
+        }
+        case "participant_updated_at": {
           return participant.updatedAt.toISOString();
-        default:
+        }
+        default: {
           return dataId;
+        }
       }
     });
 
@@ -369,36 +468,41 @@ export class EmailsService {
     // very simillar as before, but now we can have /participant_{attributeUUID} which will be replaced with the value of that attribute for the given participant
     for (const participantAttribute of participant.attributes) {
       const attribute = emailTemplate.event.attributes.find(
-        (attr) => attr.uuid === participantAttribute.attributeUuid,
+        (attribute_) => attribute_.uuid === participantAttribute.attributeUuid,
       );
 
-      if (attribute) {
+      if (attribute != null) {
         const dynamicTag = `<span data-id="/participant_${attribute.uuid}"></span>`;
         const rawValue = participantAttribute.value;
 
         if (attribute.type === AttributeType.multiSelect) {
-          try {
-            const value = rawValue as string[];
-            const optionNames = (
-              (attribute.config as { options: string[] }).options as string[]
-            ).filter((option) => value.includes(option));
-            content = content.replace(
-              new RegExp(dynamicTag, "g"),
-              optionNames.join(", "),
+          const selectedValues = Array.isArray(rawValue)
+            ? rawValue.filter(
+                (value): value is string => typeof value === "string",
+              )
+            : [];
+          const optionNames = this.getStringArray(attribute.config, "options");
+
+          if (optionNames.length > 0 && selectedValues.length > 0) {
+            const selectedOptions = optionNames.filter((option) =>
+              selectedValues.includes(option),
             );
-          } catch (error) {
-            // If parsing fails, replace with raw value
-            content = content.replace(
+            content = content.replaceAll(
               new RegExp(dynamicTag, "g"),
-              rawValue as string,
+              selectedOptions.join(", "),
+            );
+          } else {
+            content = content.replaceAll(
+              new RegExp(dynamicTag, "g"),
+              this.stringifyJsonValue(rawValue),
             );
           }
-        } else if (attribute.type == AttributeType.block) {
+        } else if (attribute.type === AttributeType.block) {
           // TODO: implement block name replacement by uuids
         } else {
-          content = content.replace(
+          content = content.replaceAll(
             new RegExp(dynamicTag, "g"),
-            rawValue as string,
+            this.stringifyJsonValue(rawValue),
           );
         }
       }
@@ -407,14 +511,17 @@ export class EmailsService {
     // TODO: a tag replacement etc.
     // form links replacement eg /form_{formUuid} will be replaced with {APP_DOMAIN}/{eventSlug}/{formUuid}/{participantUuid}
     const formLinkRegex = /<span[^>]*data-id="\/form_([^"]+)"[^>]*><\/span>/g;
-    content = content.replace(formLinkRegex, (match, formUuid) => {
-      const form = emailTemplate.event.forms.find((f) => f.uuid === formUuid);
-      if (form) {
-        const appDomain = process.env.APP_DOMAIN || "http://localhost:3000";
-        return `${appDomain}/${emailTemplate.event.slug}/${form.uuid}/${participant.uuid}`;
-      }
-      return match; // if form not found, return the original tag
-    });
+    content = content.replaceAll(
+      formLinkRegex,
+      (match: string, formUuid: string) => {
+        const form = emailTemplate.event.forms.find((f) => f.uuid === formUuid);
+        if (form != null) {
+          const appDomain = process.env.APP_DOMAIN ?? "http://localhost:3000";
+          return `${appDomain}/${emailTemplate.event.slug}/${form.uuid}/${participant.uuid}`;
+        }
+        return match; // if form not found, return the original tag
+      },
+    );
 
     return content;
   }
@@ -434,7 +541,7 @@ export class EmailsService {
       },
     });
 
-    if (!emailTemplate) {
+    if (emailTemplate == null) {
       throw new NotFoundException(
         `Email template with id: ${emailUuid} not found`,
       );
@@ -456,7 +563,7 @@ export class EmailsService {
           to: participant.email,
           subject: emailTemplate.name,
           html: parsedContent,
-          from: emailTemplate.event.contactEmail || process.env.SMTP_FROM,
+          from: emailTemplate.event.contactEmail ?? process.env.SMTP_FROM,
         });
 
         await this.prisma.participantEmailStatus.create({
@@ -464,7 +571,7 @@ export class EmailsService {
             status: EmailStatus.sent,
             sendAt: new Date(),
             participantUuid: participant.uuid,
-            emailUuid: emailUuid,
+            emailUuid,
           },
         });
       } catch (error) {
@@ -474,7 +581,7 @@ export class EmailsService {
             status: EmailStatus.failed,
             sendAt: new Date(),
             participantUuid: participant.uuid,
-            emailUuid: emailUuid,
+            emailUuid,
           },
         });
       }
