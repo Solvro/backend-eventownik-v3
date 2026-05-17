@@ -17,6 +17,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
 import { CreateEmailDto } from "./dto/create-email.dto";
 import { EmailCompleteElementDto } from "./dto/email-complete-element.dto";
@@ -27,7 +28,7 @@ import { UpdateEmailDto } from "./dto/update-email.dto";
 
 export interface EmailSendJobData {
   emailUuid: string;
-  participantUuids: string[];
+  participantUuid: string;
 }
 
 interface EmailTemplateForParsing {
@@ -68,6 +69,7 @@ export class EmailsService {
     private readonly prisma: PrismaService,
     private readonly mailerService: MailerService,
     @InjectQueue("automatic-emails") private readonly emailQueue: Queue,
+    private readonly config: ConfigService,
   ) {}
 
   private isJsonObject(
@@ -120,6 +122,15 @@ export class EmailsService {
     }
 
     return JSON.stringify(value);
+  }
+
+  private escapeHtml(str: string): string {
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
 
   async create(
@@ -260,13 +271,7 @@ export class EmailsService {
         uuid: emailUuid,
         eventUuid,
       },
-      include: {
-        participantEmails: {
-          include: {
-            participant: true,
-          },
-        },
-      },
+      // Do not eagerly load participantEmails to avoid large memory usage
     });
 
     if (emailTemplate === null) {
@@ -284,19 +289,8 @@ export class EmailsService {
       order: emailTemplate.order,
       createdAt: emailTemplate.createdAt.toISOString(),
       updatedAt: emailTemplate.updatedAt.toISOString(),
-      participants: emailTemplate.participantEmails
-        .filter((pivot) => pivot.participant !== null)
-        .map((pivot) => ({
-          id: pivot.participant?.uuid,
-          email: pivot.participant?.email,
-          createdAt: pivot.participant?.createdAt.toISOString(),
-          updatedAt: pivot.participant?.updatedAt.toISOString(),
-          meta: {
-            pivot_status: pivot.status,
-            pivot_send_at: pivot.sendAt.toISOString(),
-            pivot_send_by: pivot.sendBy,
-          },
-        })),
+      // participants should be loaded via the dedicated paginated endpoint
+      participants: [],
     };
 
     return formattedResponse;
@@ -474,7 +468,7 @@ export class EmailsService {
           return participant.updatedAt.toISOString();
         }
         default: {
-          return dataId;
+          return _match;
         }
       }
     });
@@ -488,6 +482,7 @@ export class EmailsService {
 
       if (attribute != null) {
         const dynamicTag = `<span data-id="/participant_${attribute.uuid}"></span>`;
+        console.log("Processing dynamic tag:", dynamicTag);
         const rawValue = participantAttribute.value;
 
         if (attribute.type === AttributeType.multiSelect) {
@@ -544,13 +539,12 @@ export class EmailsService {
     emailUuid: string,
     participantUuids: string[],
   ): Promise<void> {
-    await this.emailQueue.add(
-      "send-email-to-participants",
-      {
-        emailUuid,
-        participantUuids,
-      } satisfies EmailSendJobData,
-      {
+    if (!participantUuids || participantUuids.length === 0) return;
+
+    const jobs = participantUuids.map((participantUuid) => ({
+      name: "send-email-to-participant",
+      data: { emailUuid, participantUuid } satisfies EmailSendJobData,
+      opts: {
         attempts: 3,
         backoff: {
           delay: 1000,
@@ -559,12 +553,14 @@ export class EmailsService {
         removeOnComplete: true,
         removeOnFail: 100,
       },
-    );
+    }));
+
+    await this.emailQueue.addBulk(jobs);
   }
 
   async deliverEmailToParticipants(
     emailUuid: string,
-    participantUuids: string[],
+    participantUuid: string,
   ): Promise<void> {
     const emailTemplate = await this.prisma.emailTemplate.findUnique({
       where: { uuid: emailUuid },
@@ -584,45 +580,107 @@ export class EmailsService {
       );
     }
 
-    const participants = await this.prisma.participant.findMany({
-      where: { uuid: { in: participantUuids } },
+    const participant = await this.prisma.participant.findUnique({
+      where: { uuid: participantUuid },
       include: { attributes: true },
     });
 
-    for (const participant of participants) {
-      try {
-        const parsedContent = this.parseEmailContent(
-          emailTemplate,
-          participant,
-        );
-
-        await this.mailerService.sendMail({
-          to: participant.email,
-          subject: emailTemplate.name,
-          html: parsedContent,
-          from: process.env.SMTP_FROM,
-          replyTo: emailTemplate.event.contactEmail ?? process.env.SMTP_FROM,
-        });
-
-        await this.prisma.participantEmailStatus.create({
-          data: {
-            status: EmailStatus.sent,
-            sendAt: new Date(),
-            participantUuid: participant.uuid,
-            emailUuid,
-          },
-        });
-      } catch (error) {
-        console.error(`Failed to send email to ${participant.email}:`, error);
-        await this.prisma.participantEmailStatus.create({
-          data: {
-            status: EmailStatus.failed,
-            sendAt: new Date(),
-            participantUuid: participant.uuid,
-            emailUuid,
-          },
-        });
-      }
+    if (!participant) {
+      // participant not found, record failed status
+      await this.prisma.participantEmailStatus.create({
+        data: {
+          status: EmailStatus.failed,
+          sendAt: new Date(),
+          participantUuid,
+          emailUuid,
+        },
+      });
+      return;
     }
+
+    try {
+      const parsedContent = this.parseEmailContent(emailTemplate, participant);
+
+      await this.mailerService.sendMail({
+        to: participant.email,
+        subject: emailTemplate.name,
+        html: parsedContent,
+        from: this.config.get<string>("SMTP_FROM") ?? undefined,
+        replyTo:
+          emailTemplate.event.contactEmail ??
+          this.config.get<string>("SMTP_FROM") ??
+          undefined,
+      });
+
+      await this.prisma.participantEmailStatus.create({
+        data: {
+          status: EmailStatus.sent,
+          sendAt: new Date(),
+          participantUuid: participant.uuid,
+          emailUuid,
+        },
+      });
+    } catch (error) {
+      console.error(`Failed to send email to ${participant.email}:`, error);
+      await this.prisma.participantEmailStatus.create({
+        data: {
+          status: EmailStatus.failed,
+          sendAt: new Date(),
+          participantUuid: participant.uuid,
+          emailUuid,
+        },
+      });
+    }
+  }
+
+  async findParticipantsForEmail(
+    eventUuid: string,
+    emailUuid: string,
+    pageOptions: import("src/common/dto/page-options.dto").PageOptionsDto,
+  ) {
+    // validate ownership
+    const email = await this.prisma.emailTemplate.findFirst({
+      where: { uuid: emailUuid, eventUuid },
+      select: { uuid: true },
+    });
+    if (!email) {
+      throw new NotFoundException("Email not found");
+    }
+
+    const where = { emailUuid };
+    const [itemCount, items] = await this.prisma.$transaction([
+      this.prisma.participantEmailStatus.count({ where }),
+      this.prisma.participantEmailStatus.findMany({
+        where,
+        take: pageOptions.take,
+        skip: pageOptions.skip,
+        orderBy: { sendAt: "desc" },
+        include: {
+          participant: {
+            select: {
+              uuid: true,
+              email: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    const data = items.map((p) => ({
+      id: p.participant?.uuid,
+      email: p.participant?.email,
+      createdAt: p.participant?.createdAt?.toISOString(),
+      updatedAt: p.participant?.updatedAt?.toISOString(),
+      meta: {
+        pivot_status: p.status,
+        pivot_send_at: p.sendAt.toISOString(),
+        pivot_send_by: p.sendBy,
+      },
+    }));
+
+    const meta = new PageMetaDto({ itemCount, pageOptionsDto: pageOptions });
+    return new PageDto(data, meta);
   }
 }

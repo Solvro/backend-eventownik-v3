@@ -37,11 +37,13 @@ export class EmailsListeners {
       },
     });
 
-    for (const template of templates) {
-      await this.emailsService.sendEmailToParticipants(template.uuid, [
-        event.participantUuid,
-      ]);
-    }
+    await Promise.all(
+      templates.map((template) =>
+        this.emailsService.sendEmailToParticipants(template.uuid, [
+          event.participantUuid,
+        ]),
+      ),
+    );
   }
 
   @OnEvent("participant.deleted")
@@ -53,11 +55,13 @@ export class EmailsListeners {
       },
     });
 
-    for (const template of templates) {
-      await this.emailsService.sendEmailToParticipants(template.uuid, [
-        event.participantUuid,
-      ]);
-    }
+    await Promise.all(
+      templates.map((template) =>
+        this.emailsService.sendEmailToParticipants(template.uuid, [
+          event.participantUuid,
+        ]),
+      ),
+    );
   }
 
   @OnEvent("form.filled")
@@ -69,14 +73,17 @@ export class EmailsListeners {
       },
     });
 
-    for (const template of templates) {
-      const config = this.getTriggerConfig(template.triggerConfig);
-      if (config?.formUuid === event.formUuid) {
-        await this.emailsService.sendEmailToParticipants(template.uuid, [
-          event.participantUuid,
-        ]);
-      }
-    }
+    await Promise.all(
+      templates.map((template) => {
+        const config = this.getTriggerConfig(template.triggerConfig);
+        if (config?.formUuid === event.formUuid) {
+          return this.emailsService.sendEmailToParticipants(template.uuid, [
+            event.participantUuid,
+          ]);
+        }
+        return Promise.resolve();
+      }),
+    );
   }
 
   @OnEvent("attribute.changed")
@@ -88,16 +95,19 @@ export class EmailsListeners {
       },
     });
 
-    for (const template of templates) {
-      const config = this.getTriggerConfig(template.triggerConfig);
-      if (
-        config?.attributeUuid === event.attributeUuid &&
-        config.expectedValue === event.newValue
-      ) {
-        await this.emailsService.sendEmailToParticipants(template.uuid, [
-          event.participantUuid,
-        ]);
-      }
-    }
+    await Promise.all(
+      templates.map((template) => {
+        const config = this.getTriggerConfig(template.triggerConfig);
+        if (
+          config?.attributeUuid === event.attributeUuid &&
+          config.expectedValue === event.newValue
+        ) {
+          return this.emailsService.sendEmailToParticipants(template.uuid, [
+            event.participantUuid,
+          ]);
+        }
+        return Promise.resolve();
+      }),
+    );
   }
 }

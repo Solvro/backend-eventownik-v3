@@ -1,5 +1,6 @@
 import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
 
 import { EmailsConsumer } from "./emails.consumer";
 import { EmailsController } from "./emails.controller";
@@ -7,6 +8,7 @@ import { EmailsService } from "./emails.service";
 
 @Module({
   imports: [
+    ConfigModule,
     BullModule.registerQueue({
       name: "automatic-emails",
       defaultJobOptions: {

@@ -14,7 +14,7 @@ export class EmailsConsumer extends WorkerHost {
   async process(job: Job<EmailSendJobData>): Promise<void> {
     await this.emailsService.deliverEmailToParticipants(
       job.data.emailUuid,
-      job.data.participantUuids,
+      job.data.participantUuid,
     );
   }
 }
