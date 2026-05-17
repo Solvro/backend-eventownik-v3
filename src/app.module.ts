@@ -30,6 +30,7 @@ import { PrismaModule } from "./prisma/prisma.module";
         SMTP_PASS: Joi.string().required(),
         SMTP_FROM: Joi.string().required(),
         PORT: Joi.number().default(3000),
+        APP_DOMAIN: Joi.string().required(),
       }),
       isGlobal: true,
     }),
