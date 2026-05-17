@@ -340,7 +340,7 @@ export class ParticipantsService {
         name: emailStatus.email?.name,
         content: emailStatus.email?.content,
         trigger: emailStatus.email?.trigger,
-        triggerValue: emailStatus.email?.triggerValue,
+        triggerConfig: emailStatus.email?.triggerConfig,
       })),
     };
   }

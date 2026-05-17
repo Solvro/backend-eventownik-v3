@@ -1,3 +1,4 @@
+import { MailerService } from "@nestjs-modules/mailer";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { parseSortInput } from "src/common/utils/prisma.utility";
@@ -19,7 +20,10 @@ import { UpdateEmailDto } from "./dto/update-email.dto";
 
 @Injectable()
 export class EmailsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mailerService: MailerService,
+  ) {}
 
   async create(
     eventUuid: string,
@@ -39,8 +43,7 @@ export class EmailsService {
           name: query.name,
           content: query.content,
           trigger: query.trigger,
-          triggerValue: query.triggerValue,
-          triggerValue2: query.triggerValue2,
+          triggerConfig: query.triggerConfig ?? {},
           order: query.order,
           eventUuid,
         },
@@ -92,8 +95,7 @@ export class EmailsService {
           eventUuid: true,
           name: true,
           trigger: true,
-          triggerValue: true,
-          triggerValue2: true,
+          triggerConfig: true,
           createdAt: true,
           updatedAt: true,
           participantEmails: {
@@ -130,8 +132,7 @@ export class EmailsService {
         eventId: record.eventUuid,
         name: record.name,
         trigger: record.trigger,
-        triggerValue: record.triggerValue,
-        triggerValue2: record.triggerValue2,
+        triggerConfig: record.triggerConfig,
         createdAt: record.createdAt.toISOString(),
         updatedAt: record.updatedAt.toISOString(),
         meta: counts,
@@ -170,8 +171,7 @@ export class EmailsService {
       name: emailTemplate.name,
       content: emailTemplate.content,
       trigger: emailTemplate.trigger,
-      triggerValue: emailTemplate.triggerValue,
-      triggerValue2: emailTemplate.triggerValue2,
+      triggerConfig: emailTemplate.triggerConfig,
       order: emailTemplate.order,
       createdAt: emailTemplate.createdAt.toISOString(),
       updatedAt: emailTemplate.updatedAt.toISOString(),
@@ -218,8 +218,7 @@ export class EmailsService {
           name: query.name,
           content: query.content,
           trigger: query.trigger,
-          triggerValue: query.triggerValue,
-          triggerValue2: query.triggerValue2,
+          triggerConfig: query.triggerConfig ?? {},
           order: query.order,
         },
       });
@@ -371,5 +370,64 @@ export class EmailsService {
     });
 
     return content;
+  }
+  async sendEmailToParticipants(
+    emailUuid: string,
+    participantUuids: string[],
+  ): Promise<void> {
+    const emailTemplate = await this.prisma.emailTemplate.findUnique({
+      where: { uuid: emailUuid },
+      include: {
+        event: {
+          select: { contactEmail: true, name: true },
+        },
+      },
+    });
+
+    if (!emailTemplate) {
+      throw new NotFoundException(
+        `Email template with id: ${emailUuid} not found`,
+      );
+    }
+
+    const participants = await this.prisma.participant.findMany({
+      where: { uuid: { in: participantUuids } },
+      select: { uuid: true, email: true },
+    });
+
+    for (const participant of participants) {
+      try {
+        const parsedContent = await this.parseEmailTemplateContent(
+          emailUuid,
+          participant.uuid,
+        );
+
+        await this.mailerService.sendMail({
+          to: participant.email,
+          subject: emailTemplate.name,
+          html: parsedContent,
+          from: emailTemplate.event.contactEmail || process.env.SMTP_FROM,
+        });
+
+        await this.prisma.participantEmailStatus.create({
+          data: {
+            status: EmailStatus.sent,
+            sendAt: new Date(),
+            participantUuid: participant.uuid,
+            emailUuid: emailUuid,
+          },
+        });
+      } catch (error) {
+        console.error(`Failed to send email to ${participant.email}:`, error);
+        await this.prisma.participantEmailStatus.create({
+          data: {
+            status: EmailStatus.failed,
+            sendAt: new Date(),
+            participantUuid: participant.uuid,
+            emailUuid: emailUuid,
+          },
+        });
+      }
+    }
   }
 }

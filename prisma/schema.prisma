@@ -178,8 +178,7 @@ model EmailTemplate {
   trigger       EmailTrigger
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
-  triggerValue  String?
-  triggerValue2 String?
+  triggerConfig Json?
   order         Int?
   eventUuid     String       @db.Uuid
 

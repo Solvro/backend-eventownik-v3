@@ -30,25 +30,12 @@ export class CreateEmailDto {
   @IsEnum(EmailTrigger)
   trigger: EmailTrigger;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: Object, example: { formUuid: "uuid" } })
   @ValidateIf(
     (o: CreateEmailDto) =>
       o.trigger === EmailTrigger.FORM_FILLED ||
-      o.trigger === EmailTrigger.ATTRIBUTE_CHANGED ||
-      o.triggerValue !== undefined,
+      o.trigger === EmailTrigger.ATTRIBUTE_CHANGED,
   )
   @IsNotEmpty()
-  @IsString()
-  triggerValue?: string;
-
-  @ApiPropertyOptional()
-  @ValidateIf(
-    (o: CreateEmailDto) =>
-      o.trigger === EmailTrigger.FORM_FILLED ||
-      o.trigger === EmailTrigger.ATTRIBUTE_CHANGED ||
-      o.triggerValue2 !== undefined,
-  )
-  @IsNotEmpty()
-  @IsString()
-  triggerValue2?: string;
+  triggerConfig?: any;
 }
