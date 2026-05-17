@@ -25,15 +25,20 @@ import { PrismaModule } from "./prisma/prisma.module";
   imports: [
     ConfigModule.forRoot({
       validationSchema: Joi.object({
+        APP_DOMAIN: Joi.string().required(),
         DATABASE_URL: Joi.string().required(),
+        HCAPTCHA_SECRET: Joi.string().required(),
+        JWT_SECRET: Joi.string().required(),
+        JWT_EXPIRES_IN: Joi.string().default("60m"),
+        PORT: Joi.number().default(3000),
+        REDIS_HOST: Joi.string().required(),
+        REDIS_PORT: Joi.number().required(),
         SMTP_HOST: Joi.string().required(),
         SMTP_PORT: Joi.number().required(),
         SMTP_SECURE: Joi.boolean().default(false),
         SMTP_USER: Joi.string().required(),
         SMTP_PASS: Joi.string().required(),
         SMTP_FROM: Joi.string().required(),
-        PORT: Joi.number().default(3000),
-        APP_DOMAIN: Joi.string().required(),
       }),
       isGlobal: true,
     }),
