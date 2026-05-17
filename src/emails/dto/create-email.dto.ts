@@ -17,6 +17,7 @@ export class CreateEmailDto {
   @IsString()
   @IsNotEmpty()
   name: string;
+
   @ApiProperty({ example: "<p>Content</p>" })
   @IsString()
   @IsNotEmpty()
@@ -40,4 +41,9 @@ export class CreateEmailDto {
   @IsObject()
   @IsNotEmpty()
   triggerConfig?: Prisma.JsonObject;
+
+  @ApiPropertyOptional({ type: Object, example: { version: "1.0" } })
+  @IsOptional()
+  @IsObject()
+  schema?: Prisma.JsonObject;
 }

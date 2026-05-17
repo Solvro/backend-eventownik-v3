@@ -148,6 +148,7 @@ export class EmailsService {
           content: query.content,
           trigger: query.trigger,
           triggerConfig: query.triggerConfig ?? {},
+          schema: query.schema,
           order: query.order,
           eventUuid,
         },
@@ -159,6 +160,7 @@ export class EmailsService {
         content: emailTemplate.content,
         trigger: emailTemplate.trigger,
         eventId: emailTemplate.eventUuid,
+        schema: emailTemplate.schema,
         createdAt: emailTemplate.createdAt.toISOString(),
         updatedAt: emailTemplate.updatedAt.toISOString(),
       };
@@ -200,6 +202,7 @@ export class EmailsService {
           name: true,
           trigger: true,
           triggerConfig: true,
+          schema: true,
           createdAt: true,
           updatedAt: true,
           participantEmails: {
@@ -237,6 +240,7 @@ export class EmailsService {
         name: record.name,
         trigger: record.trigger,
         triggerConfig: record.triggerConfig,
+        schema: record.schema,
         createdAt: record.createdAt.toISOString(),
         updatedAt: record.updatedAt.toISOString(),
         meta: counts,
@@ -276,6 +280,7 @@ export class EmailsService {
       content: emailTemplate.content,
       trigger: emailTemplate.trigger,
       triggerConfig: emailTemplate.triggerConfig,
+      schema: emailTemplate.schema,
       order: emailTemplate.order,
       createdAt: emailTemplate.createdAt.toISOString(),
       updatedAt: emailTemplate.updatedAt.toISOString(),
@@ -332,6 +337,7 @@ export class EmailsService {
           content: query.content,
           trigger: query.trigger,
           triggerConfig: query.triggerConfig ?? {},
+          schema: query.schema,
           order: query.order,
         },
       });
@@ -342,6 +348,7 @@ export class EmailsService {
         content: emailTemplate.content,
         trigger: emailTemplate.trigger,
         eventId: emailTemplate.eventUuid,
+        schema: emailTemplate.schema,
         createdAt: emailTemplate.createdAt.toISOString(),
         updatedAt: emailTemplate.updatedAt.toISOString(),
       };
@@ -593,7 +600,8 @@ export class EmailsService {
           to: participant.email,
           subject: emailTemplate.name,
           html: parsedContent,
-          from: emailTemplate.event.contactEmail ?? process.env.SMTP_FROM,
+          from: process.env.SMTP_FROM,
+          replyTo: emailTemplate.event.contactEmail ?? process.env.SMTP_FROM,
         });
 
         await this.prisma.participantEmailStatus.create({

@@ -216,7 +216,7 @@ describe("EmailsService", () => {
           name: true,
           trigger: true,
           triggerConfig: true,
-
+          schema: true,
           createdAt: true,
           updatedAt: true,
           participantEmails: {
@@ -290,7 +290,7 @@ describe("EmailsService", () => {
           name: true,
           trigger: true,
           triggerConfig: true,
-
+          schema: true,
           createdAt: true,
           updatedAt: true,
           participantEmails: {

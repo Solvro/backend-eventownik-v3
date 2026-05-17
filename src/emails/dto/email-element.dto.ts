@@ -7,6 +7,7 @@ export class EmailElementDto {
   name: string;
   trigger: EmailTrigger;
   triggerConfig: Prisma.JsonValue | null;
+  schema?: Prisma.JsonValue | null;
   createdAt: string;
   updatedAt: string;
 }
