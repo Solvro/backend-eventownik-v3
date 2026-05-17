@@ -33,6 +33,8 @@ import { PrismaModule } from "./prisma/prisma.module";
         PORT: Joi.number().default(3000),
         REDIS_HOST: Joi.string().required(),
         REDIS_PORT: Joi.number().required(),
+        REDIS_USER: Joi.string().allow("").optional(),
+        REDIS_PASS: Joi.string().allow("").optional(),
         SMTP_HOST: Joi.string().required(),
         SMTP_PORT: Joi.number().required(),
         SMTP_SECURE: Joi.boolean().default(false),
@@ -84,6 +86,8 @@ import { PrismaModule } from "./prisma/prisma.module";
         connection: {
           host: configService.getOrThrow<string>("REDIS_HOST"),
           port: configService.getOrThrow<number>("REDIS_PORT"),
+          username: configService.get<string | undefined>("REDIS_USER"),
+          password: configService.get<string | undefined>("REDIS_PASS"),
         },
       }),
     }),
