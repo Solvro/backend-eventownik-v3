@@ -25,6 +25,11 @@ import { EmailListingDto } from "./dto/email-listing.dto";
 import { EmailResponseDto } from "./dto/email-response.dto";
 import { UpdateEmailDto } from "./dto/update-email.dto";
 
+export interface EmailSendJobData {
+  emailUuid: string;
+  participantUuids: string[];
+}
+
 interface EmailTemplateForParsing {
   content: string;
   event: {
@@ -529,6 +534,28 @@ export class EmailsService {
     return content;
   }
   async sendEmailToParticipants(
+    emailUuid: string,
+    participantUuids: string[],
+  ): Promise<void> {
+    await this.emailQueue.add(
+      "send-email-to-participants",
+      {
+        emailUuid,
+        participantUuids,
+      } satisfies EmailSendJobData,
+      {
+        attempts: 3,
+        backoff: {
+          delay: 1000,
+          type: "exponential",
+        },
+        removeOnComplete: true,
+        removeOnFail: 100,
+      },
+    );
+  }
+
+  async deliverEmailToParticipants(
     emailUuid: string,
     participantUuids: string[],
   ): Promise<void> {

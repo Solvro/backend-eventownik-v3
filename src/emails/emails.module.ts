@@ -9,6 +9,15 @@ import { EmailsService } from "./emails.service";
   imports: [
     BullModule.registerQueue({
       name: "automatic-emails",
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: {
+          delay: 1000,
+          type: "exponential",
+        },
+        removeOnComplete: true,
+        removeOnFail: 100,
+      },
     }),
   ],
   controllers: [EmailsController],
