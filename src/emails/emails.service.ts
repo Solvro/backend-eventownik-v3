@@ -124,13 +124,13 @@ export class EmailsService {
     return JSON.stringify(value);
   }
 
-  private escapeHtml(str: string): string {
-    return str
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/\"/g, "&quot;")
-      .replace(/'/g, "&#39;");
+  private escapeHtml(string_: string): string {
+    return string_
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
   }
 
   async create(
@@ -482,7 +482,6 @@ export class EmailsService {
 
       if (attribute != null) {
         const dynamicTag = `<span data-id="/participant_${attribute.uuid}"></span>`;
-        console.log("Processing dynamic tag:", dynamicTag);
         const rawValue = participantAttribute.value;
 
         if (attribute.type === AttributeType.multiSelect) {
@@ -539,7 +538,9 @@ export class EmailsService {
     emailUuid: string,
     participantUuids: string[],
   ): Promise<void> {
-    if (!participantUuids || participantUuids.length === 0) return;
+    if (participantUuids.length === 0) {
+      return;
+    }
 
     const jobs = participantUuids.map((participantUuid) => ({
       name: "send-email-to-participant",
@@ -585,7 +586,7 @@ export class EmailsService {
       include: { attributes: true },
     });
 
-    if (!participant) {
+    if (participant == null) {
       // participant not found, record failed status
       await this.prisma.participantEmailStatus.create({
         data: {
@@ -643,7 +644,7 @@ export class EmailsService {
       where: { uuid: emailUuid, eventUuid },
       select: { uuid: true },
     });
-    if (!email) {
+    if (email == null) {
       throw new NotFoundException("Email not found");
     }
 
@@ -671,8 +672,8 @@ export class EmailsService {
     const data = items.map((p) => ({
       id: p.participant?.uuid,
       email: p.participant?.email,
-      createdAt: p.participant?.createdAt?.toISOString(),
-      updatedAt: p.participant?.updatedAt?.toISOString(),
+      createdAt: p.participant?.createdAt.toISOString(),
+      updatedAt: p.participant?.updatedAt.toISOString(),
       meta: {
         pivot_status: p.status,
         pivot_send_at: p.sendAt.toISOString(),

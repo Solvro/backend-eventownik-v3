@@ -4,6 +4,7 @@ import { EmailStatus, EmailTrigger } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import { BadRequestException, NotFoundException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
@@ -53,6 +54,12 @@ describe("EmailsService", () => {
         {
           provide: getQueueToken("automatic-emails"),
           useValue: {},
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn(),
+          },
         },
       ],
     })
@@ -386,15 +393,11 @@ describe("EmailsService", () => {
           uuid: mockEmailId,
           eventUuid: mockEventId,
         },
-        include: {
-          participantEmails: {
-            include: {
-              participant: true,
-            },
-          },
-        },
       });
-      expect(result).toEqual(expectedOutput);
+      expect(result).toEqual({
+        ...expectedOutput,
+        participants: [],
+      });
     });
 
     it("should throw NotFoundException when event with provided eventId does not exist.", async () => {

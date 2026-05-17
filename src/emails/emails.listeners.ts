@@ -38,7 +38,7 @@ export class EmailsListeners {
     });
 
     await Promise.all(
-      templates.map((template) =>
+      templates.map(async (template) =>
         this.emailsService.sendEmailToParticipants(template.uuid, [
           event.participantUuid,
         ]),
@@ -56,7 +56,7 @@ export class EmailsListeners {
     });
 
     await Promise.all(
-      templates.map((template) =>
+      templates.map(async (template) =>
         this.emailsService.sendEmailToParticipants(template.uuid, [
           event.participantUuid,
         ]),
@@ -74,14 +74,13 @@ export class EmailsListeners {
     });
 
     await Promise.all(
-      templates.map((template) => {
+      templates.map(async (template) => {
         const config = this.getTriggerConfig(template.triggerConfig);
         if (config?.formUuid === event.formUuid) {
           return this.emailsService.sendEmailToParticipants(template.uuid, [
             event.participantUuid,
           ]);
         }
-        return Promise.resolve();
       }),
     );
   }
@@ -96,7 +95,7 @@ export class EmailsListeners {
     });
 
     await Promise.all(
-      templates.map((template) => {
+      templates.map(async (template) => {
         const config = this.getTriggerConfig(template.triggerConfig);
         if (
           config?.attributeUuid === event.attributeUuid &&
@@ -106,7 +105,6 @@ export class EmailsListeners {
             event.participantUuid,
           ]);
         }
-        return Promise.resolve();
       }),
     );
   }

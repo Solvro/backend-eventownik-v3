@@ -4,6 +4,7 @@ import { EmailStatus, EmailTrigger } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import { BadRequestException, NotFoundException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
@@ -54,6 +55,12 @@ describe("EmailsController", () => {
         {
           provide: getQueueToken("automatic-emails"),
           useValue: {},
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn(),
+          },
         },
       ],
       controllers: [EmailsController],

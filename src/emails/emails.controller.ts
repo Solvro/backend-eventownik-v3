@@ -37,9 +37,9 @@ import { EmailCompleteElementDto } from "./dto/email-complete-element.dto";
 import { EmailListElementDto } from "./dto/email-list-element.dto";
 import { EmailListingDto } from "./dto/email-listing.dto";
 import { EmailResponseDto } from "./dto/email-response.dto";
+import { PageOptionsDto } from "src/common/dto/page-options.dto";
 import { UpdateEmailDto } from "./dto/update-email.dto";
 import { EmailsService } from "./emails.service";
-import { PageOptionsDto } from "src/common/dto/page-options.dto";
 
 @ApiTags("EmailTemplates")
 @ApiBearerAuth()
