@@ -34,7 +34,8 @@ model Admin {
 
   events           Event[]           @relation("Organizer")
   permissions      EventPermission[]
-  authAccessTokens AuthAccessToken[]
+  refreshToken     RefreshToken[]
+  passwordResetToken PasswordResetToken[]
 
   @@map("Admins")
 }
@@ -179,7 +180,8 @@ model EmailTemplate {
   updatedAt     DateTime     @updatedAt
   triggerValue  String?
   triggerValue2 String?
-  eventUuid     String?      @db.Uuid
+  order         Int?
+  eventUuid     String       @db.Uuid
   formUuid      String?      @db.Uuid
 
   event             Event?                   @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
@@ -319,19 +321,27 @@ model ParticipantAttributeLog {
   @@map("ParticipantsAttributesLogs")
 }
 
-model AuthAccessToken {
-  id          Int       @id @default(autoincrement())
-  tokenableId String    @map("tokenable_id") @db.Uuid
-  type        String
-  name        String?
+model RefreshToken {
+  uuid        String    @id @default(uuid()) @db.Uuid
+  adminUuid   String    @db.Uuid
   token       String    @unique
-  abilities   String
   createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @map("updated_at")
-  lastUsedAt  DateTime? @map("last_used_at")
   expiresAt   DateTime  @map("expires_at")
 
-  admin Admin @relation(fields: [tokenableId], references: [uuid], onDelete: Cascade)
+  admin Admin @relation(fields: [adminUuid], references: [uuid], onDelete: Cascade)
 
-  @@map("AuthAccessTokens")
+  @@map("RefreshTokens")
+  @@index(fields: [adminUuid])
+}
+
+model PasswordResetToken {
+  uuid      String @id @default(uuid()) @db.Uuid
+  adminUuid String @db.Uuid
+  token     String @unique
+  createdAt   DateTime  @default(now()) @map("created_at")
+  expiresAt   DateTime  @map("expires_at")
+
+  admin Admin @relation(fields: [adminUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("PasswordResetTokens")
 }

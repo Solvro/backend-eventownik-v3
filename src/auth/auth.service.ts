@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { Admin } from "src/generated/prisma/client";
 
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
@@ -74,13 +75,10 @@ export class AuthService {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
 
-    await this.prisma.authAccessToken.create({
+    await this.prisma.refreshToken.create({
       data: {
-        tokenableId: adminUuid,
-        type: "refresh_token",
+        adminUuid,
         token: hashedToken,
-        abilities: "*",
-        updatedAt: new Date(),
         expiresAt,
       },
     });
@@ -90,7 +88,7 @@ export class AuthService {
 
   async refreshTokens(token: string) {
     const hashedToken = createHash("sha256").update(token).digest("hex");
-    const storedToken = await this.prisma.authAccessToken.findUnique({
+    const storedToken = await this.prisma.refreshToken.findUnique({
       where: { token: hashedToken },
       include: { admin: true },
     });
@@ -100,13 +98,59 @@ export class AuthService {
     }
 
     if (storedToken.expiresAt < new Date()) {
-      await this.prisma.authAccessToken.delete({
-        where: { id: storedToken.id },
+      await this.prisma.refreshToken.delete({
+        where: { uuid: storedToken.uuid },
       });
       throw new UnauthorizedException("Expired refresh token");
     }
 
-    await this.prisma.authAccessToken.delete({ where: { id: storedToken.id } });
+    await this.prisma.refreshToken.delete({
+      where: { uuid: storedToken.uuid },
+    });
     return this.login(storedToken.admin);
+  }
+
+  async forgotPassword(email: string) {
+    const admin = await this.prisma.admin.findUnique({
+      where: { email },
+    });
+    if (admin !== null) {
+      const resetToken = randomBytes(64).toString("hex");
+      const hashedToken = createHash("sha256").update(resetToken).digest("hex");
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+      await this.prisma.passwordResetToken.create({
+        data: {
+          adminUuid: admin.uuid,
+          expiresAt,
+          token: hashedToken,
+        },
+      });
+      // !!! TODO: ADD EMAIL SENDING !!!
+    }
+  }
+
+  async resetPassword(token: string, password: string) {
+    const hashedToken = createHash("sha256").update(token).digest("hex");
+    const resetToken = await this.prisma.passwordResetToken.findUnique({
+      where: { token: hashedToken },
+    });
+
+    if (resetToken === null || resetToken.expiresAt.getTime() < Date.now()) {
+      throw new BadRequestException("Invalid or expired token");
+    }
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    await this.prisma.$transaction([
+      this.prisma.admin.update({
+        where: { uuid: resetToken.adminUuid },
+        data: { password: hashedPassword },
+      }),
+      this.prisma.refreshToken.deleteMany({
+        where: { adminUuid: resetToken.adminUuid },
+      }),
+      this.prisma.passwordResetToken.deleteMany({
+        where: { adminUuid: resetToken.adminUuid },
+      }),
+    ]);
   }
 }
