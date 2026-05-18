@@ -546,23 +546,38 @@ export class FormsService {
       if (event == null) {
         throw new NotFoundException(`Event with id: ${eventUuid} not found`);
       }
+
+      const existingForm = await prisma.form.findFirst({
+        where: { uuid: formUuid, eventUuid: event.uuid },
+      });
+      if (existingForm == null) {
+        throw new NotFoundException(
+          `Form with id: ${formUuid} not found in this event`,
+        );
+      }
+
       if (
         updateFormDto.isFirstForm !== undefined &&
-        updateFormDto.isFirstForm
+        updateFormDto.isFirstForm === true
       ) {
         if (
           event.registerFormUuid !== null &&
           event.registerFormUuid !== formUuid
         ) {
           throw new BadRequestException(
-            `Event with id: ${eventUuid} already has a first form assigned`,
+            "Event with id: ${eventUuid} already has a first form assigned",
           );
         }
+
         await prisma.event.update({
           where: { uuid: eventUuid },
           data: { registerFormUuid: formUuid },
         });
-      } else if (event.registerFormUuid === formUuid) {
+      } else if (
+        updateFormDto.isFirstForm !== undefined &&
+        updateFormDto.isFirstForm === false &&
+        event.registerFormUuid === formUuid
+      ) {
         await prisma.event.update({
           where: { uuid: eventUuid },
           data: { registerFormUuid: null },
@@ -635,6 +650,7 @@ export class FormsService {
       if (event == null) {
         throw new NotFoundException(`Event with id: ${eventUuid} not found`);
       }
+
       if (event.registerFormUuid === formUuid) {
         await prisma.event.update({
           where: { uuid: eventUuid },
