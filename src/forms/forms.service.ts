@@ -558,7 +558,7 @@ export class FormsService {
 
       if (
         updateFormDto.isFirstForm !== undefined &&
-        updateFormDto.isFirstForm === true
+        updateFormDto.isFirstForm
       ) {
         if (
           event.registerFormUuid !== null &&
