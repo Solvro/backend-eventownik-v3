@@ -8,6 +8,7 @@ import {
 } from "@nestjs/swagger";
 
 import { BlocksService } from "./blocks.service";
+import { BlockWithParticipantCount } from "./dto/block-with-participant-count.dto";
 import { Block } from "./entities/block.entity";
 
 @ApiTags("Public")
@@ -19,12 +20,15 @@ export class BlocksPublicController {
   @ApiOperation({ summary: "Get block tree" })
   @ApiParam({ name: "eventSlug", description: "Slug of the event" })
   @ApiParam({ name: "attributeUuid", description: "UUID of the attribute" })
-  @ApiOkResponse({ description: "Block tree", type: Block })
+  @ApiOkResponse({
+    description: "Block tree",
+    type: BlockWithParticipantCount,
+  })
   @ApiNotFoundResponse({ description: "Block not found" })
   async getBlockTree(
     @Param("eventSlug") eventSlug: string,
     @Param("attributeUuid", ParseUUIDPipe) attributeUuid: string,
-  ): Promise<Block> {
+  ): Promise<BlockWithParticipantCount> {
     return await this.blocksService.getBlockTree(eventSlug, attributeUuid);
   }
 
