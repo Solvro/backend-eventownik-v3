@@ -2,6 +2,7 @@ import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
 import { ApiPaginatedResponse } from "src/common/decorators/api-paginated-response.decorator";
+import { PageOptionsDto } from "src/common/dto/page-options.dto";
 import { PermissionType } from "src/generated/prisma/enums";
 
 import {
@@ -37,7 +38,6 @@ import { EmailCompleteElementDto } from "./dto/email-complete-element.dto";
 import { EmailListElementDto } from "./dto/email-list-element.dto";
 import { EmailListingDto } from "./dto/email-listing.dto";
 import { EmailResponseDto } from "./dto/email-response.dto";
-import { PageOptionsDto } from "src/common/dto/page-options.dto";
 import { UpdateEmailDto } from "./dto/update-email.dto";
 import { EmailsService } from "./emails.service";
 
