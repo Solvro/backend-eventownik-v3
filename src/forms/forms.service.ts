@@ -558,7 +558,7 @@ export class FormsService {
 
       if (
         updateFormDto.isFirstForm !== undefined &&
-        updateFormDto.isFirstForm
+        updateFormDto.isFirstForm === true
       ) {
         if (
           event.registerFormUuid !== null &&
@@ -574,7 +574,7 @@ export class FormsService {
           data: { registerFormUuid: formUuid },
         });
       } else if (
-        !updateFormDto.isFirstForm &&
+        updateFormDto.isFirstForm === false &&
         event.registerFormUuid === formUuid
       ) {
         await prisma.event.update({
