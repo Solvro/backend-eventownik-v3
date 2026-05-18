@@ -9,7 +9,6 @@ import {
   OpenCondition,
   Prisma,
 } from "src/generated/prisma/client";
-import { ParticipantAttributeDto } from "src/participants/dto/participant-create.dto";
 import { ParticipantUpdateDto } from "src/participants/dto/participant-update.dto";
 import { ParticipantsService } from "src/participants/participants.service";
 
@@ -840,11 +839,10 @@ export class FormsService {
         const participantDtoAttributes: ParticipantUpdateDto = {
           email: submissionData.email,
           participantAttributes: Object.entries(normalizedAttributes).map(
-            ([attributeUuid, value]) =>
-              ({
-                attributeUuid,
-                value,
-              }) as ParticipantAttributeDto,
+            ([attributeUuid, value]) => ({
+              attributeUuid,
+              value,
+            }),
           ),
         };
 
