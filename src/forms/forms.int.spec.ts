@@ -234,6 +234,10 @@ describe("Forms Integration", () => {
       description: dto.description,
     });
     mockPrismaService.attribute.count.mockResolvedValue(2);
+    mockPrismaService.form.findFirst.mockResolvedValue({
+      uuid: "form-uuid-1",
+      name: "Updated Form Name",
+    });
     mockPrismaService.formDefinition.deleteMany.mockResolvedValue({ count: 2 });
     mockPrismaService.formDefinition.createMany.mockResolvedValue({});
     const result = await formsController.update(
