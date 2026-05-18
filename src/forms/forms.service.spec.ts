@@ -254,6 +254,10 @@ describe("FormsService", () => {
       uuid: eventUuid,
       registerFormUuid: null,
     });
+    mockPrismaService.form.findFirst.mockResolvedValue({
+      uuid: formUuid,
+      eventUuid,
+    });
     mockPrismaService.form.update.mockResolvedValue(mockForm);
     mockPrismaService.$transaction.mockImplementation((callback) => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
