@@ -1,3 +1,4 @@
+import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import type { TestingModule } from "@nestjs/testing";
@@ -12,6 +13,10 @@ describe("BlocksService", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BlocksService,
+        {
+          provide: ParticipantsService,
+          useValue: {},
+        },
         {
           provide: PrismaService,
           useValue: {},
