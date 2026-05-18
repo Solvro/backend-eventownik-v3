@@ -558,14 +558,14 @@ export class FormsService {
 
       if (
         updateFormDto.isFirstForm !== undefined &&
-        updateFormDto.isFirstForm === true
+        updateFormDto.isFirstForm
       ) {
         if (
           event.registerFormUuid !== null &&
           event.registerFormUuid !== formUuid
         ) {
           throw new BadRequestException(
-            "Event with id: ${eventUuid} already has a first form assigned",
+            `Event with id: ${eventUuid} already has a first form assigned`,
           );
         }
 
@@ -574,8 +574,7 @@ export class FormsService {
           data: { registerFormUuid: formUuid },
         });
       } else if (
-        updateFormDto.isFirstForm !== undefined &&
-        updateFormDto.isFirstForm === false &&
+        !updateFormDto.isFirstForm &&
         event.registerFormUuid === formUuid
       ) {
         await prisma.event.update({
