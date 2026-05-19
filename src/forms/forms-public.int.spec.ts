@@ -5,7 +5,6 @@ import { PrismaService } from "src/prisma/prisma.service";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
-import { FormsController } from "./forms.controller";
 import { FormsService } from "./forms.service";
 import { FormsPublicController } from "./forms-public.controller";
 
@@ -42,7 +41,7 @@ describe("Forms Public Integration", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         FormsService,
-        FormsController,
+        FormsPublicController,
         {
           provide: PrismaService,
           useValue: mockPrismaService,
