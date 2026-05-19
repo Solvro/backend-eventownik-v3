@@ -1,8 +1,10 @@
+import { MailerService } from "@nestjs-modules/mailer";
 import { EmailStatus, EmailTrigger } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import { getQueueToken } from "@nestjs/bullmq";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
@@ -36,14 +38,28 @@ describe("EmailsService", () => {
     $transaction: jest.fn(),
   };
 
+  const mockMailerService = {
+    sendMail: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EmailsService,
         PrismaService,
         {
+          provide: MailerService,
+          useValue: mockMailerService,
+        },
+        {
           provide: getQueueToken("automatic-emails"),
-          useValue: { add: jest.fn() },
+          useValue: {},
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn(),
+          },
         },
       ],
     })
@@ -94,6 +110,8 @@ describe("EmailsService", () => {
           name: dto.name,
           content: dto.content,
           trigger: dto.trigger,
+          triggerConfig: {},
+          order: undefined,
           eventUuid: mockEventId,
         },
       });
@@ -128,8 +146,8 @@ describe("EmailsService", () => {
           eventUuid: "event-uuid-123",
           name: "test124",
           trigger: EmailTrigger.PARTICIPANT_REGISTERED,
-          triggerValue: "",
-          triggerValue2: "",
+          triggerConfig: undefined,
+
           createdAt: new Date("2025-02-22T19:13:10.471Z"),
           updatedAt: new Date("2025-02-22T19:13:10.471Z"),
           participantEmails: [
@@ -142,8 +160,8 @@ describe("EmailsService", () => {
           eventUuid: "event-uuid-123",
           name: "test245",
           trigger: EmailTrigger.MANUAL,
-          triggerValue: "",
-          triggerValue2: "",
+          triggerConfig: undefined,
+
           createdAt: new Date("2025-02-22T19:13:10.471Z"),
           updatedAt: new Date("2025-02-22T19:13:10.471Z"),
           participantEmails: [
@@ -159,8 +177,8 @@ describe("EmailsService", () => {
           eventId: mockEventId,
           name: "test124",
           trigger: EmailTrigger.PARTICIPANT_REGISTERED,
-          triggerValue: "",
-          triggerValue2: "",
+          triggerConfig: undefined,
+
           createdAt: "2025-02-22T19:13:10.471Z",
           updatedAt: "2025-02-22T19:13:10.471Z",
           meta: {
@@ -174,8 +192,8 @@ describe("EmailsService", () => {
           eventId: mockEventId,
           name: "test245",
           trigger: EmailTrigger.MANUAL,
-          triggerValue: "",
-          triggerValue2: "",
+          triggerConfig: undefined,
+
           createdAt: "2025-02-22T19:13:10.471Z",
           updatedAt: "2025-02-22T19:13:10.471Z",
           meta: {
@@ -204,8 +222,8 @@ describe("EmailsService", () => {
           eventUuid: true,
           name: true,
           trigger: true,
-          triggerValue: true,
-          triggerValue2: true,
+          triggerConfig: true,
+          schema: true,
           createdAt: true,
           updatedAt: true,
           participantEmails: {
@@ -231,8 +249,8 @@ describe("EmailsService", () => {
           eventUuid: "event-uuid-123",
           name: "test245",
           trigger: EmailTrigger.MANUAL,
-          triggerValue: "",
-          triggerValue2: "",
+          triggerConfig: undefined,
+
           createdAt: new Date("2025-02-22T19:13:10.471Z"),
           updatedAt: new Date("2025-02-22T19:13:10.471Z"),
           participantEmails: [
@@ -248,8 +266,8 @@ describe("EmailsService", () => {
           eventId: mockEventId,
           name: "test245",
           trigger: EmailTrigger.MANUAL,
-          triggerValue: "",
-          triggerValue2: "",
+          triggerConfig: undefined,
+
           createdAt: "2025-02-22T19:13:10.471Z",
           updatedAt: "2025-02-22T19:13:10.471Z",
           meta: {
@@ -278,8 +296,8 @@ describe("EmailsService", () => {
           eventUuid: true,
           name: true,
           trigger: true,
-          triggerValue: true,
-          triggerValue2: true,
+          triggerConfig: true,
+          schema: true,
           createdAt: true,
           updatedAt: true,
           participantEmails: {
@@ -313,9 +331,8 @@ describe("EmailsService", () => {
         name: "test",
         content: "<p>test</p>",
         trigger: EmailTrigger.MANUAL,
-        triggerValue: "",
-        triggerValue2: "",
-        formUuid: null,
+        triggerConfig: undefined,
+
         order: 0,
         createdAt: new Date("2025-02-22T19:13:10.471Z"),
         updatedAt: new Date("2025-02-22T19:13:10.471Z"),
@@ -345,9 +362,8 @@ describe("EmailsService", () => {
         name: "test",
         content: "<p>test</p>",
         trigger: EmailTrigger.MANUAL,
-        triggerValue: "",
-        triggerValue2: "",
-        formId: null,
+        triggerConfig: undefined,
+
         order: 0,
         createdAt: "2025-02-22T19:13:10.471Z",
         updatedAt: "2025-02-22T19:13:10.471Z",
@@ -377,15 +393,11 @@ describe("EmailsService", () => {
           uuid: mockEmailId,
           eventUuid: mockEventId,
         },
-        include: {
-          participantEmails: {
-            include: {
-              participant: true,
-            },
-          },
-        },
       });
-      expect(result).toEqual(expectedOutput);
+      expect(result).toEqual({
+        ...expectedOutput,
+        participants: [],
+      });
     });
 
     it("should throw NotFoundException when event with provided eventId does not exist.", async () => {
@@ -416,9 +428,8 @@ describe("EmailsService", () => {
         name: "test",
         content: "<p>test2</p>",
         trigger: EmailTrigger.MANUAL,
-        triggerValue: "",
-        triggerValue2: "",
-        formUuid: null,
+        triggerConfig: undefined,
+
         order: 0,
         createdAt: new Date("2025-02-22T19:13:10.471Z"),
         updatedAt: new Date("2025-02-22T19:13:10.471Z"),
@@ -443,6 +454,9 @@ describe("EmailsService", () => {
         data: {
           name: "test2",
           content: "<p>test2</p>",
+          trigger: undefined,
+          triggerConfig: {},
+          order: undefined,
         },
       });
       expect(result).toEqual({

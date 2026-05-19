@@ -2,6 +2,7 @@ import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
 import { ApiPaginatedResponse } from "src/common/decorators/api-paginated-response.decorator";
+import { PageOptionsDto } from "src/common/dto/page-options.dto";
 import { PermissionType } from "src/generated/prisma/enums";
 
 import {
@@ -96,6 +97,23 @@ export class EmailsController {
     @Param("emailId", ParseUUIDPipe) emailId: string,
   ) {
     return this.emailsService.findOne(eventId, emailId);
+  }
+
+  @Get(":emailId/participants")
+  @RequirePermission(PermissionType.MANAGE_EMAIL)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Get paginated participant delivery statuses for an email",
+  })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "emailId", description: "UUID of the email" })
+  @ApiOkResponse({ description: "Paginated participants list" })
+  async findParticipants(
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @Param("emailId", ParseUUIDPipe) emailId: string,
+    @Query() query: PageOptionsDto,
+  ) {
+    return this.emailsService.findParticipantsForEmail(eventId, emailId, query);
   }
 
   @Patch(":emailId")
