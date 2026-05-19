@@ -197,7 +197,7 @@ describe("FormsService", () => {
     );
   });
 
-  it("should return form by uuid", async () => {
+  it("should return form by uuid with provided event uuid", async () => {
     const formUuid = "form-uuid-123";
     const eventUuid = "event-uuid-123";
     const mockForm = { uuid: formUuid, name: "Form 1" };
@@ -213,7 +213,7 @@ describe("FormsService", () => {
       },
     });
   });
-  it("should throw NotFoundException if form not found by uuid", async () => {
+  it("should throw NotFoundException if form not found by uuid with provided event uuid", async () => {
     const formUuid = "non-existent-form-uuid";
     const eventUuid = "event-uuid-123";
     mockPrismaService.form.findUnique.mockResolvedValue(null);
@@ -222,6 +222,39 @@ describe("FormsService", () => {
     );
     expect(mockPrismaService.form.findUnique).toHaveBeenCalledWith({
       where: { uuid: formUuid, eventUuid },
+      include: {
+        formDefinitions: {
+          include: { attribute: true },
+        },
+      },
+    });
+  });
+
+  it("should return form by uuid with provided event slug", async () => {
+    const formUuid = "form-uuid-123";
+    const eventSlug = "event";
+    const mockForm = { uuid: formUuid, name: "Form 1" };
+    mockPrismaService.form.findUnique.mockResolvedValue(mockForm);
+    const form = await service.findOneBySlug(formUuid, eventSlug);
+    expect(form).toEqual(mockForm);
+    expect(mockPrismaService.form.findUnique).toHaveBeenCalledWith({
+      where: { uuid: formUuid, event: { slug: eventSlug } },
+      include: {
+        formDefinitions: {
+          include: { attribute: true },
+        },
+      },
+    });
+  });
+  it("should throw NotFoundException if form not found by uuid with provided event slug", async () => {
+    const formUuid = "non-existent-form-uuid";
+    const eventSlug = "event";
+    mockPrismaService.form.findUnique.mockResolvedValue(null);
+    await expect(service.findOneBySlug(formUuid, eventSlug)).rejects.toThrow(
+      `Form with id: ${formUuid} not found`,
+    );
+    expect(mockPrismaService.form.findUnique).toHaveBeenCalledWith({
+      where: { uuid: formUuid, event: { slug: eventSlug } },
       include: {
         formDefinitions: {
           include: { attribute: true },
@@ -331,6 +364,7 @@ describe("FormsService", () => {
   });
 
   describe("formSubmit", () => {
+    const eventSlug = "event";
     const eventUuid = "event-123";
     const formUuid = "form-123";
     const participantId = "part-123";
@@ -351,7 +385,7 @@ describe("FormsService", () => {
       jest.spyOn(service, "isOpen").mockResolvedValue(false);
 
       await expect(
-        service.formSubmit(eventUuid, formUuid, { attributes: [] }, []),
+        service.formSubmit(eventSlug, formUuid, { attributes: [] }, []),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -387,7 +421,7 @@ describe("FormsService", () => {
       jest.spyOn(service, "isOpen").mockResolvedValue(true);
 
       await expect(
-        service.formSubmit(eventUuid, formUuid, submissionData, []),
+        service.formSubmit(eventSlug, formUuid, submissionData, []),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -423,7 +457,7 @@ describe("FormsService", () => {
       jest.spyOn(service, "isOpen").mockResolvedValue(true);
 
       await expect(
-        service.formSubmit(eventUuid, formUuid, submissionData, []),
+        service.formSubmit(eventSlug, formUuid, submissionData, []),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -466,7 +500,7 @@ describe("FormsService", () => {
       jest.spyOn(service, "isOpen").mockResolvedValue(true);
 
       await expect(
-        service.formSubmit(eventUuid, formUuid, submissionData, []),
+        service.formSubmit(eventSlug, formUuid, submissionData, []),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -521,7 +555,7 @@ describe("FormsService", () => {
       });
 
       const result = await service.formSubmit(
-        eventUuid,
+        eventSlug,
         formUuid,
         submissionData,
         [],
@@ -585,7 +619,7 @@ describe("FormsService", () => {
       jest.spyOn(service, "isOpen").mockResolvedValue(true);
 
       await expect(
-        service.formSubmit(eventUuid, formUuid, submissionData, []),
+        service.formSubmit(eventSlug, formUuid, submissionData, []),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -620,7 +654,7 @@ describe("FormsService", () => {
       });
 
       const result = await service.formSubmit(
-        eventUuid,
+        eventSlug,
         formUuid,
         submissionData,
         [],
@@ -662,7 +696,7 @@ describe("FormsService", () => {
         status: "updated",
       });
 
-      await service.formSubmit(eventUuid, formUuid, submissionData, []);
+      await service.formSubmit(eventSlug, formUuid, submissionData, []);
 
       expect(mockParticipantsService.update).toHaveBeenCalledWith(
         eventUuid,
@@ -695,9 +729,9 @@ describe("FormsService", () => {
       } as unknown as FormSubmitionDto;
 
       await expect(
-        service.formSubmit(eventUuid, formUuid, submissionData, []),
+        service.formSubmit(eventSlug, formUuid, submissionData, []),
       ).rejects.toThrow(
-        `Event with id: ${eventUuid} has reached the participants limit`,
+        `Event with a slug: ${eventSlug} has reached the participants limit`,
       );
     });
   });

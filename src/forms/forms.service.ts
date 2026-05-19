@@ -515,6 +515,22 @@ export class FormsService {
     return form;
   }
 
+  async findOneBySlug(formUuid: string, eventSlug: string) {
+    const form = await this.prisma.form.findUnique({
+      where: { uuid: formUuid, event: { slug: eventSlug } },
+      include: {
+        formDefinitions: {
+          include: { attribute: true },
+        },
+      },
+    });
+
+    if (form == null) {
+      throw new NotFoundException(`Form with id: ${formUuid} not found`);
+    }
+    return form;
+  }
+
   async update(
     formUuid: string,
     eventUuid: string,
@@ -668,8 +684,8 @@ export class FormsService {
     });
   }
 
-  async isOpen(formUuid: string, eventUuid: string) {
-    const form = await this.findOne(formUuid, eventUuid);
+  async isOpen(formUuid: string, eventSlug: string) {
+    const form = await this.findOneBySlug(formUuid, eventSlug);
     switch (form.openCondition) {
       case OpenCondition.MANUAL: {
         return form.isOpen;
@@ -690,21 +706,21 @@ export class FormsService {
   }
 
   async formSubmit(
-    eventUuid: string,
+    eventSlug: string,
     formUuid: string,
     submissionData: FormSubmitionDto,
     fileNames: string[],
   ) {
     return await this.prisma.$transaction(async (prisma) => {
       const event = await prisma.event.findUnique({
-        where: { uuid: eventUuid },
+        where: { slug: eventSlug },
         include: { participants: true },
       });
       if (event == null) {
-        throw new NotFoundException(`Event with id: ${eventUuid} not found`);
+        throw new NotFoundException(`Event with slug: ${eventSlug} not found`);
       }
       const form = await prisma.form.findUnique({
-        where: { uuid: formUuid, eventUuid },
+        where: { uuid: formUuid, event: { slug: eventSlug } },
         include: {
           formDefinitions: {
             include: { attribute: true },
@@ -714,7 +730,7 @@ export class FormsService {
       if (form == null) {
         throw new NotFoundException(`Form with id: ${formUuid} not found`);
       }
-      const isFormOpen = await this.isOpen(formUuid, eventUuid);
+      const isFormOpen = await this.isOpen(formUuid, eventSlug);
       if (!isFormOpen) {
         throw new BadRequestException(`Form with id: ${formUuid} is closed`);
       }
@@ -769,7 +785,7 @@ export class FormsService {
           if (fileName !== undefined) {
             fileNames.splice(fileNames.indexOf(fileName), 1);
             normalizedAttributes[attributeUuid] =
-              `./uploads/forms/${eventUuid}/${formUuid}/#####${fileName}`;
+              `./uploads/forms/${event.uuid}/${formUuid}/#####${fileName}`;
           }
         } else {
           normalizedAttributes[attributeUuid] = normalizedValue;
@@ -805,7 +821,7 @@ export class FormsService {
               continue;
             }
             const canSignIn = await this.blocksService.canSignInToBlock(
-              eventUuid,
+              event.uuid,
               attributeUuid,
               blockId,
               prisma,
@@ -862,7 +878,7 @@ export class FormsService {
         };
 
         return await this.participantService.update(
-          eventUuid,
+          event.uuid,
           submissionData.participantId,
           participantDtoAttributes,
         );
@@ -875,11 +891,11 @@ export class FormsService {
           event.participantsLimit <= event.participants.length
         ) {
           throw new BadRequestException(
-            `Event with id: ${eventUuid} has reached the participants limit`,
+            `Event with a slug: ${eventSlug} has reached the participants limit`,
           );
         }
         return await this.participantService.register(
-          eventUuid,
+          event.uuid,
           submissionData.email,
           Object.entries(normalizedAttributes).map(
             ([attributeUuid, value]) => ({
