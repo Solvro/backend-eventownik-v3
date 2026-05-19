@@ -5,8 +5,8 @@ import { PrismaService } from "src/prisma/prisma.service";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
-import { FormsService } from "./forms.service";
 import { FormsPublicController } from "./forms-public.controller";
+import { FormsService } from "./forms.service";
 
 describe("Forms Public Integration", () => {
   let formsPublicController: FormsPublicController;

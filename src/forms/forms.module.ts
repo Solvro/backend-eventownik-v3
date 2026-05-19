@@ -3,9 +3,9 @@ import { ParticipantsModule } from "src/participants/participants.module";
 
 import { Module } from "@nestjs/common";
 
+import { FormsPublicController } from "./forms-public.controller";
 import { FormsController } from "./forms.controller";
 import { FormsService } from "./forms.service";
-import { FormsPublicController } from "./forms-public.controller";
 
 @Module({
   controllers: [FormsController, FormsPublicController],
