@@ -2,9 +2,19 @@ import { Job } from "bullmq";
 
 import { Processor, WorkerHost } from "@nestjs/bullmq";
 
+import type { EmailSendJobData } from "./emails.service";
+import { EmailsService } from "./emails.service";
+
 @Processor("automatic-emails")
 export class EmailsConsumer extends WorkerHost {
-  async process(job: Job): Promise<void> {
-    await job.data; // just for testing purposes, TODO: implement actual email sending logic here
+  constructor(private readonly emailsService: EmailsService) {
+    super();
+  }
+
+  async process(job: Job<EmailSendJobData>): Promise<void> {
+    await this.emailsService.deliverEmailToParticipants(
+      job.data.emailUuid,
+      job.data.participantUuid,
+    );
   }
 }

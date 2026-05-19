@@ -44,6 +44,7 @@ jobs:
 
       - name: Generate Prisma Client
         run: npx prisma generate
+        if: always()
         env:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/eventownik_test_db"
 
@@ -57,6 +58,7 @@ jobs:
 
       - name: Apply Prisma migrations
         run: npx prisma migrate deploy
+        if: always()
         env:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/eventownik_test_db"
 
@@ -68,7 +70,7 @@ jobs:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/eventownik_test_db"
 
       - name: Build
-        env:
-          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/eventownik_test_db"
         run: npm run build
         if: always()
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/eventownik_test_db"

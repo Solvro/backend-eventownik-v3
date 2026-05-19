@@ -1,8 +1,10 @@
+import { MailerService } from "@nestjs-modules/mailer";
 import { EmailStatus, EmailTrigger } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import { getQueueToken } from "@nestjs/bullmq";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
@@ -37,15 +39,27 @@ describe("EmailsController", () => {
     $transaction: jest.fn(),
   };
 
+  const mockMailerService = {
+    sendMail: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EmailsService,
         PrismaService,
         {
+          provide: MailerService,
+          useValue: mockMailerService,
+        },
+        {
           provide: getQueueToken("automatic-emails"),
+          useValue: {},
+        },
+        {
+          provide: ConfigService,
           useValue: {
-            add: jest.fn(),
+            get: jest.fn(),
           },
         },
       ],
@@ -90,8 +104,8 @@ describe("EmailsController", () => {
           eventUuid: mockEventId,
           name: "<p>test</p>",
           trigger: EmailTrigger.MANUAL,
-          triggerValue: null,
-          triggerValue2: null,
+          triggerConfig: undefined,
+
           createdAt: mockDate,
           updatedAt: mockDate,
           participantEmails: [
@@ -170,9 +184,8 @@ describe("EmailsController", () => {
         name: dto.name,
         content: dto.content,
         trigger: dto.trigger,
-        triggerValue: null,
-        triggerValue2: null,
-        formUuid: null,
+        triggerConfig: undefined,
+
         order: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -223,9 +236,8 @@ describe("EmailsController", () => {
         name: "Single Email",
         content: "<p>Content</p>",
         trigger: EmailTrigger.MANUAL,
-        triggerValue: null,
-        triggerValue2: null,
-        formUuid: null,
+        triggerConfig: undefined,
+
         order: null,
         createdAt: new Date(),
         updatedAt: new Date(),

@@ -2,11 +2,12 @@ import {
   IsEnum,
   IsNotEmpty,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
-  IsUUID,
   ValidateIf,
 } from "class-validator";
+import type { Prisma } from "src/generated/prisma/client";
 import { EmailTrigger } from "src/generated/prisma/enums";
 
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
@@ -16,6 +17,7 @@ export class CreateEmailDto {
   @IsString()
   @IsNotEmpty()
   name: string;
+
   @ApiProperty({ example: "<p>Content</p>" })
   @IsString()
   @IsNotEmpty()
@@ -30,30 +32,18 @@ export class CreateEmailDto {
   @IsEnum(EmailTrigger)
   trigger: EmailTrigger;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: Object, example: { formUuid: "uuid" } })
   @ValidateIf(
     (o: CreateEmailDto) =>
       o.trigger === EmailTrigger.FORM_FILLED ||
-      o.trigger === EmailTrigger.ATTRIBUTE_CHANGED ||
-      o.triggerValue !== undefined,
+      o.trigger === EmailTrigger.ATTRIBUTE_CHANGED,
   )
+  @IsObject()
   @IsNotEmpty()
-  @IsString()
-  triggerValue?: string;
+  triggerConfig?: Prisma.JsonObject;
 
-  @ApiPropertyOptional()
-  @ValidateIf(
-    (o: CreateEmailDto) =>
-      o.trigger === EmailTrigger.FORM_FILLED ||
-      o.trigger === EmailTrigger.ATTRIBUTE_CHANGED ||
-      o.triggerValue2 !== undefined,
-  )
-  @IsNotEmpty()
-  @IsString()
-  triggerValue2?: string;
-
-  @ApiPropertyOptional({ example: "test-form-uuid" })
-  @IsUUID("4", { each: true })
+  @ApiPropertyOptional({ type: Object, example: { version: "1.0" } })
   @IsOptional()
-  formId?: string;
+  @IsObject()
+  schema?: Prisma.JsonObject;
 }
