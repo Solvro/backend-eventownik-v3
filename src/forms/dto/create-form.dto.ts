@@ -4,6 +4,7 @@ import {
   IsBoolean,
   IsDate,
   IsEnum,
+  IsObject,
   IsOptional,
   IsString,
   ValidateNested,
@@ -49,8 +50,9 @@ export class CreateFormDto {
   @IsOptional()
   isFirstForm?: boolean;
 
-  @ApiProperty({ isArray: true })
+  @ApiProperty({ type: CreateFormDefinitionDto, isArray: true })
   @IsArray()
+  @IsObject({ each: true })
   @ValidateNested({ each: true })
   @Type(() => CreateFormDefinitionDto)
   attributes: CreateFormDefinitionDto[];
