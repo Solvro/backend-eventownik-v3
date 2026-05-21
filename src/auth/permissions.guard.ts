@@ -4,26 +4,22 @@ import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 
 import { AuthUser } from "./jwt.strategy";
-import { EVENT_PARAM_KEY, PERMISSIONS_KEY } from "./permissions.decorator";
+import { PERMISSIONS_KEY, PermissionsMetadata } from "./permissions.decorator";
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const requiredPermissions = this.reflector.getAllAndOverride<
-      PermissionType[] | undefined
+    const meta = this.reflector.getAllAndOverride<
+      PermissionsMetadata | undefined
     >(PERMISSIONS_KEY, [context.getHandler(), context.getClass()]);
 
-    if (requiredPermissions === undefined) {
+    if (meta === undefined) {
       return true;
     }
 
-    const eventParameterKey =
-      this.reflector.getAllAndOverride<string | undefined>(EVENT_PARAM_KEY, [
-        context.getHandler(),
-        context.getClass(),
-      ]) ?? "eventId";
+    const { permissions: requiredPermissions, eventKey = "eventId" } = meta;
 
     const request = context.switchToHttp().getRequest<{
       params: Record<string, string>;
@@ -31,7 +27,7 @@ export class PermissionsGuard implements CanActivate {
     }>();
 
     const user = request.user;
-    const eventId = request.params[eventParameterKey];
+    const eventId = request.params[eventKey];
 
     if (user?.permissions === undefined) {
       return false;
