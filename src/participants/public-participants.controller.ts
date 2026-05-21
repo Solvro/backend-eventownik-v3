@@ -4,13 +4,14 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiTags,
 } from "@nestjs/swagger";
 
 import { Participant } from "./entities/participant.entity";
 import { ParticipantsService } from "./participants.service";
 
-@ApiTags("Public Participants")
+@ApiTags("Public")
 @Controller("public/events/:eventId/participants")
 export class PublicParticipantsController {
   constructor(private readonly participantsService: ParticipantsService) {}
@@ -19,6 +20,12 @@ export class PublicParticipantsController {
   @ApiOperation({ summary: "Get public participant" })
   @ApiParam({ name: "eventId", description: "UUID of the event" })
   @ApiParam({ name: "participantId", description: "UUID of the participant" })
+  @ApiQuery({
+    name: "attributes",
+    required: false,
+    type: [String],
+    description: "List of attributes to include",
+  })
   @ApiOkResponse({ type: Participant })
   @ApiNotFoundResponse({ description: "Participant not found" })
   async findOne(

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
+import { BlocksService } from "src/blocks/blocks.service";
 import { AttributeType } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -26,10 +27,18 @@ describe("Attributes Integration", () => {
       deleteMany: jest.fn(),
       findFirst: jest.fn(),
     },
+    block: {
+      deleteMany: jest.fn(),
+    },
     event: {
       findUnique: jest.fn(),
     },
     $transaction: jest.fn(),
+  };
+
+  const mockBlocksService = {
+    ensureRootBlock: jest.fn(),
+    deleteRootBlocks: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -38,6 +47,7 @@ describe("Attributes Integration", () => {
       providers: [
         AttributesService,
         { provide: PrismaService, useValue: mockPrismaService },
+        { provide: BlocksService, useValue: mockBlocksService },
       ],
     }).compile();
 
@@ -52,12 +62,13 @@ describe("Attributes Integration", () => {
   it("should create an attribute", async () => {
     const dto: CreateAttributeDto = {
       name: "Test Attribute",
-      options: ["Option 1", "Option 2"],
+      config: { maxSelections: 2, customValue: "ignored" },
       order: 1,
       showInList: true,
       type: AttributeType.block,
     };
     const eventId = "test-event-id";
+    const attributeId = "test-attribute-id";
     mockPrismaService.$transaction.mockImplementation(async (callback) => {
       return await callback(mockPrismaService);
     });
@@ -66,9 +77,9 @@ describe("Attributes Integration", () => {
       attributes: [],
     });
     mockPrismaService.attribute.create.mockResolvedValue({
-      id: 1,
+      uuid: attributeId,
       name: dto.name,
-      options: dto.options,
+      config: { maxSelections: 2 },
       order: dto.order,
       showInList: dto.showInList,
       type: dto.type,
@@ -76,9 +87,9 @@ describe("Attributes Integration", () => {
     });
     const result = await attributeController.create(dto, eventId);
     expect(result).toEqual({
-      id: 1,
+      uuid: attributeId,
       name: dto.name,
-      options: dto.options,
+      config: { maxSelections: 2 },
       order: dto.order,
       showInList: dto.showInList,
       type: dto.type,
@@ -90,19 +101,25 @@ describe("Attributes Integration", () => {
     expect(mockPrismaService.attribute.create).toHaveBeenCalledWith({
       data: {
         name: dto.name,
-        options: dto.options,
+        config: { maxSelections: 2 },
         order: dto.order,
         showInList: dto.showInList,
         type: dto.type,
         eventUuid: eventId,
       },
     });
+    expect(mockBlocksService.ensureRootBlock).toHaveBeenCalledWith(
+      eventId,
+      attributeId,
+      dto.name,
+      mockPrismaService,
+    );
   });
 
   it("should throw NotFoundException if event is not found when creating an attribute", async () => {
     const dto: CreateAttributeDto = {
       name: "Test Attribute",
-      options: ["Option 1", "Option 2"],
+      config: { maxSelections: 2 },
       order: 1,
       showInList: true,
       type: AttributeType.block,
@@ -123,7 +140,7 @@ describe("Attributes Integration", () => {
       {
         uuid: "test-attribute-id-1",
         name: "Test Attribute 1",
-        options: ["Option 1", "Option 2"],
+        config: { maxSelections: 2 },
         order: 1,
         showInList: true,
         type: AttributeType.block,
@@ -132,7 +149,7 @@ describe("Attributes Integration", () => {
       {
         uuid: "test-attribute-id-2",
         name: "Test Attribute 2",
-        options: ["Option A", "Option B"],
+        config: {},
         order: 2,
         showInList: false,
         type: AttributeType.text,
@@ -162,7 +179,7 @@ describe("Attributes Integration", () => {
     const mockAttribute = {
       uuid: attributeId,
       name: "Test Attribute",
-      options: ["Option 1", "Option 2"],
+      config: { maxSelections: 2 },
       order: 1,
       showInList: true,
       type: AttributeType.block,
@@ -193,7 +210,7 @@ describe("Attributes Integration", () => {
     const attributeId = "test-attribute-id";
     const dto: UpdateAttributeDto = {
       name: "Updated Test Attribute",
-      options: ["Updated Option 1", "Updated Option 2"],
+      config: { customValue: "ignored" },
       order: 2,
       showInList: false,
       type: AttributeType.text,
@@ -208,7 +225,7 @@ describe("Attributes Integration", () => {
     mockPrismaService.attribute.findFirst.mockResolvedValue({
       uuid: attributeId,
       name: "Test Attribute",
-      options: ["Option 1", "Option 2"],
+      config: { maxSelections: 2 },
       order: 1,
       showInList: true,
       type: AttributeType.block,
@@ -217,7 +234,7 @@ describe("Attributes Integration", () => {
     mockPrismaService.attribute.update.mockResolvedValue({
       uuid: attributeId,
       name: dto.name,
-      options: dto.options,
+      config: {},
       order: dto.order,
       showInList: dto.showInList,
       type: dto.type,
@@ -228,41 +245,36 @@ describe("Attributes Integration", () => {
     expect(result).toEqual({
       uuid: attributeId,
       name: dto.name,
-      options: dto.options,
+      config: {},
       order: dto.order,
       showInList: dto.showInList,
       type: dto.type,
       eventUuid: eventId,
     });
+    expect(mockBlocksService.deleteRootBlocks).toHaveBeenCalledWith(
+      attributeId,
+      mockPrismaService,
+    );
   });
   it("should delete an attribute", async () => {
     const eventId = "test-event-id";
     const attributeId = "test-attribute-id";
-    const mockAttribute = {
-      uuid: attributeId,
-      name: "Test Attribute",
-      options: ["Option 1", "Option 2"],
-      order: 1,
-      showInList: true,
-      type: AttributeType.block,
-      eventUuid: eventId,
-    };
     mockPrismaService.$transaction.mockImplementation(async (callback) => {
       return await callback(mockPrismaService);
     });
     mockPrismaService.event.findUnique.mockResolvedValue({
       uuid: eventId,
     });
-    mockPrismaService.attribute.deleteMany.mockResolvedValue(mockAttribute);
-    const result = await attributeController.remove(attributeId, eventId);
-    expect(result).toEqual({
+
+    mockPrismaService.attribute.findFirst.mockResolvedValue({
       uuid: attributeId,
-      name: "Test Attribute",
-      options: ["Option 1", "Option 2"],
-      order: 1,
-      showInList: true,
-      type: AttributeType.block,
-      eventUuid: eventId,
+    });
+    mockPrismaService.block.deleteMany.mockResolvedValue({ count: 3 });
+    mockPrismaService.attribute.deleteMany.mockResolvedValue({ count: 1 });
+    const result = await attributeController.remove(attributeId, eventId);
+    expect(result).toEqual({ count: 1 });
+    expect(mockPrismaService.block.deleteMany).toHaveBeenCalledWith({
+      where: { attributeUuid: attributeId },
     });
     expect(mockPrismaService.attribute.deleteMany).toHaveBeenCalledWith({
       where: { uuid: attributeId, eventUuid: eventId },

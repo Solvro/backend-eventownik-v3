@@ -2,6 +2,7 @@ import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import {
   Attribute,
+  AttributeType,
   EmailTemplate,
   ParticipantAttribute,
   ParticipantEmailStatus,
@@ -38,6 +39,286 @@ type ParticipantWithRelations = PrismaParticipant & {
 export class ParticipantsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private getStringConfigValues(
+    config: Prisma.JsonValue | null,
+    key: string,
+  ): string[] {
+    if (config == null || typeof config !== "object" || Array.isArray(config)) {
+      return [];
+    }
+
+    const values = (config as Record<string, unknown>)[key];
+    if (!Array.isArray(values)) {
+      return [];
+    }
+
+    return values.filter(
+      (value): value is string =>
+        typeof value === "string" && value.trim().length > 0,
+    );
+  }
+
+  private getBooleanConfigValue(
+    config: Prisma.JsonValue | null,
+    key: string,
+  ): boolean {
+    if (config == null || typeof config !== "object" || Array.isArray(config)) {
+      return false;
+    }
+
+    return (config as Record<string, unknown>)[key] === true;
+  }
+
+  private async normalizeParticipantAttributeValue(
+    eventUuid: string,
+    attribute: {
+      attributeUuid: string;
+      type: AttributeType;
+      config: Prisma.JsonValue | null;
+    },
+    value: unknown,
+  ): Promise<Prisma.InputJsonValue | typeof Prisma.JsonNull> {
+    if (attribute.type === AttributeType.select) {
+      if (value == null || value === "") {
+        return Prisma.JsonNull;
+      }
+      if (typeof value !== "string") {
+        throw new BadRequestException(
+          `Attribute ${attribute.attributeUuid} must be a string value.`,
+        );
+      }
+
+      const options = this.getStringConfigValues(attribute.config, "options");
+      const allowOther = this.getBooleanConfigValue(
+        attribute.config,
+        "allowOther",
+      );
+      if (!allowOther && options.length > 0 && !options.includes(value)) {
+        throw new BadRequestException(
+          `Invalid value for attribute ${attribute.attributeUuid}. Allowed values are: ${options.join(", ")}`,
+        );
+      }
+
+      return value;
+    }
+
+    if (attribute.type === AttributeType.multiSelect) {
+      if (value == null || value === "") {
+        return Prisma.JsonNull;
+      }
+
+      const rawValues = Array.isArray(value)
+        ? value
+        : typeof value === "string"
+          ? value.split(";")
+          : null;
+
+      if (rawValues == null) {
+        throw new BadRequestException(
+          `Attribute ${attribute.attributeUuid} must be a string array or a semicolon-separated string.`,
+        );
+      }
+
+      const normalizedValues = rawValues.map((item) => {
+        if (typeof item !== "string") {
+          throw new BadRequestException(
+            `Attribute ${attribute.attributeUuid} must contain only string values.`,
+          );
+        }
+        return item.trim();
+      });
+
+      if (normalizedValues.some((item) => item.length === 0)) {
+        throw new BadRequestException(
+          `Attribute ${attribute.attributeUuid} cannot contain empty values.`,
+        );
+      }
+
+      const options = this.getStringConfigValues(attribute.config, "options");
+      const allowOther = this.getBooleanConfigValue(
+        attribute.config,
+        "allowOther",
+      );
+      if (!allowOther && options.length > 0) {
+        const invalidValue = normalizedValues.find(
+          (item) => !options.includes(item),
+        );
+        if (invalidValue !== undefined) {
+          throw new BadRequestException(
+            `Invalid value for attribute ${attribute.attributeUuid}. Allowed values are: ${options.join(", ")}`,
+          );
+        }
+      }
+
+      return normalizedValues;
+    }
+
+    if (attribute.type === AttributeType.block) {
+      if (
+        value == null ||
+        value === "null" ||
+        value === "" ||
+        (Array.isArray(value) && value.length === 0)
+      ) {
+        return Prisma.JsonNull;
+      }
+
+      const rawValues = Array.isArray(value)
+        ? value
+        : typeof value === "string"
+          ? value.split(";")
+          : null;
+
+      if (rawValues == null) {
+        throw new BadRequestException(
+          `Attribute ${attribute.attributeUuid} must be an array of block UUIDs.`,
+        );
+      }
+
+      const normalizedValues = rawValues.map((item) => {
+        if (typeof item !== "string") {
+          throw new BadRequestException(
+            `Attribute ${attribute.attributeUuid} must contain only string values.`,
+          );
+        }
+        return item.trim();
+      });
+
+      if (normalizedValues.length === 0) {
+        return Prisma.JsonNull;
+      }
+
+      const blocksCount = await this.prisma.block.count({
+        where: {
+          uuid: { in: normalizedValues },
+          attribute: { eventUuid },
+        },
+      });
+
+      if (blocksCount !== normalizedValues.length) {
+        throw new BadRequestException(
+          `One or more block UUIDs are invalid or do not exist for attribute ${attribute.attributeUuid}.`,
+        );
+      }
+
+      const configObject =
+        attribute.config != null &&
+        typeof attribute.config === "object" &&
+        !Array.isArray(attribute.config)
+          ? (attribute.config as Record<string, unknown>)
+          : null;
+
+      const maxSelections =
+        configObject?.maxSelections !== undefined &&
+        typeof configObject.maxSelections === "number" &&
+        Number.isInteger(configObject.maxSelections) &&
+        configObject.maxSelections > 0
+          ? configObject.maxSelections
+          : 1;
+
+      if (normalizedValues.length > maxSelections) {
+        throw new BadRequestException(
+          `Attribute ${attribute.attributeUuid} cannot contain more than ${String(maxSelections)} selections.`,
+        );
+      }
+
+      return normalizedValues;
+    }
+
+    if (attribute.type === AttributeType.number) {
+      if (value == null || value === "") {
+        return Prisma.JsonNull;
+      }
+
+      const parsedValue =
+        typeof value === "number"
+          ? value
+          : typeof value === "string"
+            ? Number(value)
+            : Number.NaN;
+
+      if (Number.isNaN(parsedValue)) {
+        throw new BadRequestException(
+          `Attribute ${attribute.attributeUuid} must be a valid number.`,
+        );
+      }
+
+      return parsedValue;
+    }
+
+    if (
+      attribute.type === AttributeType.date ||
+      attribute.type === AttributeType.datetime
+    ) {
+      if (value == null || value === "") {
+        return Prisma.JsonNull;
+      }
+
+      const normalizedValue =
+        value instanceof Date
+          ? value.toISOString()
+          : typeof value === "string"
+            ? value
+            : null;
+
+      if (
+        normalizedValue == null ||
+        Number.isNaN(Date.parse(normalizedValue))
+      ) {
+        throw new BadRequestException(
+          `Attribute ${attribute.attributeUuid} must be a valid date/time format.`,
+        );
+      }
+
+      return normalizedValue;
+    }
+
+    if (attribute.type === AttributeType.checkbox) {
+      if (value == null || value === "") {
+        return Prisma.JsonNull;
+      }
+
+      if (typeof value === "boolean") {
+        return value;
+      }
+
+      if (typeof value === "number") {
+        if (value === 1) {
+          return true;
+        }
+        if (value === 0) {
+          return false;
+        }
+      }
+
+      if (typeof value === "string") {
+        const normalizedValue = value.toLowerCase();
+        if (["true", "1", "on"].includes(normalizedValue)) {
+          return true;
+        }
+        if (["false", "0", "off"].includes(normalizedValue)) {
+          return false;
+        }
+      }
+
+      throw new BadRequestException(
+        `Attribute ${attribute.attributeUuid} must be a boolean value.`,
+      );
+    }
+
+    if (value == null || value === "") {
+      return Prisma.JsonNull;
+    }
+
+    if (typeof value === "string") {
+      return value;
+    }
+
+    throw new BadRequestException(
+      `Attribute ${attribute.attributeUuid} must be a string value.`,
+    );
+  }
+
   private mapToEntity(participant: ParticipantWithRelations): Participant {
     return {
       uuid: participant.uuid,
@@ -59,7 +340,7 @@ export class ParticipantsService {
         name: emailStatus.email?.name,
         content: emailStatus.email?.content,
         trigger: emailStatus.email?.trigger,
-        triggerValue: emailStatus.email?.triggerValue,
+        triggerConfig: emailStatus.email?.triggerConfig,
       })),
     };
   }
@@ -82,83 +363,41 @@ export class ParticipantsService {
         uuid: { in: attributeUuids },
         eventUuid,
       },
-      select: { uuid: true, type: true },
+      select: { uuid: true, type: true, config: true },
     });
 
-    const validAttributeMap = new Map<string, string>();
+    const validAttributeMap = new Map<
+      string,
+      {
+        type: AttributeType;
+        config: Prisma.JsonValue | null;
+      }
+    >();
     for (const attribute of eventAttributes) {
-      validAttributeMap.set(attribute.uuid, attribute.type);
+      validAttributeMap.set(attribute.uuid, {
+        type: attribute.type,
+        config: attribute.config,
+      });
     }
 
     const transformedAttributes: Prisma.ParticipantAttributeUncheckedCreateWithoutParticipantInput[] =
       [];
 
     for (const attribute of participantAttributes) {
-      if (!validAttributeMap.has(attribute.attributeUuid)) {
+      const matchingAttribute = validAttributeMap.get(attribute.attributeUuid);
+      if (matchingAttribute == null) {
         continue;
       }
 
-      const type = validAttributeMap.get(attribute.attributeUuid);
-      let valueToSave = attribute.value;
-
-      switch (type) {
-        case "block": {
-          if (valueToSave == null || valueToSave === "null") {
-            valueToSave = null;
-          } else {
-            const block = await this.prisma.block.findFirst({
-              where: {
-                uuid: valueToSave,
-                attribute: { eventUuid },
-              },
-            });
-            if (block == null) {
-              throw new BadRequestException(
-                `Block with UUID ${valueToSave} does not exist.`,
-              );
-            }
-          }
-
-          break;
-        }
-        case "number": {
-          if (valueToSave != null && Number.isNaN(Number(valueToSave))) {
-            throw new BadRequestException(
-              `Attribute ${attribute.attributeUuid} must be a valid number.`,
-            );
-          }
-
-          break;
-        }
-        case "date":
-        case "datetime": {
-          if (valueToSave != null && Number.isNaN(Date.parse(valueToSave))) {
-            throw new BadRequestException(
-              `Attribute ${attribute.attributeUuid} must be a valid date/time format.`,
-            );
-          }
-
-          break;
-        }
-        case "checkbox": {
-          if (
-            valueToSave != null &&
-            !["true", "false", "1", "0", "on", "off"].includes(
-              valueToSave.toLowerCase(),
-            )
-          ) {
-            throw new BadRequestException(
-              `Attribute ${attribute.attributeUuid} must be a boolean value.`,
-            );
-          }
-
-          break;
-        }
-        case undefined:
-        default: {
-          break;
-        }
-      }
+      const valueToSave = await this.normalizeParticipantAttributeValue(
+        eventUuid,
+        {
+          attributeUuid: attribute.attributeUuid,
+          type: matchingAttribute.type,
+          config: matchingAttribute.config,
+        },
+        attribute.value,
+      );
 
       // TODO: Integrate EmailService for attribute_changed trigger
       // EmailService.sendOnTrigger(event, participant, "attribute_changed", attr.attributeUuid, valueToSave);
@@ -355,7 +594,9 @@ export class ParticipantsService {
                 attributes: {
                   some: {
                     attributeUuid,
-                    value: value as string,
+                    value: {
+                      equals: value as Prisma.InputJsonValue,
+                    },
                   },
                 },
               })),
@@ -519,7 +760,7 @@ export class ParticipantsService {
         data: uniqueParticipantIds.map((pUuid) => ({
           participantUuid: pUuid,
           attributeUuid,
-          value: valueToSave ?? "",
+          value: valueToSave,
         })),
       });
     });

@@ -1,3 +1,5 @@
+import { Prisma } from "src/generated/prisma/client";
+import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import {
@@ -12,10 +14,22 @@ import { Block } from "./entities/block.entity";
 
 @Injectable()
 export class BlocksService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly participantsService: ParticipantsService,
+  ) {}
 
-  private async checkAttributeExists(eventId: string, attributeId: string) {
-    const attribute = await this.prisma.attribute.findFirst({
+  private getClient(tx?: Prisma.TransactionClient) {
+    return tx ?? this.prisma;
+  }
+
+  private async checkAttributeExists(
+    eventId: string,
+    attributeId: string,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const prisma = this.getClient(tx);
+    const attribute = await prisma.attribute.findFirst({
       where: { uuid: attributeId, eventUuid: eventId },
     });
 
@@ -31,8 +45,10 @@ export class BlocksService {
   private async checkParentBlockExists(
     attributeId: string,
     parentUuid: string,
+    tx?: Prisma.TransactionClient,
   ) {
-    const parentBlock = await this.prisma.block.findFirst({
+    const prisma = this.getClient(tx);
+    const parentBlock = await prisma.block.findFirst({
       where: { uuid: parentUuid, attributeUuid: attributeId },
     });
 
@@ -65,6 +81,44 @@ export class BlocksService {
     });
   }
 
+  async ensureRootBlock(
+    eventId: string,
+    attributeId: string,
+    rootName: string,
+    tx: Prisma.TransactionClient,
+  ) {
+    const prisma = this.getClient(tx);
+    await this.checkAttributeExists(eventId, attributeId, tx);
+
+    const existingRoot = await prisma.block.findFirst({
+      where: { attributeUuid: attributeId, isRootBlock: true },
+      select: { uuid: true },
+    });
+    if (existingRoot != null) {
+      return existingRoot;
+    }
+
+    return prisma.block.create({
+      data: {
+        name: rootName,
+        description: null,
+        capacity: null,
+        order: 0,
+        parentUuid: null,
+        attributeUuid: attributeId,
+        isRootBlock: true,
+      },
+      select: { uuid: true },
+    });
+  }
+
+  async deleteRootBlocks(attributeId: string, tx: Prisma.TransactionClient) {
+    const prisma = this.getClient(tx);
+    return prisma.block.deleteMany({
+      where: { attributeUuid: attributeId },
+    });
+  }
+
   async findAll(eventId: string, attributeId: string) {
     await this.checkAttributeExists(eventId, attributeId);
 
@@ -75,7 +129,7 @@ export class BlocksService {
     const blocksMap = new Map<string, Block>();
 
     for (const block of blocks) {
-      blocksMap.set(block.uuid, { ...block, children: [] } as Block);
+      blocksMap.set(block.uuid, { ...block, children: [] });
     }
 
     let rootBlock: Block | null = null;
@@ -174,5 +228,159 @@ export class BlocksService {
     await this.prisma.block.delete({
       where: { uuid: id },
     });
+  }
+
+  async getBlockParticipantsCount(
+    blockId: string,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const prisma = this.getClient(tx);
+    return prisma.participantAttribute.count({
+      where: {
+        value: {
+          array_contains: blockId,
+        },
+      },
+    });
+  }
+
+  async canSignInToBlock(
+    eventId: string,
+    attributeId: string,
+    blockId: string,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const prisma = this.getClient(tx);
+    const block = await prisma.block.findFirst({
+      where: {
+        uuid: blockId,
+        attributeUuid: attributeId,
+        attribute: {
+          eventUuid: eventId,
+        },
+      },
+    });
+
+    if (block == null || block.isRootBlock) {
+      return false;
+    }
+
+    if (block.capacity === null) {
+      return false;
+    }
+
+    const count = await this.getBlockParticipantsCount(blockId, tx);
+    return count < block.capacity;
+  }
+
+  async getBlockTree(eventSlug: string, attributeUuid: string): Promise<Block> {
+    const event = await this.prisma.event.findUnique({
+      where: { slug: eventSlug },
+    });
+
+    const blocks = await this.prisma.block.findMany({
+      where: {
+        attributeUuid,
+        attribute: {
+          eventUuid: event?.uuid,
+        },
+      },
+    });
+
+    const blockMap = new Map<
+      string,
+      Block & { blockParticipantCount?: number; children: Block[] }
+    >();
+
+    for (const block of blocks) {
+      let blockParticipantCount: number | undefined;
+
+      if (block.capacity !== null) {
+        blockParticipantCount = await this.getBlockParticipantsCount(
+          block.uuid,
+        );
+      }
+
+      blockMap.set(block.uuid, {
+        ...block,
+        blockParticipantCount,
+        children: [],
+      });
+    }
+
+    let root: Block | null = null;
+
+    for (const block of blockMap.values()) {
+      if (block.isRootBlock) {
+        root = block;
+      }
+
+      if (block.parentUuid !== null) {
+        blockMap.get(block.parentUuid)?.children.push(block);
+      }
+    }
+
+    if (root === null) {
+      throw new NotFoundException(
+        `Attribute with UUID ${attributeUuid} doesn't have a block tree`,
+      );
+    }
+
+    return root;
+  }
+
+  async getBlockParticipants(
+    eventSlug: string,
+    attributeUuid: string,
+    blockUuid: string,
+  ) {
+    const event = await this.prisma.event.findUnique({
+      where: { slug: eventSlug },
+      select: { uuid: true },
+    });
+
+    if (event === null) {
+      throw new NotFoundException(`Event with slug ${eventSlug} doesn't exist`);
+    }
+
+    const block = await this.prisma.block.findUnique({
+      where: {
+        uuid: blockUuid,
+        attributeUuid,
+        attribute: {
+          eventUuid: event.uuid,
+        },
+      },
+      select: { uuid: true, attribute: { select: { config: true } } },
+    });
+
+    if (block?.attribute == null) {
+      throw new NotFoundException(`Block with UUID ${blockUuid} doesn't exist`);
+    }
+
+    const config = block.attribute.config;
+
+    let bonusAttributes = "";
+
+    if (config !== null && typeof config === "object") {
+      const configJson = config as Prisma.JsonObject;
+
+      const participantFields: unknown = configJson.participantFields;
+
+      if (
+        Array.isArray(participantFields) &&
+        participantFields.every((item) => typeof item === "string")
+      ) {
+        bonusAttributes = participantFields.join(",");
+      }
+    }
+
+    const participants = await this.participantsService.findAll(event.uuid, {
+      skip: 0,
+      filters: { attributeUuid: blockUuid },
+      bonusAttributes,
+    });
+
+    return participants;
   }
 }

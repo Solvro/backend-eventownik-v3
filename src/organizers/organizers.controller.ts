@@ -1,7 +1,7 @@
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
-import { PageDto } from "src/common/dto/page.dto";
+import { ApiPaginatedResponse } from "src/common/decorators/api-paginated-response.decorator";
 import { PermissionType } from "src/generated/prisma/enums";
 
 import {
@@ -18,11 +18,17 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiNoContentResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
   ApiOperation,
-  ApiResponse,
+  ApiParam,
   ApiTags,
-  getSchemaPath,
+  ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 
 import { CreateOrganizerDto } from "./dto/create-organizer.dto";
@@ -35,14 +41,8 @@ import { OrganizersService } from "./organizers.service";
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @RequirePermission(PermissionType.MANAGE_EVENT)
-@ApiResponse({
-  status: 401,
-  description: "Unauthorized",
-})
-@ApiResponse({
-  status: 403,
-  description: "Forbidden - insufficient permissions",
-})
+@ApiUnauthorizedResponse({ description: "Unauthorized" })
+@ApiForbiddenResponse({ description: "Forbidden - insufficient permissions" })
 @Controller("events/:eventId/organizers")
 export class OrganizersController {
   constructor(private readonly organizersService: OrganizersService) {}
@@ -50,16 +50,10 @@ export class OrganizersController {
   @Post()
   @RequirePermission(PermissionType.MANAGE_SETTINGS)
   @ApiOperation({ summary: "Add an organizer to event" })
-  @ApiResponse({
-    status: 201,
-    description: "Organizer added successfully",
-  })
-  @ApiResponse({
-    status: 404,
-    description: "admin, event or permission not found",
-  })
-  @ApiResponse({
-    status: 400,
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiCreatedResponse({ description: "Organizer added successfully" })
+  @ApiNotFoundResponse({ description: "admin, event or permission not found" })
+  @ApiBadRequestResponse({
     description: "All permissionIds's elements must be unique",
   })
   async create(
@@ -71,27 +65,9 @@ export class OrganizersController {
 
   @Get()
   @ApiOperation({ summary: "Get all organizers for an event" })
-  @ApiResponse({
-    status: 200,
-    description: "Organizers retrieved successfully",
-    schema: {
-      allOf: [
-        { $ref: getSchemaPath(PageDto) },
-        {
-          properties: {
-            data: {
-              type: "array",
-              items: { $ref: getSchemaPath(OrganizerResponseDto) },
-            },
-          },
-        },
-      ],
-    },
-  })
-  @ApiResponse({
-    status: 404,
-    description: "Event with this uuid was not found",
-  })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiPaginatedResponse(OrganizerResponseDto)
+  @ApiNotFoundResponse({ description: "Event with this uuid was not found" })
   async findAll(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Query() query: OrganizerListingDto,
@@ -101,13 +77,13 @@ export class OrganizersController {
 
   @Get(":organizerId")
   @ApiOperation({ summary: "Get organizer by event id and organizer id" })
-  @ApiResponse({
-    status: 200,
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "organizerId", description: "UUID of the organizer" })
+  @ApiOkResponse({
     description: "Organizer retrieved successfully",
     type: OrganizerResponseDto,
   })
-  @ApiResponse({
-    status: 404,
+  @ApiNotFoundResponse({
     description:
       "organizer or event does not exist, or the organizer is not assigned to this event",
   })
@@ -121,17 +97,14 @@ export class OrganizersController {
   @Patch(":organizerId")
   @RequirePermission(PermissionType.MANAGE_SETTINGS)
   @ApiOperation({ summary: "Update organizer permissions" })
-  @ApiResponse({
-    status: 200,
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "organizerId", description: "UUID of the organizer" })
+  @ApiOkResponse({
     description: "Organizer updated successfully",
     type: OrganizerResponseDto,
   })
-  @ApiResponse({
-    status: 404,
-    description: "admin, event or permission not found",
-  })
-  @ApiResponse({
-    status: 400,
+  @ApiNotFoundResponse({ description: "admin, event or permission not found" })
+  @ApiBadRequestResponse({
     description: "Duplicate permissions are not allowed",
   })
   async update(
@@ -150,18 +123,11 @@ export class OrganizersController {
   @RequirePermission(PermissionType.MANAGE_SETTINGS)
   @HttpCode(204)
   @ApiOperation({ summary: "Delete organizer" })
-  @ApiResponse({
-    status: 204,
-    description: "Organizer deleted successfully",
-  })
-  @ApiResponse({
-    status: 404,
-    description: "Admin or event not found",
-  })
-  @ApiResponse({
-    status: 403,
-    description: "Cannot remove the last organizer",
-  })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "organizerId", description: "UUID of the organizer" })
+  @ApiNoContentResponse({ description: "Organizer deleted successfully" })
+  @ApiNotFoundResponse({ description: "Admin or event not found" })
+  @ApiForbiddenResponse({ description: "Cannot remove the last organizer" })
   async remove(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("organizerId", ParseUUIDPipe) organizerId: string,

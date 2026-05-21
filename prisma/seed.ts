@@ -93,7 +93,7 @@ async function main() {
       name: "T-shirt size",
       eventUuid: event.uuid,
       type: AttributeType.select,
-      options: ["S", "M", "L", "XL"] as string[],
+      config: { options: ["S", "M", "L", "XL"] },
       showInList: true,
       order: 1,
     },
@@ -155,9 +155,6 @@ async function main() {
       name: "Welcome",
       content: "Welcome to the event!",
       trigger: EmailTrigger.PARTICIPANT_REGISTERED,
-      formUuid: form.uuid,
-      triggerValue: null,
-      triggerValue2: null,
     },
   });
 
