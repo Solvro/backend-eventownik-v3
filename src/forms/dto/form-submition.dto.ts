@@ -1,4 +1,4 @@
-import { Type } from "class-transformer";
+import { plainToInstance, Transform, Type } from "class-transformer";
 import {
   IsArray,
   IsEmail,
@@ -22,7 +22,8 @@ export class ParticipantAttributeDto {
       "- text/select: string\n" +
       "- number: number\n" +
       "- multiSelect/block: string[] (Array of UUIDs or options)\n" +
-      "- checkbox: boolean",
+      "- checkbox: boolean\n" +
+      "- for files write filename with extension (e.g., 'document.pdf')",
   })
   @IsOptional()
   value?: unknown;
@@ -33,12 +34,14 @@ export class FormSubmitionDto {
   @IsOptional()
   @IsString()
   @IsEmail()
+  @Transform(({ value }) => (value === "" ? undefined : (value as string)))
   email?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   @IsUUID()
+  @Transform(({ value }) => (value === "" ? undefined : (value as string)))
   participantId?: string;
 
   @ApiProperty({
@@ -48,5 +51,21 @@ export class FormSubmitionDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ParticipantAttributeDto)
+  @Transform(({ value }) => {
+    if (value === null || value === undefined || value === "") {
+      return [];
+    }
+    if (typeof value === "string") {
+      try {
+        const parsed: unknown = JSON.parse(value);
+        const array = Array.isArray(parsed) ? parsed : [parsed];
+        return plainToInstance(ParticipantAttributeDto, array);
+      } catch {
+        return value as unknown;
+      }
+    }
+
+    return value as unknown;
+  })
   attributes: ParticipantAttributeDto[];
 }
