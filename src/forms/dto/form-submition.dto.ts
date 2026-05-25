@@ -2,6 +2,7 @@ import { Type } from "class-transformer";
 import {
   IsArray,
   IsEmail,
+  IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
@@ -49,4 +50,11 @@ export class FormSubmitionDto {
   @ValidateNested({ each: true })
   @Type(() => ParticipantAttributeDto)
   attributes: ParticipantAttributeDto[];
+
+  @ApiProperty({
+    description: "hCaptcha response token",
+  })
+  @IsString()
+  @IsNotEmpty()
+  "h-captcha-response": string;
 }
