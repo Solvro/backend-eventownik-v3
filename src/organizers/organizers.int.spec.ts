@@ -1,25 +1,3 @@
-/**
- * Real-database integration tests for OrganizersService.
- *
- * These tests hit an actual PostgreSQL database, so they verify that:
- *   - Prisma queries are valid against the real schema
- *   - Unique constraints and FK constraints behave as expected
- *   - Transactions work correctly (e.g. create + permission assignment is atomic)
- *
- * Prerequisites
- * -------------
- * DATABASE_URL must point to a test database with migrations applied.
- *   - Locally: copy .env.test.example → .env.test and adjust the URL.
- *   - CI: DATABASE_URL is injected automatically (see .github/workflows/ci.yml).
- *
- * Isolation
- * ---------
- * Each test creates its own records with unique identifiers (UUID-based email /
- * slug suffixes). Cleanup runs once after all tests in this file and is scoped
- * to only the records created here, making it safe to run in parallel with other
- * spec files.
- */
-
 import {
   BadRequestException,
   ForbiddenException,
@@ -38,7 +16,6 @@ describe("OrganizersService (integration)", () => {
   let service: OrganizersService;
   let prisma: PrismaService;
 
-  // Tracked so afterAll only deletes what this suite created.
   const createdAdminUuids: string[] = [];
   const createdEventUuids: string[] = [];
 
@@ -48,7 +25,6 @@ describe("OrganizersService (integration)", () => {
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      // Only the pieces under test — no mocks, real PrismaService.
       providers: [OrganizersService, PrismaService],
     }).compile();
 
@@ -57,8 +33,6 @@ describe("OrganizersService (integration)", () => {
   });
 
   afterAll(async () => {
-    // Delete in FK-safe order.
-    // EventPermission has no onDelete cascade on its relations, so it must go first.
     await prisma.eventPermission.deleteMany({
       where: {
         OR: [
@@ -79,9 +53,6 @@ describe("OrganizersService (integration)", () => {
 
   // ---------------------------------------------------------------------------
   // Helpers / factories
-  //
-  // Every helper pushes created UUIDs into the tracking arrays so afterAll
-  // knows what to clean up.
   // ---------------------------------------------------------------------------
 
   async function createAdmin(
@@ -96,9 +67,7 @@ describe("OrganizersService (integration)", () => {
       data: {
         firstName: "Test",
         lastName: "Organizer",
-        // Unique per call — prevents collisions even across parallel workers.
-        email: `${Date.now()}-${Math.random().toString(36).slice(2)}@organizers-int.local`,
-        // Not a real hash — organizer tests never touch auth logic.
+        email: `${String(Date.now())}-${Math.random().toString(36).slice(2)}@organizers-int.local`,
         password: "$2b$10$placeholder.not.used.in.organizer.tests.only",
         active: true,
         ...overrides,
@@ -120,7 +89,7 @@ describe("OrganizersService (integration)", () => {
     const event = await prisma.event.create({
       data: {
         name: "Test Event",
-        slug: `organizers-int-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        slug: `organizers-int-${String(Date.now())}-${Math.random().toString(36).slice(2)}`,
         startDate: new Date("2025-06-01"),
         endDate: new Date("2025-06-02"),
         organizerUuid,
@@ -131,8 +100,6 @@ describe("OrganizersService (integration)", () => {
     return event;
   }
 
-  // Directly inserts EventPermission rows, bypassing service logic.
-  // Used to set up preconditions without going through the service under test.
   async function assignPermissions(
     adminUuid: string,
     eventUuid: string,
@@ -153,8 +120,6 @@ describe("OrganizersService (integration)", () => {
 
   describe("findAll", () => {
     it("returns all organizers assigned to the event", async () => {
-      // owner is linked via the events relation (organizerUuid field).
-      // coOrganizer is linked via an EventPermission row.
       const owner = await createAdmin();
       const coOrganizer = await createAdmin();
       const event = await createEvent(owner.uuid);
@@ -227,7 +192,10 @@ describe("OrganizersService (integration)", () => {
 
       const organizer = result.data.find((o) => o.email === admin.email);
       expect(organizer).toBeDefined();
-      const types = organizer!.permissions.map((p) => p.permission);
+      if (organizer == null) {
+        return;
+      }
+      const types = organizer.permissions.map((p) => p.permission);
       expect(types).toContain(PermissionType.MANAGE_FORM);
       expect(types).not.toContain(PermissionType.MANAGE_EMAIL);
     });
@@ -254,7 +222,6 @@ describe("OrganizersService (integration)", () => {
       const owner = await createAdmin();
       const unassigned = await createAdmin();
       const event = await createEvent(owner.uuid);
-      // unassigned has no relation to event
 
       await expect(
         service.findOne(event.uuid, unassigned.uuid),
@@ -291,8 +258,11 @@ describe("OrganizersService (integration)", () => {
       });
 
       expect(result).toBeDefined();
-      expect(result!.uuid).toBe(newOrganizer.uuid);
-      const types = result!.permissions.map((p) => p.permission);
+      if (result == null) {
+        return;
+      }
+      expect(result.uuid).toBe(newOrganizer.uuid);
+      const types = result.permissions.map((p) => p.permission);
       expect(types).toContain(PermissionType.MANAGE_PARTICIPANT);
       expect(types).toContain(PermissionType.MANAGE_FORM);
     });
@@ -325,7 +295,7 @@ describe("OrganizersService (integration)", () => {
       const owner = await createAdmin();
       const organizer = await createAdmin();
       const event = await createEvent(owner.uuid);
-      // Pre-seed the permission directly so we can trigger the conflict.
+
       await assignPermissions(organizer.uuid, event.uuid, [
         PermissionType.MANAGE_EVENT,
       ]);
@@ -360,7 +330,10 @@ describe("OrganizersService (integration)", () => {
       });
 
       expect(result).toBeDefined();
-      const types = result!.permissions.map((p) => p.permission);
+      if (result == null) {
+        return;
+      }
+      const types = result.permissions.map((p) => p.permission);
       expect(types).not.toContain(PermissionType.MANAGE_EVENT); // old one gone
       expect(types).toContain(PermissionType.MANAGE_PARTICIPANT);
       expect(types).toContain(PermissionType.MANAGE_EMAIL);
@@ -403,7 +376,6 @@ describe("OrganizersService (integration)", () => {
 
       await service.remove(event.uuid, organizer.uuid);
 
-      // Verify directly in the DB that the rows are gone.
       const remaining = await prisma.eventPermission.findMany({
         where: { adminUuid: organizer.uuid, eventUuid: event.uuid },
       });
@@ -412,8 +384,7 @@ describe("OrganizersService (integration)", () => {
 
     it("throws ForbiddenException when trying to remove the last organizer", async () => {
       const owner = await createAdmin();
-      // createEvent sets event.organizerUuid = owner.uuid, which makes owner the
-      // sole organizer via the events relation. No EventPermission rows needed.
+
       const event = await createEvent(owner.uuid);
 
       await expect(service.remove(event.uuid, owner.uuid)).rejects.toThrow(
