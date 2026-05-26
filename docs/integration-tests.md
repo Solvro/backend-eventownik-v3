@@ -226,10 +226,11 @@ The linter (`@typescript-eslint/restrict-template-expressions`) does not allow n
 Copy this skeleton when starting a new `*.int.spec.ts`:
 
 ```typescript
+import { PrismaService } from "src/prisma/prisma.service";
+
 import { NotFoundException } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import type { TestingModule } from "@nestjs/testing";
-import { PrismaService } from "src/prisma/prisma.service";
 
 import { MyService } from "./my.service";
 
