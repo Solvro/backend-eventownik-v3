@@ -1,3 +1,7 @@
+import type { Admin, Event } from "src/generated/prisma/client";
+import { PermissionType } from "src/generated/prisma/client";
+import { PrismaService } from "src/prisma/prisma.service";
+
 import {
   BadRequestException,
   ForbiddenException,
@@ -5,9 +9,6 @@ import {
 } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import type { TestingModule } from "@nestjs/testing";
-import type { Admin, Event } from "src/generated/prisma/client";
-import { PermissionType } from "src/generated/prisma/client";
-import { PrismaService } from "src/prisma/prisma.service";
 
 import { OrganizerListingDto } from "./dto/organizer-listing.dto";
 import { OrganizersService } from "./organizers.service";
