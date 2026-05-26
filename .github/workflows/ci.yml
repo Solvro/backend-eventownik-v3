@@ -25,21 +25,26 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
       - name: Setup node
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: "npm"
+          cache: "pnpm"
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Check commit name
         if: github.event_name == 'pull_request'
         run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
 
       - name: Run prettier
-        run: npm run format:check
+        run: pnpm run format:check
         if: always()
 
       - name: Generate Prisma Client
@@ -49,11 +54,11 @@ jobs:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/eventownik_test_db"
 
       - name: Run Lint
-        run: npm run lint
+        run: pnpm run lint
         if: always()
 
       - name: Check types
-        run: npm run typecheck
+        run: pnpm run typecheck
         if: always()
 
       - name: Apply Prisma migrations
@@ -63,14 +68,14 @@ jobs:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/eventownik_test_db"
 
       - name: Run tests
-        run: npm test
+        run: pnpm test
         if: always()
         env:
           NODE_ENV: test
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/eventownik_test_db"
 
       - name: Build
-        run: npm run build
+        run: pnpm run build
         if: always()
         env:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/eventownik_test_db"
