@@ -116,11 +116,9 @@ export class EventsController {
     @Request() request: { user: AuthUser },
   ): Promise<Event> {
     let photoUrl = eventDto.photoUrl ?? null;
-    console.log("Received event update DTO:", eventDto);
-    console.log("Received photo file:", photo);
     if (photo !== undefined) {
       const existing = await this.eventsService.findOne(eventUUID);
-      if (existing.photoUrl) {
+      if (existing.photoUrl !== null) {
         await this.storageService.delete(
           this.configService.getOrThrow("S3_BUCKET_EVENTS"),
           existing.photoUrl,
@@ -147,7 +145,7 @@ export class EventsController {
     @Param("eventId", ParseUUIDPipe) eventUUID: string,
   ): Promise<Event> {
     const existing = await this.eventsService.findOne(eventUUID);
-    if (existing.photoUrl) {
+    if (existing.photoUrl !== null) {
       await this.storageService.delete(
         this.configService.getOrThrow("S3_BUCKET_EVENTS"),
         existing.photoUrl,
