@@ -1,7 +1,4 @@
-import { diskStorage } from "multer";
-import { existsSync, mkdirSync } from "node:fs";
-// eslint-disable-next-line unicorn/import-style
-import { extname } from "node:path";
+import { memoryStorage } from "multer";
 
 import {
   BadRequestException,
@@ -14,22 +11,7 @@ export function UploadPhoto() {
   return applyDecorators(
     UseInterceptors(
       FileInterceptor("photo", {
-        storage: diskStorage({
-          destination: (_request, _file, callback) => {
-            const uploadPath = "./uploads/events";
-            if (!existsSync(uploadPath)) {
-              mkdirSync(uploadPath, { recursive: true });
-            }
-            callback(null, uploadPath);
-          },
-          filename: (_request, file, callback) => {
-            const now = Date.now().toString();
-            const random = Math.round(Math.random() * 1e9).toString();
-            const uniqueSuffix = `${now}-${random}`;
-            const extension = extname(file.originalname);
-            callback(null, `${uniqueSuffix}${extension}`);
-          },
-        }),
+        storage: memoryStorage(),
         limits: { fileSize: 10 * 1024 * 1024 },
         fileFilter: (_request, file, callback) => {
           const allowedTypes = [

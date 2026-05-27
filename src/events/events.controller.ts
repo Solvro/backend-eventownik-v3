@@ -35,9 +35,12 @@ import {
 
 import { EventCreateDto } from "./dto/event-create.dto";
 import { EventListingDto } from "./dto/event-listing.dto";
+import { EventUpdateDto } from "./dto/event-update.dto";
 import { Event } from "./entities/event.entity";
 import { EventsService } from "./events.service";
 import { UploadPhoto } from "./utils/upload-photo.decorator";
+import { StorageService } from "src/storage/storage.service";
+import { ConfigService } from "@nestjs/config";
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @ApiBearerAuth()
@@ -46,7 +49,11 @@ import { UploadPhoto } from "./utils/upload-photo.decorator";
 @ApiTags("Events")
 @Controller("events")
 export class EventsController {
-  constructor(private readonly eventsService: EventsService) {}
+  constructor(
+    private readonly eventsService: EventsService,
+    private readonly storageService: StorageService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: "Get list of events with pagination and filtering" })
@@ -74,10 +81,13 @@ export class EventsController {
     let photoUrl = eventDto.photoUrl ?? null;
 
     if (photo !== undefined) {
-      photoUrl = `/uploads/events/${photo.filename}`;
+      photoUrl = await this.storageService.upload(
+        this.configService.getOrThrow("S3_BUCKET_EVENTS"),
+        photo,
+      );
     }
-    eventDto.applyUserTypeRestrictions(request.user.type);
 
+    eventDto.applyUserTypeRestrictions(request.user.type);
     return this.eventsService.create(eventDto, photoUrl, request.user.uuid);
   }
 
@@ -102,16 +112,27 @@ export class EventsController {
     @Param("eventId", ParseUUIDPipe) eventUUID: string,
     @UploadedFile()
     photo: Express.Multer.File | undefined,
-    @Body() eventDto: EventCreateDto,
+    @Body() eventDto: EventUpdateDto,
     @Request() request: { user: AuthUser },
   ): Promise<Event> {
     let photoUrl = eventDto.photoUrl ?? null;
-
+    console.log("Received event update DTO:", eventDto);
+    console.log("Received photo file:", photo);
     if (photo !== undefined) {
-      photoUrl = `/uploads/events/${photo.filename}`;
+      const existing = await this.eventsService.findOne(eventUUID);
+      if (existing.photoUrl) {
+        await this.storageService.delete(
+          this.configService.getOrThrow("S3_BUCKET_EVENTS"),
+          existing.photoUrl,
+        );
+      }
+      photoUrl = await this.storageService.upload(
+        this.configService.getOrThrow("S3_BUCKET_EVENTS"),
+        photo,
+      );
     }
-    eventDto.applyUserTypeRestrictions(request.user.type);
 
+    eventDto.applyUserTypeRestrictions?.(request.user.type);
     return this.eventsService.update(eventUUID, eventDto, photoUrl);
   }
 
@@ -125,6 +146,13 @@ export class EventsController {
   async remove(
     @Param("eventId", ParseUUIDPipe) eventUUID: string,
   ): Promise<Event> {
+    const existing = await this.eventsService.findOne(eventUUID);
+    if (existing.photoUrl) {
+      await this.storageService.delete(
+        this.configService.getOrThrow("S3_BUCKET_EVENTS"),
+        existing.photoUrl,
+      );
+    }
     return this.eventsService.remove(eventUUID);
   }
 }
