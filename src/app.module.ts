@@ -20,6 +20,7 @@ import { ImportExportModule } from "./import-export/import-export.module";
 import { OrganizersModule } from "./organizers/organizers.module";
 import { ParticipantsModule } from "./participants/participants.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { StorageModule } from "./storage/storage.module";
 
 @Module({
   imports: [
@@ -41,6 +42,12 @@ import { PrismaModule } from "./prisma/prisma.module";
         SMTP_USER: Joi.string().required(),
         SMTP_PASS: Joi.string().required(),
         SMTP_FROM: Joi.string().required(),
+        S3_ENDPOINT: Joi.string().required(),
+        S3_ACCESS_KEY: Joi.string().required(),
+        S3_SECRET_KEY: Joi.string().required(),
+        S3_BUCKET_EVENTS: Joi.string().required(),
+        S3_BUCKET_FORMS: Joi.string().required(),
+        S3_PUBLIC_URL: Joi.string().required(),
       }),
       isGlobal: true,
     }),
@@ -92,6 +99,7 @@ import { PrismaModule } from "./prisma/prisma.module";
       }),
     }),
     EmailsModule,
+    StorageModule,
   ],
   controllers: [AppController],
   providers: [AppService],
