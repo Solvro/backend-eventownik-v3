@@ -26,6 +26,7 @@ import { PrismaModule } from "./prisma/prisma.module";
     ConfigModule.forRoot({
       validationSchema: Joi.object({
         APP_DOMAIN: Joi.string().required(),
+        CORS_ORIGINS: Joi.string().required(),
         DATABASE_URL: Joi.string().required(),
         HCAPTCHA_SECRET: Joi.string().required(),
         JWT_SECRET: Joi.string().required(),
