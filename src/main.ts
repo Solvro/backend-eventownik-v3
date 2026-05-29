@@ -2,7 +2,11 @@ import type * as express from "express";
 import * as qs from "qs";
 import { swaggerConfig } from "src/config/swagger.config";
 
-import { ValidationPipe, VersioningType } from "@nestjs/common";
+import {
+  ForbiddenException,
+  ValidationPipe,
+  VersioningType,
+} from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { SwaggerModule } from "@nestjs/swagger";
 
@@ -36,8 +40,28 @@ async function bootstrap() {
     SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup("api/docs", app, documentFactory);
 
+  const corsEntries = (process.env.CORS_ORIGINS ?? "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+  const allowAll = corsEntries.includes("*");
+  const exactOrigins = corsEntries.filter((o) => !o.startsWith("*."));
+  const wildcardDomains = corsEntries
+    .filter((o) => o.startsWith("*."))
+    .map((o) => o.slice(1));
+
   app.enableCors({
-    origin: process.env.CORS_ORIGINS,
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
+      if (!origin) return callback(null, true);
+      if (allowAll) return callback(null, true);
+      if (exactOrigins.includes(origin)) return callback(null, true);
+      if (wildcardDomains.some((domain) => origin.endsWith(domain)))
+        return callback(null, true);
+      callback(new ForbiddenException("Not allowed by CORS"), false);
+    },
     credentials: true,
   });
 
