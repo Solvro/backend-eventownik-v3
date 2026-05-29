@@ -1,4 +1,4 @@
-import { plainToInstance, Transform, Type } from "class-transformer";
+import { Transform, Type, plainToInstance } from "class-transformer";
 import {
   IsArray,
   IsEmail,
