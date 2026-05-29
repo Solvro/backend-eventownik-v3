@@ -45,7 +45,7 @@ async function bootstrap() {
     .map((o) => o.trim())
     .filter(Boolean);
   const allowAll = corsEntries.includes("*");
-  const exactOrigins = corsEntries.filter((o) => !o.startsWith("*."));
+  const exactOrigins = new Set(corsEntries.filter((o) => !o.startsWith("*.")));
   const wildcardDomains = corsEntries
     .filter((o) => o.startsWith("*."))
     .map((o) => o.slice(1));
@@ -53,13 +53,24 @@ async function bootstrap() {
   app.enableCors({
     origin: (
       origin: string | undefined,
-      callback: (err: Error | null, allow?: boolean) => void,
+      callback: (error: Error | null, allow?: boolean) => void,
     ) => {
-      if (!origin) return callback(null, true);
-      if (allowAll) return callback(null, true);
-      if (exactOrigins.includes(origin)) return callback(null, true);
-      if (wildcardDomains.some((domain) => origin.endsWith(domain)))
-        return callback(null, true);
+      if (origin === undefined) {
+        callback(null, true);
+        return;
+      }
+      if (allowAll) {
+        callback(null, true);
+        return;
+      }
+      if (exactOrigins.has(origin)) {
+        callback(null, true);
+        return;
+      }
+      if (wildcardDomains.some((domain) => origin.endsWith(domain))) {
+        callback(null, true);
+        return;
+      }
       callback(new ForbiddenException("Not allowed by CORS"), false);
     },
     credentials: true,
