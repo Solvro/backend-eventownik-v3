@@ -41,6 +41,7 @@ describe("Blocks Integration", () => {
 
   const mockParticipantService = {
     findAll: jest.fn(),
+    getPublicBlockAttributes: jest.fn(),
   };
 
   const eventId = "3fa85f64-5717-4562-b3fc-2c963f66afa6";
@@ -458,7 +459,10 @@ describe("Blocks Integration", () => {
         attribute: { config: null },
       });
 
-      mockParticipantService.findAll.mockResolvedValue(["p1", "p2"]);
+      mockParticipantService.getPublicBlockAttributes.mockResolvedValue([
+        "p1",
+        "p2",
+      ]);
 
       const result = await blocksPublicController.getBlockParticipants(
         "event-slug",
@@ -466,14 +470,9 @@ describe("Blocks Integration", () => {
         "block-uuid",
       );
 
-      expect(mockParticipantService.findAll).toHaveBeenCalledWith(
-        "event-uuid",
-        {
-          skip: 0,
-          filters: { attributeUuid: "block-uuid" },
-          bonusAttributes: "",
-        },
-      );
+      expect(
+        mockParticipantService.getPublicBlockAttributes,
+      ).toHaveBeenCalledWith("event-uuid", "block-uuid", []);
 
       expect(result).toEqual(["p1", "p2"]);
     });
@@ -492,7 +491,7 @@ describe("Blocks Integration", () => {
         },
       });
 
-      mockParticipantService.findAll.mockResolvedValue(["p1"]);
+      mockParticipantService.getPublicBlockAttributes.mockResolvedValue(["p1"]);
 
       await blocksPublicController.getBlockParticipants(
         "event-slug",
@@ -500,12 +499,9 @@ describe("Blocks Integration", () => {
         "block-uuid",
       );
 
-      expect(mockParticipantService.findAll).toHaveBeenCalledWith(
-        "event-uuid",
-        expect.objectContaining({
-          bonusAttributes: "a,b,c",
-        }),
-      );
+      expect(
+        mockParticipantService.getPublicBlockAttributes,
+      ).toHaveBeenCalledWith("event-uuid", "block-uuid", ["a", "b", "c"]);
     });
 
     it("ignores invalid participantFields", async () => {
@@ -517,12 +513,12 @@ describe("Blocks Integration", () => {
         uuid: "block-uuid",
         attribute: {
           config: {
-            participantFields: ["valid", 123, null],
+            participantFields: ["a", 123, null, "b", {}],
           },
         },
       });
 
-      mockParticipantService.findAll.mockResolvedValue([]);
+      mockParticipantService.getPublicBlockAttributes.mockResolvedValue(["p1"]);
 
       await blocksPublicController.getBlockParticipants(
         "event-slug",
@@ -530,12 +526,9 @@ describe("Blocks Integration", () => {
         "block-uuid",
       );
 
-      expect(mockParticipantService.findAll).toHaveBeenCalledWith(
-        "event-uuid",
-        expect.objectContaining({
-          bonusAttributes: "",
-        }),
-      );
+      expect(
+        mockParticipantService.getPublicBlockAttributes,
+      ).toHaveBeenCalledWith("event-uuid", "block-uuid", ["a", "b"]);
     });
   });
 });

@@ -2,7 +2,11 @@
 import { Prisma } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
-import { ConflictException, NotFoundException } from "@nestjs/common";
+import {
+  ConflictException,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
@@ -32,6 +36,7 @@ describe("ParticipantsService", () => {
     attribute: {
       findUnique: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
     },
     participantAttribute: {
       deleteMany: jest.fn(),
@@ -367,6 +372,81 @@ describe("ParticipantsService", () => {
           eventUuid,
         },
       });
+    });
+  });
+
+  describe("getPublicBlockAttributes", () => {
+    const eventId = "event-123";
+    const blockId = "block-123";
+    it("should return empty array, when requestedFields is empty", async () => {
+      const result = await service.getPublicBlockAttributes(
+        eventId,
+        blockId,
+        [],
+      );
+      expect(result).toEqual([]);
+    });
+
+    it("should throw BadRequestException, when attributes does not belong to event", async () => {
+      const requestedFields = ["attr-1", "attr-2"];
+      mockPrismaService.attribute.count.mockResolvedValue(1);
+      await expect(
+        service.getPublicBlockAttributes(eventId, blockId, requestedFields),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockPrismaService.attribute.count).toHaveBeenCalledWith({
+        where: {
+          eventUuid: eventId,
+          uuid: { in: requestedFields },
+        },
+      });
+
+      expect(mockPrismaService.participant.findMany).not.toHaveBeenCalled();
+    });
+
+    it("should properly map email and participant attributes", async () => {
+      const requestedFields = ["email", "attr-name", "attr-age"];
+      mockPrismaService.attribute.count.mockResolvedValue(2);
+      mockPrismaService.participant.findMany.mockResolvedValue([
+        {
+          email: "jan@doe.com",
+          attributes: [
+            { attributeUuid: "attr-name", value: "Jan" },
+            { attributeUuid: "attr-age", value: "30" },
+          ],
+        },
+      ]);
+      const result = await service.getPublicBlockAttributes(
+        eventId,
+        blockId,
+        requestedFields,
+      );
+      expect(result).toEqual([{ 0: "jan@doe.com", 1: "Jan", 2: "30" }]);
+    });
+
+    it("should return null for missing attributes and hide email if not requested", async () => {
+      const requestedFields = ["attr-name", "attr-age", "attr-city"];
+      mockPrismaService.attribute.count.mockResolvedValue(3);
+      mockPrismaService.participant.findMany.mockResolvedValue([
+        {
+          email: "jan@doe.com",
+          attributes: [{ attributeUuid: "attr-name", value: "Jan" }],
+        },
+      ]);
+      const result = await service.getPublicBlockAttributes(
+        eventId,
+        blockId,
+        requestedFields,
+      );
+      expect(result).toEqual([
+        {
+          0: "Jan",
+          1: null,
+          2: null,
+        },
+      ]);
+
+      expect(result[0]).not.toHaveProperty("email");
     });
   });
 });

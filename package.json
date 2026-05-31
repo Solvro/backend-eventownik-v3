@@ -25,7 +25,7 @@
     "typecheck": "tsc --noEmit"
   },
   "lint-staged": {
-    "*": "prettier -w --ignore-unknown "
+    "*": "prettier -w --end-of-line lf --ignore-unknown "
   },
   "prettier": "@solvro/config/prettier",
   "jest": {
