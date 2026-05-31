@@ -424,7 +424,7 @@ describe("ParticipantsService", () => {
       expect(result).toEqual([{ 0: "jan@doe.com", 1: "Jan", 2: "30" }]);
     });
 
-    it("should return null for missing attributes and hide email if not requested", async () => {
+    it("should return null value for missing attributes and hide email if not requested", async () => {
       const requestedFields = ["attr-name", "attr-age", "attr-city"];
       mockPrismaService.attribute.count.mockResolvedValue(3);
       mockPrismaService.participant.findMany.mockResolvedValue([
