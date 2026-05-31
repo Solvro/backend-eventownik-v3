@@ -3,9 +3,9 @@ import { Prisma } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import {
+  BadRequestException,
   ConflictException,
   NotFoundException,
-  BadRequestException,
 } from "@nestjs/common";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
