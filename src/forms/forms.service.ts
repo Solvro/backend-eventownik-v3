@@ -21,6 +21,7 @@ import {
 
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateFormDto } from "./dto/create-form.dto";
+import { DuplicateFormDto } from "./dto/duplicate-form.dto";
 import { FormListingDto } from "./dto/form-listing.dto";
 import { FormSubmitionDto } from "./dto/form-submition.dto";
 import { UpdateFormDto } from "./dto/update-form.dto";
@@ -513,6 +514,57 @@ export class FormsService {
       throw new NotFoundException(`Form with id: ${formUuid} not found`);
     }
     return form;
+  }
+
+  async duplicate(
+    formUuid: string,
+    eventUuid: string,
+    duplicateFormDto: DuplicateFormDto,
+  ) {
+    return await this.prisma.$transaction(async (prisma) => {
+      const sourceForm = await prisma.form.findFirst({
+        where: { uuid: formUuid, eventUuid },
+        include: { formDefinitions: true },
+      });
+      if (sourceForm == null) {
+        throw new NotFoundException(
+          `Form with id: ${formUuid} not found in this event`,
+        );
+      }
+
+      const newForm = await prisma.form.create({
+        data: {
+          name: duplicateFormDto.name ?? `${sourceForm.name} - copy`,
+          isEditable: sourceForm.isEditable,
+          openDate: sourceForm.openDate,
+          closeDate: sourceForm.closeDate,
+          description: sourceForm.description,
+          eventUuid: sourceForm.eventUuid,
+          openCondition: sourceForm.openCondition,
+          isOpen: sourceForm.isOpen,
+        },
+      });
+
+      if (sourceForm.formDefinitions.length > 0) {
+        await prisma.formDefinition.createMany({
+          data: sourceForm.formDefinitions.map((formDefinition) => ({
+            formUuid: newForm.uuid,
+            attributeUuid: formDefinition.attributeUuid,
+            isRequired: formDefinition.isRequired,
+            order: formDefinition.order,
+          })),
+        });
+      }
+
+      return prisma.form.findUnique({
+        where: { uuid: newForm.uuid },
+        include: {
+          formDefinitions: {
+            include: { attribute: true },
+          },
+        },
+      });
+    });
   }
 
   async findOneBySlug(formUuid: string, eventSlug: string) {

@@ -32,6 +32,7 @@ import {
 } from "@nestjs/swagger";
 
 import { CreateFormDto } from "./dto/create-form.dto";
+import { DuplicateFormDto } from "./dto/duplicate-form.dto";
 import { FormListingDto } from "./dto/form-listing.dto";
 import { UpdateFormDto } from "./dto/update-form.dto";
 import { FormsService } from "./forms.service";
@@ -87,6 +88,23 @@ export class FormsController {
     @Param("id", ParseUUIDPipe) formId: string,
   ) {
     return this.formsService.findOne(formId, eventId);
+  }
+
+  @Post(":id/duplicate")
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: "Duplicate a form (including its definition) for an event",
+  })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "id", description: "UUID of the form to duplicate" })
+  @ApiCreatedResponse({ description: "Form duplicated successfully." })
+  @ApiNotFoundResponse({ description: "Event or Form not found." })
+  async duplicate(
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @Param("id", ParseUUIDPipe) formId: string,
+    @Body() duplicateFormDto: DuplicateFormDto,
+  ) {
+    return this.formsService.duplicate(formId, eventId, duplicateFormDto);
   }
 
   @Patch(":id")
