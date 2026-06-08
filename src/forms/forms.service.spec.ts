@@ -390,7 +390,6 @@ describe("FormsService", () => {
           formUuid,
           {
             attributes: [],
-            "h-captcha-response": "10000000-aaaa-bbbb-cccc-000000000001",
           },
           {},
         ),
