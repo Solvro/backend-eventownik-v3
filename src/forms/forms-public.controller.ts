@@ -66,8 +66,8 @@ export class FormsPublicController {
     files: Express.Multer.File[] | null,
     @Body() submissionData: FormSubmitionDto,
   ) {
-    const fileUrlMap: Record<string, string> = {};
-    if (files?.length) {
+    const fileUrlMap: Record<string, string | undefined> = {};
+    if (files != null && files.length > 0) {
       const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
       await Promise.all(
         files.map(async (file) => {

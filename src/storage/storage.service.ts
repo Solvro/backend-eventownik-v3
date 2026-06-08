@@ -5,7 +5,8 @@ import {
 } from "@aws-sdk/client-s3";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import * as path from "node:path";
+// eslint-disable-next-line unicorn/import-style
+import { extname } from "node:path";
 
 @Injectable()
 export class StorageService {
@@ -27,7 +28,7 @@ export class StorageService {
   }
 
   async upload(bucket: string, file: Express.Multer.File): Promise<string> {
-    const extension = path.extname(file.originalname);
+    const extension = extname(file.originalname);
     const key = `${String(Date.now())}-${String(Math.round(Math.random() * 1e9))}${extension}`;
 
     await this.client.send(

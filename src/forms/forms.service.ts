@@ -709,7 +709,7 @@ export class FormsService {
     eventSlug: string,
     formUuid: string,
     submissionData: FormSubmitionDto,
-    fileUrlMap: Record<string, string>,
+    fileUrlMap: Record<string, string | undefined>,
   ) {
     return await this.prisma.$transaction(async (prisma) => {
       const event = await prisma.event.findUnique({
