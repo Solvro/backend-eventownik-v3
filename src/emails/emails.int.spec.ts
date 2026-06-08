@@ -333,4 +333,90 @@ describe("EmailsController", () => {
       expect(mockPrismaService.emailTemplate.delete).not.toHaveBeenCalled();
     });
   });
+
+  describe("duplicate an email template", () => {
+    it("should duplicate the email template with a default name", async () => {
+      mockPrismaService.emailTemplate.findFirst.mockResolvedValue({
+        uuid: mockEmailId,
+        eventUuid: mockEventId,
+        name: "Welcome",
+        content: "Welcome to the event!",
+        trigger: EmailTrigger.PARTICIPANT_REGISTERED,
+        triggerConfig: null,
+        schema: null,
+        order: null,
+      });
+      mockPrismaService.emailTemplate.create.mockResolvedValue({
+        uuid: "new-email-uuid",
+        eventUuid: mockEventId,
+        name: "Welcome - copy",
+        content: "Welcome to the event!",
+        trigger: EmailTrigger.PARTICIPANT_REGISTERED,
+        schema: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const result = await controller.duplicate(mockEventId, mockEmailId, {});
+
+      expect(mockPrismaService.emailTemplate.findFirst).toHaveBeenCalledWith({
+        where: { uuid: mockEmailId, eventUuid: mockEventId },
+      });
+      expect(result.id).toEqual("new-email-uuid");
+      expect(result.name).toEqual("Welcome - copy");
+      expect(mockPrismaService.emailTemplate.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          data: expect.objectContaining({
+            name: "Welcome - copy",
+            content: "Welcome to the event!",
+            eventUuid: mockEventId,
+          }),
+        }),
+      );
+    });
+
+    it("should use the provided name when duplicating", async () => {
+      mockPrismaService.emailTemplate.findFirst.mockResolvedValue({
+        uuid: mockEmailId,
+        eventUuid: mockEventId,
+        name: "Welcome",
+        content: "Welcome to the event!",
+        trigger: EmailTrigger.MANUAL,
+        triggerConfig: null,
+        schema: null,
+        order: null,
+      });
+      mockPrismaService.emailTemplate.create.mockResolvedValue({
+        uuid: "new-email-uuid",
+        eventUuid: mockEventId,
+        name: "Custom email",
+        content: "Welcome to the event!",
+        trigger: EmailTrigger.MANUAL,
+        schema: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      await controller.duplicate(mockEventId, mockEmailId, {
+        name: "Custom email",
+      });
+
+      expect(mockPrismaService.emailTemplate.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          data: expect.objectContaining({ name: "Custom email" }),
+        }),
+      );
+    });
+
+    it("should throw NotFoundException when the source template is not in the event (IDOR)", async () => {
+      mockPrismaService.emailTemplate.findFirst.mockResolvedValue(null);
+
+      await expect(
+        controller.duplicate(mockEventId, mockEmailId, {}),
+      ).rejects.toThrow(NotFoundException);
+      expect(mockPrismaService.emailTemplate.create).not.toHaveBeenCalled();
+    });
+  });
 });

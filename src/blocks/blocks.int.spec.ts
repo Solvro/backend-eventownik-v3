@@ -1,7 +1,7 @@
 import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
 
-import { NotFoundException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
@@ -220,6 +220,89 @@ describe("Blocks Integration", () => {
 
       expect(result).toHaveProperty("uuid", blockId);
       expect(result).toHaveProperty("name", "Updated Block");
+    });
+  });
+
+  describe("duplicate", () => {
+    it("should duplicate a non-root block with a default name and no children", async () => {
+      mockPrismaService.block.findFirst.mockResolvedValue({
+        uuid: blockId,
+        name: "Room 101",
+        description: "First floor room",
+        capacity: 30,
+        order: 2,
+        parentUuid: "parent-uuid",
+        attributeUuid: attributeId,
+        isRootBlock: false,
+      });
+      mockPrismaService.block.create.mockResolvedValue({
+        uuid: "new-block-uuid",
+        name: "Room 101 - copy",
+      });
+
+      const result = await blocksController.duplicate(
+        eventId,
+        attributeId,
+        blockId,
+        {},
+      );
+
+      expect(mockPrismaService.block.create).toHaveBeenCalledWith({
+        data: {
+          capacity: 30,
+          order: 2,
+          name: "Room 101 - copy",
+          description: "First floor room",
+          parentUuid: "parent-uuid",
+          attributeUuid: attributeId,
+        },
+      });
+      expect(result).toHaveProperty("uuid", "new-block-uuid");
+    });
+
+    it("should use the provided name when duplicating", async () => {
+      mockPrismaService.block.findFirst.mockResolvedValue({
+        uuid: blockId,
+        name: "Room 101",
+        description: null,
+        capacity: 30,
+        order: 2,
+        parentUuid: "parent-uuid",
+        attributeUuid: attributeId,
+        isRootBlock: false,
+      });
+      mockPrismaService.block.create.mockResolvedValue({ uuid: "new-uuid" });
+
+      await blocksController.duplicate(eventId, attributeId, blockId, {
+        name: "Custom block",
+      });
+
+      expect(mockPrismaService.block.create).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        data: expect.objectContaining({ name: "Custom block" }),
+      });
+    });
+
+    it("should throw BadRequestException when duplicating a root block", async () => {
+      mockPrismaService.block.findFirst.mockResolvedValue({
+        uuid: blockId,
+        name: "Root",
+        isRootBlock: true,
+      });
+
+      await expect(
+        blocksController.duplicate(eventId, attributeId, blockId, {}),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrismaService.block.create).not.toHaveBeenCalled();
+    });
+
+    it("should throw NotFoundException when the block is not in the event/attribute (IDOR)", async () => {
+      mockPrismaService.block.findFirst.mockResolvedValue(null);
+
+      await expect(
+        blocksController.duplicate(eventId, attributeId, blockId, {}),
+      ).rejects.toThrow(NotFoundException);
+      expect(mockPrismaService.block.create).not.toHaveBeenCalled();
     });
   });
 
