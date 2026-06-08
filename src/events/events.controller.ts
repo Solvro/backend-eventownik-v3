@@ -115,19 +115,21 @@ export class EventsController {
     @Body() eventDto: EventUpdateDto,
     @Request() request: { user: AuthUser },
   ): Promise<Event> {
-    let photoUrl = eventDto.photoUrl ?? null;
+    let photoUrl: string | null | undefined = undefined;
+    const bucket = this.configService.getOrThrow<string>("S3_BUCKET_EVENTS");
+
     if (photo !== undefined) {
       const existing = await this.eventsService.findOne(eventUUID);
       if (existing.photoUrl !== null) {
-        await this.storageService.delete(
-          this.configService.getOrThrow("S3_BUCKET_EVENTS"),
-          existing.photoUrl,
-        );
+        await this.storageService.delete(bucket, existing.photoUrl);
       }
-      photoUrl = await this.storageService.upload(
-        this.configService.getOrThrow("S3_BUCKET_EVENTS"),
-        photo,
-      );
+      photoUrl = await this.storageService.upload(bucket, photo);
+    } else if (eventDto.photoUrl === null) {
+      const existing = await this.eventsService.findOne(eventUUID);
+      if (existing.photoUrl !== null) {
+        await this.storageService.delete(bucket, existing.photoUrl);
+      }
+      photoUrl = null;
     }
 
     eventDto.applyUserTypeRestrictions?.(request.user.type);

@@ -184,10 +184,11 @@ export class EventsService {
   async update(
     uuid: string,
     eventDto: EventUpdateDto,
-    photoUrl: string | null,
+    photoUrl: string | null | undefined,
   ) {
     // TODO: superadmin dowolny, organizator swoj
-    const { links, ...dataWithoutLinks } = eventDto;
+    const { links, photoUrl: _photoUrl, ...dataWithoutLinks } = eventDto;
+    const photoData = photoUrl !== undefined ? { photoUrl } : {};
 
     try {
       if (links === undefined) {
@@ -195,7 +196,7 @@ export class EventsService {
           where: { uuid },
           data: {
             ...dataWithoutLinks,
-            photoUrl,
+            ...photoData,
           },
           include: {
             links: true,
@@ -212,7 +213,7 @@ export class EventsService {
           where: { uuid },
           data: {
             ...dataWithoutLinks,
-            photoUrl,
+            ...photoData,
             ...(links.length === 0 ? {} : { links: { create: links } }),
           },
           include: {
