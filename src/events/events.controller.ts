@@ -5,6 +5,7 @@ import { PermissionsGuard } from "src/auth/permissions.guard";
 import { ApiPaginatedResponse } from "src/common/decorators/api-paginated-response.decorator";
 import { PageDto } from "src/common/dto/page.dto";
 import { PermissionType } from "src/generated/prisma/enums";
+import { StorageService } from "src/storage/storage.service";
 
 import {
   Body,
@@ -21,6 +22,7 @@ import {
   UploadedFile,
   UseGuards,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -39,8 +41,6 @@ import { EventUpdateDto } from "./dto/event-update.dto";
 import { Event } from "./entities/event.entity";
 import { EventsService } from "./events.service";
 import { UploadPhoto } from "./utils/upload-photo.decorator";
-import { StorageService } from "src/storage/storage.service";
-import { ConfigService } from "@nestjs/config";
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @ApiBearerAuth()

@@ -7,6 +7,10 @@ import { ConfigService } from "@nestjs/config";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
+import { FormListingDto } from "./dto/form-listing.dto";
+import { FormsController } from "./forms.controller";
+import { FormsService } from "./forms.service";
+
 const mockStorageService: Pick<StorageService, "upload" | "delete"> = {
   upload: jest.fn(),
   delete: jest.fn(),
@@ -14,10 +18,6 @@ const mockStorageService: Pick<StorageService, "upload" | "delete"> = {
 const mockConfigService: Pick<ConfigService, "getOrThrow"> = {
   getOrThrow: jest.fn().mockReturnValue("test-bucket") as never,
 };
-
-import { FormListingDto } from "./dto/form-listing.dto";
-import { FormsController } from "./forms.controller";
-import { FormsService } from "./forms.service";
 
 describe("Forms Integration", () => {
   let formsController: FormsController;

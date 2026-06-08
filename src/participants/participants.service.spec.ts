@@ -12,7 +12,6 @@ import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
 import { StorageService } from "../storage/storage.service";
-
 import type { ParticipantCreateDto } from "./dto/participant-create.dto";
 import type { ParticipantListingDto } from "./dto/participant-listing.dto";
 import type { ParticipantUpdateDto } from "./dto/participant-update.dto";

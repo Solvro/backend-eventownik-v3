@@ -68,6 +68,7 @@ jobs:
         env:
           NODE_ENV: test
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/eventownik_test_db"
+          S3_ENDPOINT: "http://localhost:9000"
 
       - name: Build
         run: npm run build
