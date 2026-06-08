@@ -507,13 +507,14 @@ export class ParticipantsService {
           );
 
           if (attributeUuidsToUpdate.length > 0) {
-            const existingFileAttrs = await tx.participantAttribute.findMany({
-              where: {
-                participantUuid,
-                attributeUuid: { in: attributeUuidsToUpdate },
-                attribute: { type: AttributeType.file },
-              },
-            });
+            const existingFileAttributes =
+              await tx.participantAttribute.findMany({
+                where: {
+                  participantUuid,
+                  attributeUuid: { in: attributeUuidsToUpdate },
+                  attribute: { type: AttributeType.file },
+                },
+              });
 
             await tx.participantAttribute.deleteMany({
               where: {
@@ -524,9 +525,12 @@ export class ParticipantsService {
 
             const bucket =
               this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
-            for (const attr of existingFileAttrs) {
-              if (typeof attr.value === "string" && attr.value.length > 0) {
-                await this.storageService.delete(bucket, attr.value);
+            for (const attribute of existingFileAttributes) {
+              if (
+                typeof attribute.value === "string" &&
+                attribute.value.length > 0
+              ) {
+                await this.storageService.delete(bucket, attribute.value);
               }
             }
           }
@@ -582,9 +586,9 @@ export class ParticipantsService {
     });
 
     const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
-    for (const attr of participant.attributes) {
-      if (typeof attr.value === "string" && attr.value.length > 0) {
-        await this.storageService.delete(bucket, attr.value);
+    for (const attribute of participant.attributes) {
+      if (typeof attribute.value === "string" && attribute.value.length > 0) {
+        await this.storageService.delete(bucket, attribute.value);
       }
     }
   }
@@ -610,9 +614,9 @@ export class ParticipantsService {
 
     const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
     for (const participant of participants) {
-      for (const attr of participant.attributes) {
-        if (typeof attr.value === "string" && attr.value.length > 0) {
-          await this.storageService.delete(bucket, attr.value);
+      for (const attribute of participant.attributes) {
+        if (typeof attribute.value === "string" && attribute.value.length > 0) {
+          await this.storageService.delete(bucket, attribute.value);
         }
       }
     }

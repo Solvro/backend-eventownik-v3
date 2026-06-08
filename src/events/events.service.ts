@@ -188,7 +188,7 @@ export class EventsService {
   ) {
     // TODO: superadmin dowolny, organizator swoj
     const { links, photoUrl: _photoUrl, ...dataWithoutLinks } = eventDto;
-    const photoData = photoUrl !== undefined ? { photoUrl } : {};
+    const photoData = photoUrl === undefined ? {} : { photoUrl };
 
     try {
       if (links === undefined) {

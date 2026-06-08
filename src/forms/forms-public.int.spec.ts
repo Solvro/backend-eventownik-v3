@@ -2,7 +2,9 @@ import { HcaptchaGuard } from "@gvrs/nestjs-hcaptcha";
 import { BlocksService } from "src/blocks/blocks.service";
 import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
+import { StorageService } from "src/storage/storage.service";
 
+import { ConfigService } from "@nestjs/config";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
@@ -49,6 +51,14 @@ describe("Forms Public Integration", () => {
         },
         ParticipantsService,
         BlocksService,
+        {
+          provide: StorageService,
+          useValue: { upload: jest.fn(), delete: jest.fn() },
+        },
+        {
+          provide: ConfigService,
+          useValue: { getOrThrow: jest.fn().mockReturnValue("test-bucket") },
+        },
       ],
     })
       .overrideGuard(HcaptchaGuard)

@@ -35,9 +35,9 @@ export class PublicParticipantsController {
   ) {
     const normalizedAttributes = Array.isArray(attributes)
       ? attributes
-      : attributes !== undefined
-        ? [attributes]
-        : [];
+      : attributes === undefined
+        ? []
+        : [attributes];
     return this.participantsService.findOnePublic(
       eventUuid,
       participantUuid,

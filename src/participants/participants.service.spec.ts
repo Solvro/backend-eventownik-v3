@@ -3,8 +3,11 @@ import { Prisma } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import { ConflictException, NotFoundException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
+
+import { StorageService } from "../storage/storage.service";
 
 import type { ParticipantCreateDto } from "./dto/participant-create.dto";
 import type { ParticipantListingDto } from "./dto/participant-listing.dto";
@@ -36,6 +39,7 @@ describe("ParticipantsService", () => {
     participantAttribute: {
       deleteMany: jest.fn(),
       createMany: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     block: {
       findUnique: jest.fn(),
@@ -50,6 +54,14 @@ describe("ParticipantsService", () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: StorageService,
+          useValue: { upload: jest.fn(), delete: jest.fn() },
+        },
+        {
+          provide: ConfigService,
+          useValue: { getOrThrow: jest.fn().mockReturnValue("test-bucket") },
         },
       ],
     }).compile();
@@ -334,6 +346,7 @@ describe("ParticipantsService", () => {
       mockPrismaService.participant.findFirst.mockResolvedValue({
         uuid: participantUuid,
         eventUuid,
+        attributes: [],
       });
 
       await service.remove(eventUuid, participantUuid);
@@ -355,8 +368,8 @@ describe("ParticipantsService", () => {
       const ids = ["p-1", "p-2"];
 
       mockPrismaService.participant.findMany.mockResolvedValue([
-        { uuid: "p-1" },
-        { uuid: "p-2" },
+        { uuid: "p-1", attributes: [] },
+        { uuid: "p-2", attributes: [] },
       ]);
 
       await service.removeMany(eventUuid, ids);

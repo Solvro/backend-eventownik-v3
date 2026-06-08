@@ -115,7 +115,7 @@ export class EventsController {
     @Body() eventDto: EventUpdateDto,
     @Request() request: { user: AuthUser },
   ): Promise<Event> {
-    let photoUrl: string | null | undefined = undefined;
+    let photoUrl: string | null | undefined;
     const bucket = this.configService.getOrThrow<string>("S3_BUCKET_EVENTS");
 
     if (photo !== undefined) {
