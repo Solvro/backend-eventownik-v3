@@ -31,12 +31,17 @@ export class PublicParticipantsController {
   async findOne(
     @Param("eventId", ParseUUIDPipe) eventUuid: string,
     @Param("participantId", ParseUUIDPipe) participantUuid: string,
-    @Query("attributes") attributes?: string[],
+    @Query("attributes") attributes?: string | string[],
   ) {
+    const normalizedAttributes = Array.isArray(attributes)
+      ? attributes
+      : attributes !== undefined
+        ? [attributes]
+        : [];
     return this.participantsService.findOnePublic(
       eventUuid,
       participantUuid,
-      attributes ?? [],
+      normalizedAttributes,
     );
   }
 }
