@@ -821,4 +821,74 @@ export class ParticipantsService {
       });
     });
   }
+  async getPublicBlockAttributes(
+    eventId: string,
+    blockId: string,
+    requestedFields: string[],
+  ) {
+    if (requestedFields.length === 0) {
+      return [];
+    }
+
+    const wantsEmail = requestedFields.includes("email");
+    const attributeIds = requestedFields.filter((field) => field !== "email");
+
+    if (attributeIds.length > 0) {
+      const validAttributesCount = await this.prisma.attribute.count({
+        where: {
+          eventUuid: eventId,
+          uuid: { in: attributeIds },
+        },
+      });
+
+      if (validAttributesCount !== attributeIds.length) {
+        throw new BadRequestException(
+          "One or more requested attributes are invalid for this event.",
+        );
+      }
+    }
+
+    const participants = await this.prisma.participant.findMany({
+      where: {
+        eventUuid: eventId,
+        attributes: {
+          some: {
+            value: {
+              array_contains: blockId,
+            },
+          },
+        },
+      },
+      select: {
+        email: wantsEmail,
+        attributes: {
+          where: {
+            attributeUuid: { in: attributeIds },
+          },
+          select: {
+            attributeUuid: true,
+            value: true,
+          },
+        },
+      },
+    });
+
+    return participants.map((participant) => {
+      const row: Record<string, Prisma.JsonValue> = {};
+
+      for (const [index, field] of requestedFields.entries()) {
+        if (field === "email") {
+          row[index] = participant.email;
+        } else {
+          const attribute = participant.attributes.find(
+            (a) => a.attributeUuid === field,
+          );
+
+          row[index] = attribute?.value ?? null;
+        }
+      }
+
+      return row;
+    });
+  }
 }
