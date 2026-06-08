@@ -51,10 +51,10 @@ export class FormSubmitionDto {
   @Type(() => ParticipantAttributeDto)
   attributes: ParticipantAttributeDto[];
 
-  @ApiProperty({
-    description: "hCaptcha response token",
-  })
-  @IsString()
-  @IsNotEmpty()
-  "h-captcha-response": string;
+  // @ApiProperty({
+  //   description: "hCaptcha response token",
+  // })
+  // @IsString()
+  // @IsNotEmpty()
+  // "h-captcha-response": string;
 }

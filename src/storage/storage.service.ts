@@ -5,7 +5,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import path from "node:path";
+import * as path from "node:path";
 
 @Injectable()
 export class StorageService {

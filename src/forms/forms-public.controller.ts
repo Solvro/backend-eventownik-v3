@@ -11,6 +11,7 @@ import {
   Post,
   UploadedFiles,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   ApiBadRequestResponse,
   ApiNotFoundResponse,
@@ -19,6 +20,8 @@ import {
   ApiParam,
   ApiTags,
 } from "@nestjs/swagger";
+
+import { StorageService } from "src/storage/storage.service";
 
 import { FormSubmitionDto } from "./dto/form-submition.dto";
 import { FormsService } from "./forms.service";
@@ -29,7 +32,11 @@ import { UploadFiles } from "./utils/upload-files-decorator";
 @ApiTags("Forms")
 @Controller("/public/events/:eventSlug/forms")
 export class FormsPublicController {
-  constructor(private readonly formsService: FormsService) {}
+  constructor(
+    private readonly formsService: FormsService,
+    private readonly storageService: StorageService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Get(":id")
   @HttpCode(HttpStatus.OK)
@@ -54,7 +61,6 @@ export class FormsPublicController {
   @ApiNotFoundResponse({ description: "Event or Form not found." })
   @ApiBadRequestResponse({ description: "Form is closed." })
   @UploadFiles()
-  @VerifyCaptcha()
   async submit(
     @Param("eventSlug") eventSlug: string,
     @Param("id", ParseUUIDPipe) formId: string,
@@ -62,13 +68,23 @@ export class FormsPublicController {
     files: Express.Multer.File[] | null,
     @Body() submissionData: FormSubmitionDto,
   ) {
-    const filenames: string[] =
-      files == null ? [] : files.map((file) => file.filename);
+    const fileUrlMap: Record<string, string> = {};
+    if (files?.length) {
+      const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
+      await Promise.all(
+        files.map(async (file) => {
+          fileUrlMap[file.originalname] = await this.storageService.upload(
+            bucket,
+            file,
+          );
+        }),
+      );
+    }
     return this.formsService.formSubmit(
       eventSlug,
       formId,
       submissionData,
-      filenames,
+      fileUrlMap,
     );
   }
 }

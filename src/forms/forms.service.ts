@@ -709,7 +709,7 @@ export class FormsService {
     eventSlug: string,
     formUuid: string,
     submissionData: FormSubmitionDto,
-    fileNames: string[],
+    fileUrlMap: Record<string, string>,
   ) {
     return await this.prisma.$transaction(async (prisma) => {
       const event = await prisma.event.findUnique({
@@ -779,13 +779,9 @@ export class FormsService {
           foundAttribute.attribute.type === AttributeType.file &&
           isString(normalizedValue)
         ) {
-          const fileName = fileNames.find((f) =>
-            f.endsWith(`#####${normalizedValue}`),
-          );
-          if (fileName !== undefined) {
-            fileNames.splice(fileNames.indexOf(fileName), 1);
-            normalizedAttributes[attributeUuid] =
-              `./uploads/forms/${event.uuid}/${formUuid}/#####${fileName}`;
+          const url = fileUrlMap[normalizedValue];
+          if (url !== undefined) {
+            normalizedAttributes[attributeUuid] = url;
           }
         } else {
           normalizedAttributes[attributeUuid] = normalizedValue;
