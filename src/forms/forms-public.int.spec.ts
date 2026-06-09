@@ -1,3 +1,4 @@
+import { HcaptchaGuard } from "@gvrs/nestjs-hcaptcha";
 import { BlocksService } from "src/blocks/blocks.service";
 import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
@@ -49,7 +50,10 @@ describe("Forms Public Integration", () => {
         ParticipantsService,
         BlocksService,
       ],
-    }).compile();
+    })
+      .overrideGuard(HcaptchaGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
     formsPublicController = module.get<FormsPublicController>(
       FormsPublicController,
     );

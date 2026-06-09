@@ -385,7 +385,15 @@ describe("FormsService", () => {
       jest.spyOn(service, "isOpen").mockResolvedValue(false);
 
       await expect(
-        service.formSubmit(eventSlug, formUuid, { attributes: [] }, []),
+        service.formSubmit(
+          eventSlug,
+          formUuid,
+          {
+            attributes: [],
+            "h-captcha-response": "10000000-aaaa-bbbb-cccc-000000000001",
+          },
+          [],
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 

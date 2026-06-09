@@ -1,3 +1,4 @@
+import { HcaptchaModule } from "@gvrs/nestjs-hcaptcha";
 import { BlocksModule } from "src/blocks/blocks.module";
 import { ParticipantsModule } from "src/participants/participants.module";
 
@@ -10,7 +11,7 @@ import { FormsService } from "./forms.service";
 @Module({
   controllers: [FormsController, FormsPublicController],
   providers: [FormsService],
-  imports: [ParticipantsModule, BlocksModule],
+  imports: [ParticipantsModule, BlocksModule, HcaptchaModule],
   exports: [FormsService],
 })
 export class FormsModule {}

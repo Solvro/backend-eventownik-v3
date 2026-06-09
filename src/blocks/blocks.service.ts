@@ -359,27 +359,26 @@ export class BlocksService {
     }
 
     const config = block.attribute.config;
-
-    let bonusAttributes = "";
+    let requestedFields: string[] = [];
 
     if (config !== null && typeof config === "object") {
       const configJson = config as Prisma.JsonObject;
+      const participantFields = configJson.participantFields;
 
-      const participantFields: unknown = configJson.participantFields;
-
-      if (
-        Array.isArray(participantFields) &&
-        participantFields.every((item) => typeof item === "string")
-      ) {
-        bonusAttributes = participantFields.join(",");
+      if (Array.isArray(participantFields)) {
+        requestedFields = participantFields.filter(
+          (item): item is string =>
+            typeof item === "string" && item.trim().length > 0,
+        );
       }
     }
 
-    const participants = await this.participantsService.findAll(event.uuid, {
-      skip: 0,
-      filters: { attributeUuid: blockUuid },
-      bonusAttributes,
-    });
+    const participants =
+      await this.participantsService.getPublicBlockAttributes(
+        event.uuid,
+        block.uuid,
+        requestedFields,
+      );
 
     return participants;
   }

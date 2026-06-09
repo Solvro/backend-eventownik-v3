@@ -1,3 +1,5 @@
+import { VerifyCaptcha } from "@gvrs/nestjs-hcaptcha";
+
 import {
   Body,
   Controller,
@@ -102,6 +104,7 @@ export class FormsPublicController {
   @ApiNotFoundResponse({ description: "Event or Form not found." })
   @ApiBadRequestResponse({ description: "Form is closed." })
   @UploadFiles()
+  @VerifyCaptcha()
   async submit(
     @Param("eventSlug") eventSlug: string,
     @Param("id", ParseUUIDPipe) formId: string,
