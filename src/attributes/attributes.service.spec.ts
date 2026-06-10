@@ -164,4 +164,52 @@ describe("AttributesService", () => {
       },
     });
   });
+
+  it("should allow email in block participantFields", async () => {
+    const eventId = "event-uuid";
+
+    mockPrismaService.$transaction.mockImplementation(async (callback) => {
+      return await callback(mockPrismaService);
+    });
+    mockPrismaService.event.findUnique.mockResolvedValue({ uuid: eventId });
+    mockPrismaService.attribute.create.mockResolvedValue({
+      uuid: "attribute-uuid",
+      name: "Block attribute",
+      order: 1,
+      showInList: true,
+      type: AttributeType.block,
+      eventUuid: eventId,
+      config: {
+        maxSelections: 1,
+        participantFields: ["550e8400-e29b-41d4-a716-446655440000", "email"],
+      },
+    });
+
+    await service.create(
+      {
+        name: "Block attribute",
+        order: 1,
+        showInList: true,
+        type: AttributeType.block,
+        config: {
+          participantFields: ["550e8400-e29b-41d4-a716-446655440000", "email"],
+        },
+      },
+      eventId,
+    );
+
+    expect(mockPrismaService.attribute.create).toHaveBeenCalledWith({
+      data: {
+        name: "Block attribute",
+        order: 1,
+        showInList: true,
+        type: AttributeType.block,
+        eventUuid: eventId,
+        config: {
+          maxSelections: 1,
+          participantFields: ["550e8400-e29b-41d4-a716-446655440000", "email"],
+        },
+      },
+    });
+  });
 });
