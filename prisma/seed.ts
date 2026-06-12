@@ -12,6 +12,7 @@ import type {
   ParticipantAttributeLog,
   ParticipantEmailStatus,
   ParticipantFormLog,
+  Permission,
 } from "src/generated/prisma/client";
 import {
   AttributeType,

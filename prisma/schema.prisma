@@ -190,17 +190,12 @@ model EmailTemplate {
   eventUuid     String       @db.Uuid
   formUuid      String?      @db.Uuid
 
-  event             Event?                   @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
-  form              Form?                    @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
+  event             Event?             @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+  form              Form?              @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
   participantEmails ParticipantEmailStatus[]
   participantForms  ParticipantFormLog[]
 
   @@map("EmailTemplates")
-}
-
-enum OpenCondition {
-  ON_DATE
-  MANUAL
 }
 
 model Form {
@@ -220,7 +215,7 @@ model Form {
   formDefinitions  FormDefinition[]
   emails           EmailTemplate[]
   participantForms ParticipantFormLog[]
-  registerEvent    Event[]              @relation("RegisterForm")
+  registerEvent    Event[]           @relation("RegisterForm")
 
   @@map("Forms")
 }
@@ -289,8 +284,8 @@ model ParticipantEmailStatus {
   participantUuid String?     @db.Uuid
   emailUuid       String?     @db.Uuid
 
-  participant Participant?   @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
-  email       EmailTemplate? @relation(fields: [emailUuid], references: [uuid], onDelete: Cascade)
+  participant Participant? @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
+  email       EmailTemplate?       @relation(fields: [emailUuid], references: [uuid], onDelete: Cascade)
 
   @@map("ParticipantsEmailStatuses")
 }
@@ -305,11 +300,10 @@ model ParticipantFormLog {
   lastSubmittedAt DateTime?
   emailUuid       String?   @db.Uuid
 
-  participant Participant    @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
-  form        Form           @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
-  email       EmailTemplate? @relation(fields: [emailUuid], references: [uuid], onDelete: SetNull)
+  participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
+  form        Form        @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
+  email       EmailTemplate?      @relation(fields: [emailUuid], references: [uuid], onDelete: SetNull)
 
-  @@unique([participantUuid, formUuid])
   @@map("ParticipantsFormLogs")
 }
 
