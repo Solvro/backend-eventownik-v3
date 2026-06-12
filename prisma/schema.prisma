@@ -21,6 +21,12 @@ enum PermissionType {
   MANAGE_SETTINGS
 }
 
+enum LogTrigger {
+  ADMIN
+  PARTICIPANT
+  SYSTEM
+}
+
 model Admin {
   uuid      String        @id @default(uuid()) @db.Uuid
   firstName String
@@ -303,18 +309,19 @@ model ParticipantFormLog {
   form        Form           @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
   email       EmailTemplate? @relation(fields: [emailUuid], references: [uuid], onDelete: SetNull)
 
+  @@unique([participantUuid, formUuid])
   @@map("ParticipantsFormLogs")
 }
 
 model ParticipantAttributeLog {
   uuid            String   @id @default(uuid()) @db.Uuid
   participantUuid String   @db.Uuid
-  triggeredBy     String
+  triggeredBy     LogTrigger
   createdAt       DateTime @default(now())
   triggeredUuid   String?  @db.Uuid
   attributeUuid   String?  @db.Uuid
-  before          String?
-  after           String?
+  before          Json?
+  after           Json?
 
   participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
 
@@ -344,4 +351,17 @@ model PasswordResetToken {
   admin Admin @relation(fields: [adminUuid], references: [uuid], onDelete: Cascade)
 
   @@map("PasswordResetTokens")
+}
+
+model AuditLog {
+  uuid      String @id @default(uuid()) @db.Uuid
+  action    String
+  entityType    String
+  entityUuid    String?  @db.Uuid
+  triggeredBy   String?
+  before    Json?
+  after     Json?
+  createdAt   DateTime @default(now())
+
+  @@map("AuditLogs")
 }

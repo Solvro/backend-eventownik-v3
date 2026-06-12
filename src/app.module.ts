@@ -18,11 +18,13 @@ import { ImportExportModule } from "./import-export/import-export.module";
 import { OrganizersModule } from "./organizers/organizers.module";
 import { ParticipantsModule } from "./participants/participants.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { AuditLogModule } from "./audit-log/audit-log.module";
 
 @Module({
   imports: [
     PrismaModule,
     EventsModule,
+    AuditLogModule,
     FormsModule,
     ConfigModule.forRoot({
       validationSchema: Joi.object({
