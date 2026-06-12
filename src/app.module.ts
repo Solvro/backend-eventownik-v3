@@ -10,11 +10,13 @@ import { EventsModule } from "./events/events.module";
 import { FormsModule } from "./forms/forms.module";
 import { OrganizersModule } from "./organizers/organizers.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { AuditLogModule } from "./audit-log/audit-log.module";
 
 @Module({
   imports: [
     PrismaModule,
     EventsModule,
+    AuditLogModule,
     FormsModule,
     ConfigModule.forRoot({
       validationSchema: Joi.object({
