@@ -76,7 +76,9 @@ export class AuditLogService {
 
     for (const newAttr of newAttributes) {
       const hadOld = oldMap.has(newAttr.attributeUuid);
-      const oldValue = hadOld ? oldMap.get(newAttr.attributeUuid)! : null;
+      const oldValue = hadOld
+        ? (oldMap.get(newAttr.attributeUuid) ?? null)
+        : null;
 
       if (JSON.stringify(oldValue) !== JSON.stringify(newAttr.value)) {
         changedEntries.push({

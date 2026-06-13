@@ -12,7 +12,6 @@ import type {
   ParticipantAttributeLog,
   ParticipantEmailStatus,
   ParticipantFormLog,
-  Permission,
 } from "src/generated/prisma/client";
 import {
   AttributeType,
@@ -190,7 +189,7 @@ async function main() {
         participantUuid: participant.uuid,
         emailUuid: email.uuid,
         sendAt: new Date(),
-        sendBy: "system",
+        sendBy: "SYSTEM",
         status: EmailStatus.sent,
       },
     });
@@ -199,10 +198,10 @@ async function main() {
     await prisma.participantAttributeLog.create({
       data: {
         participantUuid: participant.uuid,
-        triggeredBy: "system",
+        triggeredBy: LogTrigger.SYSTEM,
         triggeredUuid: admin.uuid,
         attributeUuid: attribute.uuid,
-        before: null,
+        before: undefined,
         after: "M",
       },
     });
