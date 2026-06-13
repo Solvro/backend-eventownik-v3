@@ -11,6 +11,7 @@ import { AdminsModule } from "./admins/admins.module";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { AttributesModule } from "./attributes/attributes.module";
+import { AuditLogModule } from "./audit-log/audit-log.module";
 import { AuthModule } from "./auth/auth.module";
 import { BlocksModule } from "./blocks/blocks.module";
 import { EmailsModule } from "./emails/emails.module";
@@ -20,7 +21,6 @@ import { ImportExportModule } from "./import-export/import-export.module";
 import { OrganizersModule } from "./organizers/organizers.module";
 import { ParticipantsModule } from "./participants/participants.module";
 import { PrismaModule } from "./prisma/prisma.module";
-import { AuditLogModule } from "./audit-log/audit-log.module";
 
 @Module({
   imports: [
