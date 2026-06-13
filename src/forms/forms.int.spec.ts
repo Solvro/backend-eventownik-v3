@@ -1,3 +1,5 @@
+import { BlocksService } from "src/blocks/blocks.service";
+import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import type { TestingModule } from "@nestjs/testing";
@@ -45,6 +47,8 @@ describe("Forms Integration", () => {
           provide: PrismaService,
           useValue: mockPrismaService,
         },
+        ParticipantsService,
+        BlocksService,
       ],
     }).compile();
     formsController = module.get<FormsController>(FormsController);
@@ -230,6 +234,10 @@ describe("Forms Integration", () => {
       description: dto.description,
     });
     mockPrismaService.attribute.count.mockResolvedValue(2);
+    mockPrismaService.form.findFirst.mockResolvedValue({
+      uuid: "form-uuid-1",
+      name: "Updated Form Name",
+    });
     mockPrismaService.formDefinition.deleteMany.mockResolvedValue({ count: 2 });
     mockPrismaService.formDefinition.createMany.mockResolvedValue({});
     const result = await formsController.update(

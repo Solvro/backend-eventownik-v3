@@ -19,6 +19,7 @@ import {
   EmailStatus,
   EmailTrigger,
   OrganizerType,
+  PermissionType,
   PrismaClient,
 } from "src/generated/prisma/client";
 
@@ -29,7 +30,7 @@ const prisma = new PrismaClient({ adapter });
 
 async function main() {
   await prisma.participantAttributeLog.deleteMany();
-  await prisma.adminPermission.deleteMany();
+  await prisma.eventPermission.deleteMany();
   await prisma.participantAttribute.deleteMany();
   await prisma.participantEmailStatus.deleteMany();
   await prisma.participantFormLog.deleteMany();
@@ -40,7 +41,6 @@ async function main() {
   await prisma.attribute.deleteMany();
   await prisma.participant.deleteMany();
   await prisma.event.deleteMany();
-  await prisma.permission.deleteMany();
   await prisma.admin.deleteMany();
 
   await prisma.admin.create({
@@ -64,18 +64,11 @@ async function main() {
       active: true,
     },
   });
-  const permission: Permission = await prisma.permission.create({
-    data: {
-      action: "manage",
-      subject: "all",
-    },
-  });
+
   const event: Event = await prisma.event.create({
     data: {
       name: "Sample Event",
       description: "A test event lorem sigmum",
-      links: [] as string[],
-      policyLinks: [] as string[],
       startDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // next week
       endDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 8),
       organizerUuid: admin.uuid,
@@ -88,11 +81,11 @@ async function main() {
     },
   });
 
-  await prisma.adminPermission.create({
+  await prisma.eventPermission.create({
     data: {
       adminUuid: admin.uuid,
       eventUuid: event.uuid,
-      permissionUuid: permission.uuid,
+      permission: PermissionType.MANAGE_ALL,
     },
   });
 
@@ -101,7 +94,7 @@ async function main() {
       name: "T-shirt size",
       eventUuid: event.uuid,
       type: AttributeType.select,
-      options: ["S", "M", "L", "XL"] as string[],
+      config: { options: ["S", "M", "L", "XL"] },
       showInList: true,
       order: 1,
     },
@@ -163,9 +156,6 @@ async function main() {
       name: "Welcome",
       content: "Welcome to the event!",
       trigger: EmailTrigger.PARTICIPANT_REGISTERED,
-      formUuid: form.uuid,
-      triggerValue: null,
-      triggerValue2: null,
     },
   });
 

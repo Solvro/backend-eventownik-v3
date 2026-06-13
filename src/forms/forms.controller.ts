@@ -1,3 +1,8 @@
+import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
+import { RequirePermission } from "src/auth/permissions.decorator";
+import { PermissionsGuard } from "src/auth/permissions.guard";
+import { PermissionType } from "src/generated/prisma/enums";
+
 import {
   Body,
   Controller,
@@ -10,8 +15,21 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from "@nestjs/common";
-import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBadRequestResponse,
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiNoContentResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from "@nestjs/swagger";
 
 import { CreateFormDto } from "./dto/create-form.dto";
 import { FormListingDto } from "./dto/form-listing.dto";
@@ -19,6 +37,11 @@ import { UpdateFormDto } from "./dto/update-form.dto";
 import { FormsService } from "./forms.service";
 
 @ApiTags("Forms")
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermission(PermissionType.MANAGE_FORM)
+@ApiUnauthorizedResponse({ description: "Unauthorized" })
+@ApiForbiddenResponse({ description: "Forbidden - insufficient permissions" })
 @Controller("events/:eventId/forms")
 export class FormsController {
   constructor(private readonly formsService: FormsService) {}
@@ -26,10 +49,10 @@ export class FormsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: "Creates a form for the specified event" })
-  @ApiResponse({ status: 201, description: "Form created successfully." })
-  @ApiResponse({ status: 404, description: "Event or Attribute not found." })
-  @ApiResponse({
-    status: HttpStatus.BAD_REQUEST,
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiCreatedResponse({ description: "Form created successfully." })
+  @ApiNotFoundResponse({ description: "Event or Attribute not found." })
+  @ApiBadRequestResponse({
     description: "Given event has already a firstform assigned.",
   })
   async create(
@@ -42,8 +65,9 @@ export class FormsController {
   @Get()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Get all forms for an event" })
-  @ApiResponse({ status: 200, description: "Forms retrieved successfully." })
-  @ApiResponse({ status: 404, description: "Event not found." })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiOkResponse({ description: "Forms retrieved successfully." })
+  @ApiNotFoundResponse({ description: "Event not found." })
   async findAll(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Query() query: FormListingDto,
@@ -54,8 +78,10 @@ export class FormsController {
   @Get(":id")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Get a form by id for an event" })
-  @ApiResponse({ status: 200, description: "Form retrieved successfully." })
-  @ApiResponse({ status: 404, description: "Event or Form not found." })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "id", description: "UUID of the form" })
+  @ApiOkResponse({ description: "Form retrieved successfully." })
+  @ApiNotFoundResponse({ description: "Event or Form not found." })
   async findOne(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("id", ParseUUIDPipe) formId: string,
@@ -66,13 +92,11 @@ export class FormsController {
   @Patch(":id")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Update a form for an event" })
-  @ApiResponse({ status: 200, description: "Form updated successfully." })
-  @ApiResponse({
-    status: 404,
-    description: "Event, Form or Attribute not found.",
-  })
-  @ApiResponse({
-    status: HttpStatus.BAD_REQUEST,
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "id", description: "UUID of the form" })
+  @ApiOkResponse({ description: "Form updated successfully." })
+  @ApiNotFoundResponse({ description: "Event, Form or Attribute not found." })
+  @ApiBadRequestResponse({
     description: "Given event has already a firstform assigned.",
   })
   async update(
@@ -86,8 +110,10 @@ export class FormsController {
   @Delete(":id")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "Delete a form for an event" })
-  @ApiResponse({ status: 204, description: "Form deleted successfully." })
-  @ApiResponse({ status: 404, description: "Event or Form not found." })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "id", description: "UUID of the form" })
+  @ApiNoContentResponse({ description: "Form deleted successfully." })
+  @ApiNotFoundResponse({ description: "Event or Form not found." })
   async remove(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("id", ParseUUIDPipe) formId: string,

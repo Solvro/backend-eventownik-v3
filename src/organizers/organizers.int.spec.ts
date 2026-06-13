@@ -1,433 +1,406 @@
+import type { Admin, Event } from "src/generated/prisma/client";
+import { PermissionType } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import type { TestingModule } from "@nestjs/testing";
 
 import { OrganizerListingDto } from "./dto/organizer-listing.dto";
-import { OrganizersController } from "./organizers.controller";
 import { OrganizersService } from "./organizers.service";
 
-describe("Organizers integration tests", () => {
-  let organizersController: OrganizersController;
+describe("OrganizersService (integration)", () => {
+  let service: OrganizersService;
+  let prisma: PrismaService;
 
-  const mockPrismaService = {
-    admin: {
-      findMany: jest.fn(),
-      count: jest.fn(),
-      findFirst: jest.fn(),
-      findUnique: jest.fn(),
-    },
-    event: {
-      findUnique: jest.fn(),
-    },
-    $transaction: jest.fn(),
-    adminPermission: {
-      create: jest.fn(),
-      createMany: jest.fn(),
-      deleteMany: jest.fn(),
-      groupBy: jest.fn(),
-      findFirst: jest.fn(),
-    },
-  };
+  const createdAdminUuids: string[] = [];
+  const createdEventUuids: string[] = [];
 
-  beforeEach(async () => {
-    jest.clearAllMocks();
-    jest.resetAllMocks();
-    mockPrismaService.$transaction.mockImplementation((callback) =>
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
-      callback(mockPrismaService),
-    );
+  // ---------------------------------------------------------------------------
+  // Module setup / teardown
+  // ---------------------------------------------------------------------------
+
+  beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        OrganizersService,
-        {
-          provide: PrismaService,
-          useValue: mockPrismaService,
-        },
-      ],
-      controllers: [OrganizersController],
+      providers: [OrganizersService, PrismaService],
     }).compile();
-    organizersController =
-      module.get<OrganizersController>(OrganizersController);
+
+    service = module.get<OrganizersService>(OrganizersService);
+    prisma = module.get<PrismaService>(PrismaService);
   });
-  it("should be defined", () => {
-    expect(organizersController).toBeDefined();
-  });
-  describe("find all organizers by event", () => {
-    it("should return a list of organizers", async () => {
-      const eventUuid = "test-event-123";
-      const query = new OrganizerListingDto();
-      const mockOrganizers = [
-        { firstName: "testName1", active: true },
-        { firstName: "testName2", active: false },
-      ];
 
-      mockPrismaService.admin.findMany.mockResolvedValue(mockOrganizers);
-      mockPrismaService.event.findUnique.mockResolvedValue("event");
-      mockPrismaService.admin.count.mockResolvedValue(mockOrganizers.length);
-      mockPrismaService.$transaction.mockResolvedValue([
-        mockOrganizers.length,
-        mockOrganizers,
-      ]);
-
-      const result = await organizersController.findAll(eventUuid, query);
-
-      expect(result.data).toEqual(mockOrganizers);
-      expect(result.meta).toEqual({
-        page: 1,
-        take: 10,
-        itemCount: mockOrganizers.length,
-        pageCount: 1,
-        hasPreviousPage: false,
-        hasNextPage: false,
-      });
-      expect(mockPrismaService.admin.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            permissions: {
-              some: {
-                eventUuid,
-              },
-            },
-          },
-        }),
-      );
+  afterAll(async () => {
+    await prisma.eventPermission.deleteMany({
+      where: {
+        OR: [
+          { eventUuid: { in: createdEventUuids } },
+          { adminUuid: { in: createdAdminUuids } },
+        ],
+      },
     });
+    await prisma.event.deleteMany({
+      where: { uuid: { in: createdEventUuids } },
+    });
+    await prisma.admin.deleteMany({
+      where: { uuid: { in: createdAdminUuids } },
+    });
+
+    await prisma.$disconnect();
   });
-  it("should return 404 not found if event does not exist", async () => {
-    const eventUuid = "bad-event-123";
-    const query = new OrganizerListingDto();
 
-    mockPrismaService.event.findUnique.mockResolvedValue(null);
+  // ---------------------------------------------------------------------------
+  // Helpers / factories
+  // ---------------------------------------------------------------------------
 
-    await expect(
-      organizersController.findAll(eventUuid, query),
-    ).rejects.toThrow(`Event with uuid: ${eventUuid} not found`);
-  });
-  it("should filter by active status", async () => {
-    const eventUuid = "event-123";
-    const query = new OrganizerListingDto();
-    query.isActive = true;
+  async function createAdmin(
+    overrides: Partial<{
+      firstName: string;
+      lastName: string;
+      email: string;
+      active: boolean;
+    }> = {},
+  ): Promise<Admin> {
+    const admin = await prisma.admin.create({
+      data: {
+        firstName: "Test",
+        lastName: "Organizer",
+        email: `${String(Date.now())}-${Math.random().toString(36).slice(2)}@organizers-int.local`,
+        password: "$2b$10$placeholder.not.used.in.organizer.tests.only",
+        active: true,
+        ...overrides,
+      },
+    });
+    createdAdminUuids.push(admin.uuid);
+    return admin;
+  }
 
-    const mockOrganizers = [
-      { firstName: "testName1", active: true },
-      { firstName: "testName2", active: false },
-    ];
-    mockPrismaService.admin.findMany.mockResolvedValue(mockOrganizers);
-    mockPrismaService.event.findUnique.mockResolvedValue("event");
-
-    mockPrismaService.$transaction.mockResolvedValue([
-      mockOrganizers.length,
-      mockOrganizers,
-    ]);
-
-    await organizersController.findAll(eventUuid, query);
-
-    expect(mockPrismaService.admin.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        where: expect.objectContaining({
-          active: true,
-        }),
-      }),
-    );
-  });
-  describe("Find organizer by event and admin id", () => {
-    it("Should return admin when event and admin exists", async () => {
-      const eventUuid = "event-test-123";
-      const organizerUuid = "admin-test-123";
-
-      const mockOrganizer = {
-        firstName: "abc",
-        uuid: organizerUuid,
-        eventUuid,
-      };
-
-      mockPrismaService.admin.findFirst.mockResolvedValue(mockOrganizer);
-
-      const result = await organizersController.findOne(
-        eventUuid,
+  async function createEvent(
+    organizerUuid: string,
+    overrides: Partial<{
+      name: string;
+      slug: string;
+      startDate: Date;
+      endDate: Date;
+    }> = {},
+  ): Promise<Event> {
+    const event = await prisma.event.create({
+      data: {
+        name: "Test Event",
+        slug: `organizers-int-${String(Date.now())}-${Math.random().toString(36).slice(2)}`,
+        startDate: new Date("2025-06-01"),
+        endDate: new Date("2025-06-02"),
         organizerUuid,
-      );
-
-      expect(result).toEqual(mockOrganizer);
-
-      expect(mockPrismaService.admin.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          where: expect.objectContaining({
-            uuid: organizerUuid,
-            permissions: {
-              some: {
-                eventUuid,
-              },
-            },
-          }),
-        }),
-      );
+        ...overrides,
+      },
     });
-    it("Should return 404 if admin/event does not exist, or admin is not an organizer of an event", async () => {
-      const eventUuid = "bad-event-123";
-      const organizerUuid = "bad-organizer-123";
+    createdEventUuids.push(event.uuid);
+    return event;
+  }
 
-      mockPrismaService.admin.findFirst.mockResolvedValue(null);
+  async function assignPermissions(
+    adminUuid: string,
+    eventUuid: string,
+    permissions: PermissionType[] = [PermissionType.MANAGE_EVENT],
+  ): Promise<void> {
+    await prisma.eventPermission.createMany({
+      data: permissions.map((permission) => ({
+        adminUuid,
+        eventUuid,
+        permission,
+      })),
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // findAll
+  // ---------------------------------------------------------------------------
+
+  describe("findAll", () => {
+    it("returns all organizers assigned to the event", async () => {
+      const owner = await createAdmin();
+      const coOrganizer = await createAdmin();
+      const event = await createEvent(owner.uuid);
+      await assignPermissions(coOrganizer.uuid, event.uuid);
+
+      const result = await service.findAll(
+        event.uuid,
+        new OrganizerListingDto(),
+      );
+
+      expect(result.meta.itemCount).toBe(2);
+      const emails = result.data.map((o) => o.email);
+      expect(emails).toContain(owner.email);
+      expect(emails).toContain(coOrganizer.email);
+    });
+
+    it("omits the password field from every returned organizer", async () => {
+      const owner = await createAdmin();
+      const event = await createEvent(owner.uuid);
+
+      const result = await service.findAll(
+        event.uuid,
+        new OrganizerListingDto(),
+      );
+
+      for (const organizer of result.data) {
+        expect(organizer).not.toHaveProperty("password");
+      }
+    });
+
+    it("throws NotFoundException when the event does not exist", async () => {
+      const nonExistentUuid = "00000000-0000-0000-0000-000000000000";
 
       await expect(
-        organizersController.findOne(eventUuid, organizerUuid),
-      ).rejects.toThrow(
-        `organizer or event does not exist, or the organizer is not assigned to event: ${eventUuid}`,
+        service.findAll(nonExistentUuid, new OrganizerListingDto()),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("filters organizers by active status", async () => {
+      const active = await createAdmin({ active: true });
+      const inactive = await createAdmin({ active: false });
+      const event = await createEvent(active.uuid);
+      await assignPermissions(inactive.uuid, event.uuid);
+
+      const query = Object.assign(new OrganizerListingDto(), {
+        isActive: true,
+      });
+      const result = await service.findAll(event.uuid, query);
+
+      const emails = result.data.map((o) => o.email);
+      expect(emails).toContain(active.email);
+      expect(emails).not.toContain(inactive.email);
+    });
+
+    it("includes only permissions scoped to the requested event, not other events", async () => {
+      const admin = await createAdmin();
+      const event = await createEvent(admin.uuid);
+      const otherEvent = await createEvent(admin.uuid);
+      await assignPermissions(admin.uuid, event.uuid, [
+        PermissionType.MANAGE_FORM,
+      ]);
+      await assignPermissions(admin.uuid, otherEvent.uuid, [
+        PermissionType.MANAGE_EMAIL,
+      ]);
+
+      const result = await service.findAll(
+        event.uuid,
+        new OrganizerListingDto(),
+      );
+
+      const organizer = result.data.find((o) => o.email === admin.email);
+      expect(organizer).toBeDefined();
+      if (organizer == null) {
+        return;
+      }
+      const types = organizer.permissions.map((p) => p.permission);
+      expect(types).toContain(PermissionType.MANAGE_FORM);
+      expect(types).not.toContain(PermissionType.MANAGE_EMAIL);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // findOne
+  // ---------------------------------------------------------------------------
+
+  describe("findOne", () => {
+    it("returns the organizer when assigned to the event", async () => {
+      const admin = await createAdmin();
+      const event = await createEvent(admin.uuid);
+      await assignPermissions(admin.uuid, event.uuid);
+
+      const result = await service.findOne(event.uuid, admin.uuid);
+
+      expect(result.uuid).toBe(admin.uuid);
+      expect(result.email).toBe(admin.email);
+      expect(result).not.toHaveProperty("password");
+    });
+
+    it("throws NotFoundException when admin exists but is not assigned to the event", async () => {
+      const owner = await createAdmin();
+      const unassigned = await createAdmin();
+      const event = await createEvent(owner.uuid);
+
+      await expect(
+        service.findOne(event.uuid, unassigned.uuid),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("throws NotFoundException for a non-existent admin uuid", async () => {
+      const owner = await createAdmin();
+      const event = await createEvent(owner.uuid);
+      const fakeAdminUuid = "00000000-0000-0000-0000-000000000001";
+
+      await expect(service.findOne(event.uuid, fakeAdminUuid)).rejects.toThrow(
+        NotFoundException,
       );
     });
   });
-  describe("Assign (create) organizer", () => {
-    it("should add an organizer and return created permissions", async () => {
-      const eventUuid = "event-uuid-123";
-      const existingAdminUuid = "admin-uuid-123";
 
-      const dto = {
-        email: "organizer@example.com",
-        firstName: "John",
-        lastName: "Doe",
-        permissionIds: ["perm-1", "perm-2"],
-      };
+  // ---------------------------------------------------------------------------
+  // create
+  // ---------------------------------------------------------------------------
 
-      mockPrismaService.admin.findFirst.mockResolvedValue({
-        uuid: existingAdminUuid,
-        email: dto.email,
-        firstName: dto.firstName,
-        lastName: dto.lastName,
+  describe("create", () => {
+    it("assigns an admin as organizer with the specified permissions", async () => {
+      const owner = await createAdmin();
+      const newOrganizer = await createAdmin();
+      const event = await createEvent(owner.uuid);
+
+      const result = await service.create(event.uuid, {
+        email: newOrganizer.email,
+        permissions: [
+          PermissionType.MANAGE_PARTICIPANT,
+          PermissionType.MANAGE_FORM,
+        ],
       });
-
-      mockPrismaService.event.findUnique.mockResolvedValue({
-        uuid: eventUuid,
-      });
-
-      mockPrismaService.adminPermission.create.mockImplementation(
-        (arguments_: {
-          data: {
-            eventUuid: string;
-            adminUuid: string;
-            permissionUuid: string;
-          };
-        }) => {
-          const data = arguments_.data;
-          return {
-            uuid: "new-record-uuid",
-            eventUuid: data.eventUuid,
-            adminUuid: data.adminUuid,
-            permissionUuid: data.permissionUuid,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          };
-        },
-      );
-
-      const result = await organizersController.create(eventUuid, dto);
 
       expect(result).toBeDefined();
-      expect(Array.isArray(result)).toBe(true);
-      expect(result).toHaveLength(2);
+      if (result == null) {
+        return;
+      }
+      expect(result.uuid).toBe(newOrganizer.uuid);
+      const types = result.permissions.map((p) => p.permission);
+      expect(types).toContain(PermissionType.MANAGE_PARTICIPANT);
+      expect(types).toContain(PermissionType.MANAGE_FORM);
+    });
 
-      expect(result[0]).toMatchObject({
-        eventUuid,
-        adminUuid: existingAdminUuid,
-        permissionUuid: dto.permissionIds[0],
-      });
+    it("throws NotFoundException when no admin has that email", async () => {
+      const owner = await createAdmin();
+      const event = await createEvent(owner.uuid);
 
-      expect(result[1]).toMatchObject({
-        eventUuid,
-        adminUuid: existingAdminUuid,
-        permissionUuid: dto.permissionIds[1],
-      });
-
-      expect(mockPrismaService.admin.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { email: dto.email },
+      await expect(
+        service.create(event.uuid, {
+          email: "nobody@organizers-int.local",
+          permissions: [PermissionType.MANAGE_EVENT],
         }),
-      );
+      ).rejects.toThrow(NotFoundException);
     });
 
-    it("should throw 404 if admin, does not exist", async () => {
-      const eventUuid = "event-123";
-      const dto = {
-        email: "organizer@example.com",
-        firstName: "John",
-        lastName: "Doe",
-        permissionIds: ["perm-1"],
-      };
+    it("throws NotFoundException when the event does not exist", async () => {
+      const admin = await createAdmin();
+      const fakeEventUuid = "00000000-0000-0000-0000-000000000002";
 
-      mockPrismaService.admin.findFirst.mockResolvedValue(null);
+      await expect(
+        service.create(fakeEventUuid, {
+          email: admin.email,
+          permissions: [PermissionType.MANAGE_EVENT],
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
 
-      await expect(organizersController.create(eventUuid, dto)).rejects.toThrow(
-        `Admin with email: ${dto.email} not found`,
-      );
+    it("throws BadRequestException when a permission already exists (unique constraint violation)", async () => {
+      const owner = await createAdmin();
+      const organizer = await createAdmin();
+      const event = await createEvent(owner.uuid);
+
+      await assignPermissions(organizer.uuid, event.uuid, [
+        PermissionType.MANAGE_EVENT,
+      ]);
+
+      await expect(
+        service.create(event.uuid, {
+          email: organizer.email,
+          permissions: [PermissionType.MANAGE_EVENT], // duplicate — hits P2002
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
-  describe("Update organizer permissions", () => {
-    it("should update permissions and return updated organizer", async () => {
-      const eventUuid = "event-uuid-123";
-      const organizerUuid = "admin-uuid-123";
-      const dto = {
-        permissionIds: ["new-perm-1", "new-perm-2"],
-      };
 
-      const expectedOrganizer = {
-        uuid: organizerUuid,
-        email: "test@example.com",
-        firstName: "John",
-        lastName: "Doe",
+  // ---------------------------------------------------------------------------
+  // update
+  // ---------------------------------------------------------------------------
+
+  describe("update", () => {
+    it("replaces all permissions for an organizer", async () => {
+      const owner = await createAdmin();
+      const organizer = await createAdmin();
+      const event = await createEvent(owner.uuid);
+      await assignPermissions(organizer.uuid, event.uuid, [
+        PermissionType.MANAGE_EVENT,
+      ]);
+
+      const result = await service.update(event.uuid, organizer.uuid, {
         permissions: [
-          { permissionUuid: "new-perm-1", eventUuid },
-          { permissionUuid: "new-perm-2", eventUuid },
+          PermissionType.MANAGE_PARTICIPANT,
+          PermissionType.MANAGE_EMAIL,
         ],
-      };
-
-      mockPrismaService.event.findUnique.mockResolvedValue({
-        eventUuid,
       });
 
-      mockPrismaService.admin.findUnique.mockResolvedValue({
-        uuid: organizerUuid,
-      });
-
-      mockPrismaService.adminPermission.findFirst.mockResolvedValue({
-        uuid: "existing-link-uuid",
-        adminUuid: organizerUuid,
-        eventUuid,
-      });
-
-      mockPrismaService.adminPermission.deleteMany.mockResolvedValue({
-        count: 5,
-      });
-
-      mockPrismaService.adminPermission.create.mockImplementation(
-        async (arguments_: {
-          data: {
-            eventUuid: string;
-            adminUuid: string;
-            permissionUuid: string;
-          };
-        }) => {
-          const data = arguments_.data;
-          return await Promise.resolve({
-            uuid: "new-record-uuid",
-            eventUuid: data.eventUuid,
-            adminUuid: data.adminUuid,
-            permissionUuid: data.permissionUuid,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          });
-        },
-      );
-
-      mockPrismaService.admin.findUnique.mockResolvedValue(expectedOrganizer);
-
-      const result = await organizersController.update(
-        eventUuid,
-        organizerUuid,
-        dto,
-      );
-
-      expect(result).toEqual(expectedOrganizer);
-
-      expect(mockPrismaService.adminPermission.deleteMany).toHaveBeenCalledWith(
-        {
-          where: {
-            eventUuid,
-            adminUuid: organizerUuid,
-          },
-        },
-      );
-
-      expect(
-        mockPrismaService.adminPermission.createMany,
-      ).toHaveBeenCalledTimes(1);
+      expect(result).toBeDefined();
+      if (result == null) {
+        return;
+      }
+      const types = result.permissions.map((p) => p.permission);
+      expect(types).not.toContain(PermissionType.MANAGE_EVENT); // old one gone
+      expect(types).toContain(PermissionType.MANAGE_PARTICIPANT);
+      expect(types).toContain(PermissionType.MANAGE_EMAIL);
     });
 
-    it("should throw 404 if organizer does not exist", async () => {
-      const eventUuid = "event-uuid-123";
-      const organizerUuid = "admin-uuid-123";
-      const dto = {
-        permissionIds: ["perm-1"],
-      };
-
-      mockPrismaService.event.findUnique.mockResolvedValue(eventUuid);
-
-      mockPrismaService.admin.findUnique.mockResolvedValue(null);
+    it("throws NotFoundException when the event does not exist", async () => {
+      const organizer = await createAdmin();
+      const fakeEventUuid = "00000000-0000-0000-0000-000000000003";
 
       await expect(
-        organizersController.update(eventUuid, organizerUuid, dto),
-      ).rejects.toThrow(`Organizer with uuid: ${organizerUuid} not found`);
+        service.update(fakeEventUuid, organizer.uuid, {
+          permissions: [PermissionType.MANAGE_EVENT],
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("throws NotFoundException when the organizer is not assigned to the event", async () => {
+      const owner = await createAdmin();
+      const unassigned = await createAdmin();
+      const event = await createEvent(owner.uuid);
+
+      await expect(
+        service.update(event.uuid, unassigned.uuid, {
+          permissions: [PermissionType.MANAGE_EVENT],
+        }),
+      ).rejects.toThrow(NotFoundException);
     });
   });
-  describe("Remove organizer", () => {
-    it("should remove organizer if there are more than 1 organizers assigned", async () => {
-      const eventUuid = "event-uuid-123";
-      const organizerUuid = "admin-uuid-123";
 
-      mockPrismaService.adminPermission.groupBy.mockResolvedValue([
-        { adminUuid: "other-admin-uuid", count: { all: 5 } },
-        { adminUuid: organizerUuid, count: { all: 5 } },
-      ]);
+  // ---------------------------------------------------------------------------
+  // remove
+  // ---------------------------------------------------------------------------
 
-      mockPrismaService.adminPermission.deleteMany.mockResolvedValue({
-        count: 1,
+  describe("remove", () => {
+    it("removes the organizer's EventPermission rows when other organizers remain", async () => {
+      const owner = await createAdmin();
+      const organizer = await createAdmin();
+      const event = await createEvent(owner.uuid);
+      await assignPermissions(organizer.uuid, event.uuid);
+
+      await service.remove(event.uuid, organizer.uuid);
+
+      const remaining = await prisma.eventPermission.findMany({
+        where: { adminUuid: organizer.uuid, eventUuid: event.uuid },
       });
+      expect(remaining).toHaveLength(0);
+    });
 
-      await organizersController.remove(eventUuid, organizerUuid);
+    it("throws ForbiddenException when trying to remove the last organizer", async () => {
+      const owner = await createAdmin();
 
-      expect(mockPrismaService.adminPermission.groupBy).toHaveBeenCalledWith({
-        by: ["adminUuid"],
-        where: { eventUuid },
-      });
+      const event = await createEvent(owner.uuid);
 
-      expect(mockPrismaService.adminPermission.deleteMany).toHaveBeenCalledWith(
-        {
-          where: {
-            eventUuid,
-            adminUuid: organizerUuid,
-          },
-        },
+      await expect(service.remove(event.uuid, owner.uuid)).rejects.toThrow(
+        ForbiddenException,
       );
     });
 
-    it("should throw 404 if organizer was not assigned to this event or does not exist", async () => {
-      const eventUuid = "event-uuid-123";
-      const organizerUuid = "non-existent-admin";
+    it("throws NotFoundException when the organizer is not assigned to the event", async () => {
+      const owner = await createAdmin();
+      const unassigned = await createAdmin();
+      const event = await createEvent(owner.uuid);
 
-      mockPrismaService.adminPermission.groupBy.mockResolvedValue([
-        { count: { all: 5 } },
-      ]);
-
-      mockPrismaService.adminPermission.deleteMany.mockResolvedValue({
-        count: 0,
-      });
-
-      await expect(
-        organizersController.remove(eventUuid, organizerUuid),
-      ).rejects.toThrow(
-        "Organizer was not assigned to this event or does not exist",
+      await expect(service.remove(event.uuid, unassigned.uuid)).rejects.toThrow(
+        NotFoundException,
       );
-    });
-
-    it("should throw 403 Forbidden if trying to remove the last organizer", async () => {
-      const eventUuid = "event-uuid-123";
-      const organizerUuid = "last-admin-uuid";
-
-      mockPrismaService.adminPermission.groupBy.mockResolvedValue([
-        {
-          adminUuid: organizerUuid,
-          count: { all: 1 },
-        },
-      ]);
-
-      await expect(
-        organizersController.remove(eventUuid, organizerUuid),
-      ).rejects.toThrow("Unable to remove the last organizer from the event");
-
-      expect(
-        mockPrismaService.adminPermission.deleteMany,
-      ).not.toHaveBeenCalled();
     });
   });
 });
