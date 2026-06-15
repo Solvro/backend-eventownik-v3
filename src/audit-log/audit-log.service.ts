@@ -1,12 +1,13 @@
 import { Injectable } from "@nestjs/common";
-import { Prisma, LogTrigger } from "../generated/prisma/client";
+
+import { LogTrigger, Prisma } from "../generated/prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
 export class AuditLogService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async log(params: {
+  async log(parameters: {
     action: string;
     entityType: string;
     entityUuid?: string;
@@ -16,12 +17,12 @@ export class AuditLogService {
   }) {
     return this.prisma.auditLog.create({
       data: {
-        action: params.action,
-        entityType: params.entityType,
-        entityUuid: params.entityUuid,
-        triggeredBy: params.triggeredBy,
-        before: params.before ?? undefined,
-        after: params.after ?? undefined,
+        action: parameters.action,
+        entityType: parameters.entityType,
+        entityUuid: parameters.entityUuid,
+        triggeredBy: parameters.triggeredBy,
+        before: parameters.before ?? undefined,
+        after: parameters.after ?? undefined,
       },
     });
   }
@@ -74,17 +75,17 @@ export class AuditLogService {
       after: Prisma.InputJsonValue | null;
     }[] = [];
 
-    for (const newAttr of newAttributes) {
-      const hadOld = oldMap.has(newAttr.attributeUuid);
+    for (const newAttribute of newAttributes) {
+      const hadOld = oldMap.has(newAttribute.attributeUuid);
       const oldValue = hadOld
-        ? (oldMap.get(newAttr.attributeUuid) ?? null)
+        ? (oldMap.get(newAttribute.attributeUuid) ?? null)
         : null;
 
-      if (JSON.stringify(oldValue) !== JSON.stringify(newAttr.value)) {
+      if (JSON.stringify(oldValue) !== JSON.stringify(newAttribute.value)) {
         changedEntries.push({
-          attributeUuid: newAttr.attributeUuid,
+          attributeUuid: newAttribute.attributeUuid,
           before: hadOld ? oldValue : null,
-          after: newAttr.value,
+          after: newAttribute.value,
         });
       }
     }
@@ -94,7 +95,7 @@ export class AuditLogService {
     }
 
     return Promise.all(
-      changedEntries.map((entry) =>
+      changedEntries.map(async (entry) =>
         tx.participantAttributeLog.create({
           data: {
             participantUuid,
