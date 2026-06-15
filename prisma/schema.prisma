@@ -21,6 +21,12 @@ enum PermissionType {
   MANAGE_SETTINGS
 }
 
+enum LogTrigger {
+  ADMIN
+  PARTICIPANT
+  SYSTEM
+}
+
 model Admin {
   uuid      String        @id @default(uuid()) @db.Uuid
   firstName String
@@ -44,11 +50,13 @@ model EventPermission {
   uuid      String @id @default(uuid()) @db.Uuid
   eventUuid String @db.Uuid
   adminUuid String @db.Uuid
+  formUuid       String?        @db.Uuid
 
   permission PermissionType
 
   admin Admin @relation(fields: [adminUuid], references: [uuid])
   event Event @relation(fields: [eventUuid], references: [uuid])
+  form              Form?                  @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
 
   @@unique([eventUuid, adminUuid, permission])
   @@map("EventPermissions")
@@ -96,12 +104,14 @@ model EventLink {
   uuid      String        @id @default(uuid()) @db.Uuid
   eventUuid String        @db.Uuid
   url       String
+  formUuid       String?        @db.Uuid
   type      EventLinkType
   label     String?
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
   event Event @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+  form              Form?                  @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
 
   @@map("EventsLinks")
 }
@@ -128,6 +138,7 @@ model Attribute {
   uuid       String        @id @default(uuid()) @db.Uuid
   eventUuid  String        @db.Uuid
   type       AttributeType
+  formUuid       String?        @db.Uuid
   name       String
   order      Int
   showInList Boolean       @default(true)
@@ -137,6 +148,7 @@ model Attribute {
   updatedAt DateTime @updatedAt
 
   event                 Event                  @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+  form              Form?                  @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
   blocks                Block[]
   formDefinitions       FormDefinition[]
   participantAttributes ParticipantAttribute[]
@@ -182,8 +194,10 @@ model EmailTemplate {
   triggerConfig Json?
   order         Int?
   eventUuid     String       @db.Uuid
+  formUuid       String?        @db.Uuid
 
   event             Event                    @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+  form              Form?                  @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
   participantEmails ParticipantEmailStatus[]
   participantForms  ParticipantFormLog[]
 
@@ -210,8 +224,16 @@ model Form {
 
   event            Event?               @relation("EventForms", fields: [eventUuid], references: [uuid], onDelete: Cascade)
   formDefinitions  FormDefinition[]
+  emails           EmailTemplate[]
   participantForms ParticipantFormLog[]
-  registerEvent    Event[]              @relation("RegisterForm")
+  registerEvent    Event[]           @relation("RegisterForm")
+
+  eventPermissions  EventPermission[]
+  eventLinks        EventLink[]
+  attributes        Attribute[]
+  participants      Participant[]
+  refreshTokens     RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
 
   @@map("Forms")
 }
@@ -234,11 +256,13 @@ model FormDefinition {
 model Participant {
   uuid      String   @id @default(uuid()) @db.Uuid
   email     String
+  formUuid       String?        @db.Uuid
   eventUuid String   @db.Uuid
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   event         Event                     @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+  form              Form?                  @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
   attributes    ParticipantAttribute[]
   emails        ParticipantEmailStatus[]
   forms         ParticipantFormLog[]
@@ -280,9 +304,8 @@ model ParticipantEmailStatus {
   participantUuid String?     @db.Uuid
   emailUuid       String?     @db.Uuid
 
-  participant Participant?   @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
-  email       EmailTemplate? @relation(fields: [emailUuid], references: [uuid], onDelete: Cascade)
-
+  participant Participant? @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
+  email       EmailTemplate?       @relation(fields: [emailUuid], references: [uuid], onDelete: Cascade)
   @@map("ParticipantsEmailStatuses")
 }
 
@@ -296,22 +319,23 @@ model ParticipantFormLog {
   lastSubmittedAt DateTime?
   emailUuid       String?   @db.Uuid
 
-  participant Participant    @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
-  form        Form           @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
-  email       EmailTemplate? @relation(fields: [emailUuid], references: [uuid], onDelete: SetNull)
+  participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
+  form        Form        @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
+  email       EmailTemplate?      @relation(fields: [emailUuid], references: [uuid], onDelete: SetNull)
 
+  @@unique([participantUuid, formUuid])
   @@map("ParticipantsFormLogs")
 }
 
 model ParticipantAttributeLog {
   uuid            String   @id @default(uuid()) @db.Uuid
   participantUuid String   @db.Uuid
-  triggeredBy     String
+  triggeredBy     LogTrigger
   createdAt       DateTime @default(now())
   triggeredUuid   String?  @db.Uuid
   attributeUuid   String?  @db.Uuid
-  before          String?
-  after           String?
+  before          Json?
+  after           Json?
 
   participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
 
@@ -321,11 +345,14 @@ model ParticipantAttributeLog {
 model RefreshToken {
   uuid        String    @id @default(uuid()) @db.Uuid
   adminUuid   String    @db.Uuid
+  formUuid       String?        @db.Uuid
   token       String    @unique
   createdAt   DateTime  @default(now()) @map("created_at")
   expiresAt   DateTime  @map("expires_at")
 
   admin Admin @relation(fields: [adminUuid], references: [uuid], onDelete: Cascade)
+
+  form  Form?  @relation(fields: [formUuid], references: [uuid], onDelete: SetNull)
 
   @@map("RefreshTokens")
   @@index(fields: [adminUuid])
@@ -334,11 +361,28 @@ model RefreshToken {
 model PasswordResetToken {
   uuid      String @id @default(uuid()) @db.Uuid
   adminUuid String @db.Uuid
+  formUuid       String?        @db.Uuid
   token     String @unique
   createdAt   DateTime  @default(now()) @map("created_at")
   expiresAt   DateTime  @map("expires_at")
 
   admin Admin @relation(fields: [adminUuid], references: [uuid], onDelete: Cascade)
 
+  form  Form?  @relation(fields: [formUuid], references: [uuid], onDelete: SetNull)
+
   @@map("PasswordResetTokens")
 }
+
+model AuditLog {
+  uuid      String @id @default(uuid()) @db.Uuid
+  action    String
+  entityType    String
+  entityUuid    String?  @db.Uuid
+  triggeredBy   String?
+  before    Json?
+  after     Json?
+  createdAt   DateTime @default(now())
+
+  @@map("AuditLogs")
+}
+

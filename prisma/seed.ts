@@ -17,6 +17,7 @@ import {
   AttributeType,
   EmailStatus,
   EmailTrigger,
+  LogTrigger,
   OrganizerType,
   PermissionType,
   PrismaClient,
@@ -42,8 +43,10 @@ async function main() {
   await prisma.event.deleteMany();
   await prisma.admin.deleteMany();
 
-  await prisma.admin.create({
-    data: {
+  await prisma.admin.upsert({
+    where: { email: "admin@solvro.pl" },
+    update: {},
+    create: {
       firstName: "SuperAdmin",
       lastName: "Solvro",
       password: "changeme",
@@ -53,8 +56,10 @@ async function main() {
     },
   });
 
-  const admin: Admin = await prisma.admin.create({
-    data: {
+  const admin: Admin = await prisma.admin.upsert({
+    where: { email: "admin@example.com" },
+    update: {},
+    create: {
       firstName: "Admin",
       lastName: "User",
       password: "changeme",
@@ -80,8 +85,16 @@ async function main() {
     },
   });
 
-  await prisma.eventPermission.create({
-    data: {
+  await prisma.eventPermission.upsert({
+    where: {
+      eventUuid_adminUuid_permission: {
+        eventUuid: event.uuid,
+        adminUuid: admin.uuid,
+        permission: PermissionType.MANAGE_ALL,
+      },
+    },
+    update: {},
+    create: {
       adminUuid: admin.uuid,
       eventUuid: event.uuid,
       permission: PermissionType.MANAGE_ALL,
@@ -189,7 +202,7 @@ async function main() {
         participantUuid: participant.uuid,
         emailUuid: email.uuid,
         sendAt: new Date(),
-        sendBy: "system",
+        sendBy: "SYSTEM",
         status: EmailStatus.sent,
       },
     });
@@ -198,10 +211,10 @@ async function main() {
     await prisma.participantAttributeLog.create({
       data: {
         participantUuid: participant.uuid,
-        triggeredBy: "system",
+        triggeredBy: LogTrigger.SYSTEM,
         triggeredUuid: admin.uuid,
         attributeUuid: attribute.uuid,
-        before: null,
+        before: undefined,
         after: "M",
       },
     });

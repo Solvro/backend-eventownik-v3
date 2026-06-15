@@ -11,6 +11,7 @@ import { AdminsModule } from "./admins/admins.module";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { AttributesModule } from "./attributes/attributes.module";
+import { AuditLogModule } from "./audit-log/audit-log.module";
 import { AuthModule } from "./auth/auth.module";
 import { BlocksModule } from "./blocks/blocks.module";
 import { EmailsModule } from "./emails/emails.module";
@@ -23,6 +24,10 @@ import { PrismaModule } from "./prisma/prisma.module";
 
 @Module({
   imports: [
+    PrismaModule,
+    EventsModule,
+    AuditLogModule,
+    FormsModule,
     ConfigModule.forRoot({
       validationSchema: Joi.object({
         APP_DOMAIN: Joi.string().required(),
