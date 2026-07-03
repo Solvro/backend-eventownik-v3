@@ -1,3 +1,5 @@
+import { Request, Response } from "express";
+
 import {
   Body,
   Controller,
@@ -10,6 +12,7 @@ import {
   UnauthorizedException,
   UseGuards,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -30,8 +33,6 @@ import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { TokenResponseDto } from "./dto/token-response.dto";
 import { JwtAuthGuard } from "./jwt-auth.guard";
 import { AuthUser } from "./jwt.strategy";
-import { Request, Response } from "express";
-import { ConfigService } from "@nestjs/config";
 
 @ApiTags("Auth")
 @Controller("auth")

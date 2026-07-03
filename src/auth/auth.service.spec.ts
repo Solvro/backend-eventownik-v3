@@ -7,13 +7,13 @@ import {
   ConflictException,
   UnauthorizedException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthService } from "./auth.service";
-import { ConfigService } from "@nestjs/config";
 
 describe("AuthService", () => {
   let service: AuthService;

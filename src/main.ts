@@ -1,3 +1,4 @@
+import * as cookieParser from "cookie-parser";
 import type * as express from "express";
 import * as qs from "qs";
 import { swaggerConfig } from "src/config/swagger.config";
@@ -12,7 +13,6 @@ import { SwaggerModule } from "@nestjs/swagger";
 
 import { AppModule } from "./app.module";
 import { HcaptchaExceptionFilter } from "./common/exception-filters/hcaptcha.exception";
-import * as cookieParser from "cookie-parser";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

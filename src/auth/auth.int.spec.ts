@@ -1,15 +1,14 @@
+import type { Request, Response } from "express";
 import type { Admin } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import { UnauthorizedException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
-
-import type { Response, Request } from "express";
-import { ConfigService } from "@nestjs/config";
 
 describe("AuthController integration tests", () => {
   let controller: AuthController;

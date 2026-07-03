@@ -8,10 +8,10 @@ import {
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 
 import { PrismaService } from "../prisma/prisma.service";
-import { ConfigService } from "@nestjs/config";
 
 @Injectable()
 export class AuthService {
