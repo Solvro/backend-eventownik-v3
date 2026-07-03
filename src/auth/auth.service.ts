@@ -98,15 +98,19 @@ export class AuthService {
     }
 
     if (storedToken.expiresAt < new Date()) {
-      await this.prisma.refreshToken.delete({
+      await this.prisma.refreshToken.deleteMany({
         where: { uuid: storedToken.uuid },
       });
       throw new UnauthorizedException("Expired refresh token");
     }
 
-    await this.prisma.refreshToken.delete({
+    const { count } = await this.prisma.refreshToken.deleteMany({
       where: { uuid: storedToken.uuid },
     });
+
+    if (count === 0) {
+      throw new UnauthorizedException("Invalid refresh token");
+    }
     return this.login(storedToken.admin);
   }
 
@@ -140,17 +144,23 @@ export class AuthService {
     }
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    await this.prisma.$transaction([
-      this.prisma.admin.update({
+    await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.passwordResetToken.deleteMany({
+        where: { uuid: resetToken.uuid },
+      });
+
+      if (count === 0) {
+        throw new BadRequestException("Invalid or expired token");
+      }
+
+      await tx.admin.update({
         where: { uuid: resetToken.adminUuid },
         data: { password: hashedPassword },
-      }),
-      this.prisma.refreshToken.deleteMany({
+      });
+
+      await tx.refreshToken.deleteMany({
         where: { adminUuid: resetToken.adminUuid },
-      }),
-      this.prisma.passwordResetToken.deleteMany({
-        where: { adminUuid: resetToken.adminUuid },
-      }),
-    ]);
+      });
+    });
   }
 }

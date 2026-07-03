@@ -192,7 +192,7 @@ describe("AuthService", () => {
         admin: mockAdmin,
       };
       mockPrisma.refreshToken.findUnique.mockResolvedValue(storedToken);
-      mockPrisma.refreshToken.delete.mockResolvedValue(storedToken);
+      mockPrisma.refreshToken.deleteMany.mockResolvedValue({ count: 1 });
       const loginSpy = jest.spyOn(service, "login").mockResolvedValue({
         access_token: "new",
         refresh_token: "new-refresh",
@@ -204,7 +204,7 @@ describe("AuthService", () => {
         where: { token: hashedToken },
         include: { admin: true },
       });
-      expect(mockPrisma.refreshToken.delete).toHaveBeenCalledWith({
+      expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
         where: { uuid: "3e19d992-2ea5-4ed3-9245-6691c41f4f06" },
       });
       expect(loginSpy).toHaveBeenCalledWith(mockAdmin);
@@ -233,7 +233,7 @@ describe("AuthService", () => {
       await expect(service.refreshTokens("expired-token")).rejects.toThrow(
         UnauthorizedException,
       );
-      expect(mockPrisma.refreshToken.delete).toHaveBeenCalledWith({
+      expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
         where: { uuid: "3e19d992-2ea5-4ed3-9245-6691c41f4f06" },
       });
     });
@@ -268,6 +268,7 @@ describe("AuthService", () => {
   describe("resetPassword", () => {
     it("Should reset password", async () => {
       mockPrisma.passwordResetToken.findUnique.mockResolvedValue({
+        uuid: "token-uuid",
         adminUuid: "admin-uuid",
         expiresAt: new Date(Date.now() + 100_000_000),
       });
@@ -276,18 +277,24 @@ describe("AuthService", () => {
         .spyOn(bcrypt, "hash")
         .mockImplementation(() => "hashed-password-123");
 
-      mockPrisma.$transaction.mockResolvedValue([]);
+      mockPrisma.$transaction.mockImplementation((callback) =>
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+        callback(mockPrisma),
+      );
+      mockPrisma.passwordResetToken.deleteMany.mockResolvedValue({ count: 1 });
 
       await service.resetPassword("token-123", "Password123!?");
 
       expect(bcrypt.hash).toHaveBeenCalledWith("Password123!?", 12);
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
-      expect(mockPrisma.$transaction).toHaveBeenCalledWith(expect.any(Array));
+      expect(mockPrisma.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+      );
       expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
         where: { adminUuid: "admin-uuid" },
       });
       expect(mockPrisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({
-        where: { adminUuid: "admin-uuid" },
+        where: { uuid: "token-uuid" },
       });
       expect(mockPrisma.admin.update).toHaveBeenCalledWith({
         where: { uuid: "admin-uuid" },

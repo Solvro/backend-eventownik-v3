@@ -5,6 +5,7 @@ import { ApiProperty } from "@nestjs/swagger";
 export class ResetPasswordDto {
   @IsString()
   @ApiProperty({ example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." })
+  @IsNotEmpty()
   token!: string;
 
   @ApiProperty({ example: "password123" })
