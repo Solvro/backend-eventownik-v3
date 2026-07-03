@@ -11,12 +11,14 @@ import {
 import { JwtService } from "@nestjs/jwt";
 
 import { PrismaService } from "../prisma/prisma.service";
+import { ConfigService } from "@nestjs/config";
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private configService: ConfigService,
   ) {}
 
   async register(data: {
@@ -71,9 +73,12 @@ export class AuthService {
   private async generateRefreshToken(adminUuid: string): Promise<string> {
     const refreshToken = randomBytes(64).toString("hex");
     const hashedToken = createHash("sha256").update(refreshToken).digest("hex");
+    const ttlDays = this.configService.getOrThrow<number>(
+      "REFRESH_TOKEN_TTL_DAYS",
+    );
 
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
+    expiresAt.setDate(expiresAt.getDate() + ttlDays); // 7 days
 
     await this.prisma.refreshToken.create({
       data: {
@@ -162,5 +167,15 @@ export class AuthService {
         where: { adminUuid: resetToken.adminUuid },
       });
     });
+  }
+
+  async logout(token: string): Promise<{ message: string }> {
+    const hashedToken = createHash("sha256").update(token).digest("hex");
+
+    await this.prisma.refreshToken.deleteMany({
+      where: { token: hashedToken },
+    });
+
+    return { message: "Logged out successfully!" };
   }
 }

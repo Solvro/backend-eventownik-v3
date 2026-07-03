@@ -170,4 +170,31 @@ export class AuthController {
       message: "Password has been reset",
     };
   }
+
+  @Post("logout")
+  @ApiOperation({ summary: "Logs out a user" })
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({
+    description: "Logged out",
+  })
+  async logout(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const refreshToken = request.cookies.refresh_token as string | undefined;
+
+    response.clearCookie("refresh_token", {
+      httpOnly: true,
+      secure:
+        this.configService.getOrThrow<string>("NODE_ENV") === "production",
+      sameSite: "strict",
+      domain: this.configService.getOrThrow<string>("APP_DOMAIN"),
+      path: "/api/v3/auth",
+    });
+    if (refreshToken !== undefined && refreshToken !== "") {
+      return await this.authService.logout(refreshToken);
+    }
+
+    return { message: "Logged out successfully!" };
+  }
 }

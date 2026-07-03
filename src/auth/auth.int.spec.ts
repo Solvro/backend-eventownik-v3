@@ -33,6 +33,7 @@ describe("AuthController integration tests", () => {
     refreshTokens: jest.fn(),
     forgotPassword: jest.fn(),
     resetPassword: jest.fn(),
+    logout: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -188,6 +189,54 @@ describe("AuthController integration tests", () => {
         dto.token,
         dto.password,
       );
+    });
+  });
+  describe("logout", () => {
+    it("should clear the cookie and call authService.logout on success", async () => {
+      const mockRequest = {
+        cookies: { refresh_token: "valid-rt" },
+      } as unknown as Request;
+
+      const mockResponse = {
+        clearCookie: jest.fn(),
+      } as unknown as Response;
+
+      mockAuthService.logout.mockResolvedValue({
+        message: "Logged out successfully!",
+      });
+
+      const result = await controller.logout(mockRequest, mockResponse);
+
+      expect(mockAuthService.logout).toHaveBeenCalledWith("valid-rt");
+
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(mockResponse.clearCookie).toHaveBeenCalledWith(
+        "refresh_token",
+        expect.objectContaining({
+          httpOnly: true,
+          sameSite: "strict",
+          path: "/api/v3/auth",
+          secure: expect.any(Boolean) as boolean,
+          domain: expect.any(String) as string,
+        }),
+      );
+
+      expect(result).toEqual({ message: "Logged out successfully!" });
+    });
+
+    it("should not call service if cookie is missing", async () => {
+      const mockRequest = {
+        cookies: {},
+      } as unknown as Request;
+
+      const mockResponse = {
+        clearCookie: jest.fn(),
+      } as unknown as Response;
+
+      const result = await controller.logout(mockRequest, mockResponse);
+
+      expect(mockAuthService.logout).not.toHaveBeenCalled();
+      expect(result).toEqual({ message: "Logged out successfully!" });
     });
   });
 });

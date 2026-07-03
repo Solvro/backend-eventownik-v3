@@ -13,6 +13,7 @@ import { Test } from "@nestjs/testing";
 
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthService } from "./auth.service";
+import { ConfigService } from "@nestjs/config";
 
 describe("AuthService", () => {
   let service: AuthService;
@@ -59,6 +60,10 @@ describe("AuthService", () => {
         AuthService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: JwtService, useValue: mockJwtService },
+        {
+          provide: ConfigService,
+          useValue: { getOrThrow: jest.fn().mockReturnValue(7) },
+        },
       ],
     }).compile();
 
