@@ -8,6 +8,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 
 import { PrismaService } from "../prisma/prisma.service";
@@ -17,6 +18,7 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private configService: ConfigService,
   ) {}
 
   async register(data: {
@@ -71,9 +73,12 @@ export class AuthService {
   private async generateRefreshToken(adminUuid: string): Promise<string> {
     const refreshToken = randomBytes(64).toString("hex");
     const hashedToken = createHash("sha256").update(refreshToken).digest("hex");
+    const ttlDays = this.configService.getOrThrow<number>(
+      "REFRESH_TOKEN_TTL_DAYS",
+    );
 
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
+    expiresAt.setDate(expiresAt.getDate() + ttlDays); // 7 days
 
     await this.prisma.refreshToken.create({
       data: {
@@ -98,15 +103,19 @@ export class AuthService {
     }
 
     if (storedToken.expiresAt < new Date()) {
-      await this.prisma.refreshToken.delete({
+      await this.prisma.refreshToken.deleteMany({
         where: { uuid: storedToken.uuid },
       });
       throw new UnauthorizedException("Expired refresh token");
     }
 
-    await this.prisma.refreshToken.delete({
+    const { count } = await this.prisma.refreshToken.deleteMany({
       where: { uuid: storedToken.uuid },
     });
+
+    if (count === 0) {
+      throw new UnauthorizedException("Invalid refresh token");
+    }
     return this.login(storedToken.admin);
   }
 
@@ -140,17 +149,33 @@ export class AuthService {
     }
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    await this.prisma.$transaction([
-      this.prisma.admin.update({
+    await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.passwordResetToken.deleteMany({
+        where: { uuid: resetToken.uuid },
+      });
+
+      if (count === 0) {
+        throw new BadRequestException("Invalid or expired token");
+      }
+
+      await tx.admin.update({
         where: { uuid: resetToken.adminUuid },
         data: { password: hashedPassword },
-      }),
-      this.prisma.refreshToken.deleteMany({
+      });
+
+      await tx.refreshToken.deleteMany({
         where: { adminUuid: resetToken.adminUuid },
-      }),
-      this.prisma.passwordResetToken.deleteMany({
-        where: { adminUuid: resetToken.adminUuid },
-      }),
-    ]);
+      });
+    });
+  }
+
+  async logout(token: string): Promise<{ message: string }> {
+    const hashedToken = createHash("sha256").update(token).digest("hex");
+
+    await this.prisma.refreshToken.deleteMany({
+      where: { token: hashedToken },
+    });
+
+    return { message: "Logged out successfully!" };
   }
 }

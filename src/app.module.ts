@@ -36,6 +36,7 @@ import { PrismaModule } from "./prisma/prisma.module";
         HCAPTCHA_SECRET: Joi.string().required(),
         JWT_SECRET: Joi.string().required(),
         JWT_EXPIRES_IN: Joi.string().default("60m"),
+        REFRESH_TOKEN_TTL_DAYS: Joi.number().required().default(3),
         PORT: Joi.number().default(3000),
         REDIS_HOST: Joi.string().required(),
         REDIS_PORT: Joi.number().required(),
