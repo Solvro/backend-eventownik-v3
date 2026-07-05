@@ -28,13 +28,12 @@ export class PublicEventsController {
     if (event.photoUrl === null) {
       return event;
     }
-    return {
-      ...event,
+    return Object.assign({} as Event, event, {
       photoUrl: this.storageService.getUrl(
         this.configService.getOrThrow("S3_BUCKET_EVENTS"),
         event.photoUrl,
       ),
-    };
+    });
   }
 
   @Get("")
@@ -45,7 +44,7 @@ export class PublicEventsController {
   async findAllPublic(@Query() dto: EventListingDto): Promise<PageDto<Event>> {
     const result = await this.eventsService.findAllPublic(dto);
     return new PageDto<Event>(
-      result.data.map((e) => this.resolvePhotoUrl(e as Event)),
+      result.data.map((event_) => this.resolvePhotoUrl(event_ as Event)),
       result.meta,
     );
   }

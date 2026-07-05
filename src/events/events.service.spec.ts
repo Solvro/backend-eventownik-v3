@@ -78,7 +78,7 @@ describe("EventsService", () => {
         mockAdmin.type,
       );
 
-      expect(prisma.event.findMany).toHaveBeenCalledWith({
+      expect(mockPrismaService.event.findMany).toHaveBeenCalledWith({
         where: { uuid: { in: mockAdmin.eventsIds } },
         skip: 0,
         take: 10,
@@ -114,9 +114,11 @@ describe("EventsService", () => {
         location: { contains: "Room A", mode: "insensitive" },
       };
 
-      expect(prisma.event.count).toHaveBeenCalledWith({ where: expectedWhere });
+      expect(mockPrismaService.event.count).toHaveBeenCalledWith({
+        where: expectedWhere,
+      });
 
-      expect(prisma.event.findMany).toHaveBeenCalledWith(
+      expect(mockPrismaService.event.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expectedWhere,
         }),
@@ -141,7 +143,7 @@ describe("EventsService", () => {
 
       await service.findAll(query, ["1"], "organizer");
 
-      expect(prisma.event.findMany).toHaveBeenCalledWith(
+      expect(mockPrismaService.event.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           orderBy: [{ name: "asc" }],
         }),
@@ -182,9 +184,11 @@ describe("EventsService", () => {
         isPublic: true,
       };
 
-      expect(prisma.event.count).toHaveBeenCalledWith({ where: expectedWhere });
+      expect(mockPrismaService.event.count).toHaveBeenCalledWith({
+        where: expectedWhere,
+      });
 
-      expect(prisma.event.findMany).toHaveBeenCalledWith(
+      expect(mockPrismaService.event.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expectedWhere,
           skip: 0,
@@ -208,7 +212,7 @@ describe("EventsService", () => {
       const result = await service.findOne(eventId);
       expect(result).toBe(mockEvent);
 
-      expect(prisma.event.findUnique).toHaveBeenCalledWith({
+      expect(mockPrismaService.event.findUnique).toHaveBeenCalledWith({
         where: { uuid: eventId },
         include: { links: true },
       });
@@ -223,7 +227,7 @@ describe("EventsService", () => {
         `Event with UUID ${eventId} not found`,
       );
 
-      expect(prisma.event.findUnique).toHaveBeenCalledWith({
+      expect(mockPrismaService.event.findUnique).toHaveBeenCalledWith({
         where: { uuid: eventId },
         include: { links: true },
       });
@@ -246,7 +250,7 @@ describe("EventsService", () => {
       const result = await service.findOnePublic(mockEvent.slug);
       expect(result).toBe(mockEvent);
 
-      expect(prisma.event.findUnique).toHaveBeenCalledWith({
+      expect(mockPrismaService.event.findUnique).toHaveBeenCalledWith({
         where: {
           slug: mockEvent.slug,
           isPublic: true,
@@ -271,7 +275,7 @@ describe("EventsService", () => {
         `Event with slug ${slug} not found`,
       );
 
-      expect(prisma.event.findUnique).toHaveBeenCalledWith({
+      expect(mockPrismaService.event.findUnique).toHaveBeenCalledWith({
         where: {
           slug,
           isPublic: true,

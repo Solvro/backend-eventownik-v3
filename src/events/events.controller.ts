@@ -59,13 +59,12 @@ export class EventsController {
     if (event.photoUrl === null) {
       return event;
     }
-    return {
-      ...event,
+    return Object.assign({} as Event, event, {
       photoUrl: this.storageService.getUrl(
         this.configService.getOrThrow("S3_BUCKET_EVENTS"),
         event.photoUrl,
       ),
-    };
+    });
   }
 
   @Get()
@@ -83,7 +82,7 @@ export class EventsController {
       request.user.type,
     );
     return new PageDto<Event>(
-      result.data.map((e) => this.resolvePhotoUrl(e as Event)),
+      result.data.map((event_) => this.resolvePhotoUrl(event_ as Event)),
       result.meta,
     );
   }
