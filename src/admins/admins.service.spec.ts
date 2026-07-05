@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 import type { AuthUser } from "src/auth/jwt.strategy";
 import { OrganizerType } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";

@@ -55,6 +55,19 @@ export class EventsController {
     private readonly configService: ConfigService,
   ) {}
 
+  private resolvePhotoUrl(event: Event): Event {
+    if (event.photoUrl === null) {
+      return event;
+    }
+    return {
+      ...event,
+      photoUrl: this.storageService.getUrl(
+        this.configService.getOrThrow("S3_BUCKET_EVENTS"),
+        event.photoUrl,
+      ),
+    };
+  }
+
   @Get()
   @ApiOperation({ summary: "Get list of events with pagination and filtering" })
   @ApiPaginatedResponse(Event)
@@ -64,7 +77,15 @@ export class EventsController {
   ): Promise<PageDto<Event>> {
     // z auth'em, zwracać swoje eventy / wszystkie dla superadmina
     const eventsIds = request.user.permissions.map((p) => p.eventId);
-    return this.eventsService.findAll(dto, eventsIds, request.user.type);
+    const result = await this.eventsService.findAll(
+      dto,
+      eventsIds,
+      request.user.type,
+    );
+    return new PageDto<Event>(
+      result.data.map((e) => this.resolvePhotoUrl(e as Event)),
+      result.meta,
+    );
   }
 
   // TODO: usuwanie zdjęcia z serwera przy aktualizacji, usuwaniu eventu i gdy nie przejdzie walidacji, to samo dla PUT
@@ -78,17 +99,22 @@ export class EventsController {
     @Body() eventDto: EventCreateDto,
     @Request() request: { user: AuthUser },
   ): Promise<Event> {
-    let photoUrl = eventDto.photoUrl ?? null;
+    let photoKey = eventDto.photoUrl ?? null;
 
     if (photo !== undefined) {
-      photoUrl = await this.storageService.upload(
+      photoKey = await this.storageService.upload(
         this.configService.getOrThrow("S3_BUCKET_EVENTS"),
         photo,
       );
     }
 
     eventDto.applyUserTypeRestrictions(request.user.type);
-    return this.eventsService.create(eventDto, photoUrl, request.user.uuid);
+    const event = await this.eventsService.create(
+      eventDto,
+      photoKey,
+      request.user.uuid,
+    );
+    return this.resolvePhotoUrl(event);
   }
 
   @Get(":eventId")
@@ -99,7 +125,7 @@ export class EventsController {
   async findOne(
     @Param("eventId", ParseUUIDPipe) eventUUID: string,
   ): Promise<Event> {
-    return this.eventsService.findOne(eventUUID);
+    return this.resolvePhotoUrl(await this.eventsService.findOne(eventUUID));
   }
 
   @Patch(":eventId")
@@ -115,7 +141,7 @@ export class EventsController {
     @Body() eventDto: EventUpdateDto,
     @Request() request: { user: AuthUser },
   ): Promise<Event> {
-    let photoUrl: string | null | undefined;
+    let photoKey: string | null | undefined;
     const bucket = this.configService.getOrThrow<string>("S3_BUCKET_EVENTS");
 
     if (photo !== undefined) {
@@ -123,17 +149,19 @@ export class EventsController {
       if (existing.photoUrl !== null) {
         await this.storageService.delete(bucket, existing.photoUrl);
       }
-      photoUrl = await this.storageService.upload(bucket, photo);
+      photoKey = await this.storageService.upload(bucket, photo);
     } else if (eventDto.photoUrl === null) {
       const existing = await this.eventsService.findOne(eventUUID);
       if (existing.photoUrl !== null) {
         await this.storageService.delete(bucket, existing.photoUrl);
       }
-      photoUrl = null;
+      photoKey = null;
     }
 
     eventDto.applyUserTypeRestrictions?.(request.user.type);
-    return this.eventsService.update(eventUUID, eventDto, photoUrl);
+    return this.resolvePhotoUrl(
+      await this.eventsService.update(eventUUID, eventDto, photoKey),
+    );
   }
 
   @Delete(":eventId")

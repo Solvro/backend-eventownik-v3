@@ -28,6 +28,10 @@ export class StorageService {
     this.publicUrl = this.configService.getOrThrow<string>("S3_PUBLIC_URL");
   }
 
+  getUrl(bucket: string, key: string): string {
+    return `${this.publicUrl}/${bucket}/${key}`;
+  }
+
   async upload(bucket: string, file: Express.Multer.File): Promise<string> {
     const extension = extname(file.originalname);
     const key = `${String(Date.now())}-${String(Math.round(Math.random() * 1e9))}${extension}`;
@@ -41,12 +45,10 @@ export class StorageService {
       }),
     );
 
-    return `${this.publicUrl}/${bucket}/${key}`;
+    return key;
   }
 
-  async delete(bucket: string, url: string): Promise<void> {
-    const key = url.replace(`${this.publicUrl}/${bucket}/`, "");
-
+  async delete(bucket: string, key: string): Promise<void> {
     try {
       await this.client.send(
         new DeleteObjectCommand({

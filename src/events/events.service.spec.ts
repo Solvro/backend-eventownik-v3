@@ -78,7 +78,6 @@ describe("EventsService", () => {
         mockAdmin.type,
       );
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.event.findMany).toHaveBeenCalledWith({
         where: { uuid: { in: mockAdmin.eventsIds } },
         skip: 0,
@@ -115,9 +114,8 @@ describe("EventsService", () => {
         location: { contains: "Room A", mode: "insensitive" },
       };
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.event.count).toHaveBeenCalledWith({ where: expectedWhere });
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+
       expect(prisma.event.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expectedWhere,
@@ -143,7 +141,6 @@ describe("EventsService", () => {
 
       await service.findAll(query, ["1"], "organizer");
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.event.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           orderBy: [{ name: "asc" }],
@@ -185,9 +182,8 @@ describe("EventsService", () => {
         isPublic: true,
       };
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.event.count).toHaveBeenCalledWith({ where: expectedWhere });
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+
       expect(prisma.event.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expectedWhere,
@@ -211,7 +207,7 @@ describe("EventsService", () => {
 
       const result = await service.findOne(eventId);
       expect(result).toBe(mockEvent);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+
       expect(prisma.event.findUnique).toHaveBeenCalledWith({
         where: { uuid: eventId },
         include: { links: true },
@@ -226,7 +222,7 @@ describe("EventsService", () => {
       await expect(service.findOne(eventId)).rejects.toThrow(
         `Event with UUID ${eventId} not found`,
       );
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+
       expect(prisma.event.findUnique).toHaveBeenCalledWith({
         where: { uuid: eventId },
         include: { links: true },
@@ -249,7 +245,7 @@ describe("EventsService", () => {
 
       const result = await service.findOnePublic(mockEvent.slug);
       expect(result).toBe(mockEvent);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+
       expect(prisma.event.findUnique).toHaveBeenCalledWith({
         where: {
           slug: mockEvent.slug,
@@ -274,7 +270,7 @@ describe("EventsService", () => {
       await expect(service.findOnePublic(slug)).rejects.toThrow(
         `Event with slug ${slug} not found`,
       );
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+
       expect(prisma.event.findUnique).toHaveBeenCalledWith({
         where: {
           slug,

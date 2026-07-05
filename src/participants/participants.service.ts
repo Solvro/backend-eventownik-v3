@@ -334,7 +334,15 @@ export class ParticipantsService {
         participant.attributes?.map((attribute) => ({
           uuid: attribute.attributeUuid,
           name: attribute.attribute?.name ?? "",
-          value: attribute.value,
+          value:
+            attribute.attribute?.type === AttributeType.file &&
+            typeof attribute.value === "string" &&
+            attribute.value.length > 0
+              ? this.storageService.getUrl(
+                  this.configService.getOrThrow("S3_BUCKET_FORMS"),
+                  attribute.value,
+                )
+              : attribute.value,
           createdAt: attribute.createdAt,
           updatedAt: attribute.updatedAt,
         })) ?? [],
