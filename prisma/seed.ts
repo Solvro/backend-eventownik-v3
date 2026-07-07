@@ -1,10 +1,13 @@
 import { PrismaPg } from "@prisma/adapter-pg";
+import "dotenv/config";
+
 import type {
   Admin,
   Attribute,
   Block,
   EmailTemplate,
   Event,
+  EventLink,
   Form,
   FormDefinition,
   Participant,
@@ -12,25 +15,38 @@ import type {
   ParticipantAttributeLog,
   ParticipantEmailStatus,
   ParticipantFormLog,
-} from "src/generated/prisma/client";
+} from "../src/generated/prisma/client";
 import {
   AttributeType,
   EmailStatus,
   EmailTrigger,
+  EventLinkType,
   LogTrigger,
   OrganizerType,
   PermissionType,
   PrismaClient,
-} from "src/generated/prisma/client";
+} from "../src/generated/prisma/client";
+
+if (
+  process.env.DATABASE_URL === undefined ||
+  process.env.DATABASE_URL.trim() === ""
+) {
+  throw new Error(
+    "Missing DATABASE_URL environment variable. Please set it in your .env file.",
+  );
+}
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL,
 });
+
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
+  await prisma.auditLog.deleteMany();
   await prisma.participantAttributeLog.deleteMany();
   await prisma.eventPermission.deleteMany();
+  await prisma.eventLink.deleteMany();
   await prisma.participantAttribute.deleteMany();
   await prisma.participantEmailStatus.deleteMany();
   await prisma.participantFormLog.deleteMany();
@@ -73,7 +89,7 @@ async function main() {
     data: {
       name: "Sample Event",
       description: "A test event lorem sigmum",
-      startDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // next week
+      startDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7),
       endDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 8),
       organizerUuid: admin.uuid,
       organizerName: "Test Org",
@@ -101,6 +117,24 @@ async function main() {
     },
   });
 
+  const generalLink: EventLink = await prisma.eventLink.create({
+    data: {
+      eventUuid: event.uuid,
+      type: EventLinkType.general,
+      url: "https://example.com/sample-event",
+      label: "General info",
+    },
+  });
+
+  const policyLink: EventLink = await prisma.eventLink.create({
+    data: {
+      eventUuid: event.uuid,
+      type: EventLinkType.policy,
+      url: "https://example.com/sample-event/privacy-policy",
+      label: "Privacy policy",
+    },
+  });
+
   const attribute: Attribute = await prisma.attribute.create({
     data: {
       name: "T-shirt size",
@@ -119,6 +153,7 @@ async function main() {
       capacity: 200,
       attributeUuid: attribute.uuid,
       order: 1,
+      isRootBlock: true,
     },
   });
 
@@ -175,6 +210,7 @@ async function main() {
     data: {
       email: "participant@example.com",
       eventUuid: event.uuid,
+      formUuid: form.uuid,
     },
   });
 
@@ -237,6 +273,8 @@ async function main() {
     participantFormUuid: participantForm.uuid,
     participantEmailUuid: participantEmail.uuid,
     participantAttributeLogUuid: participantAttributeLog.uuid,
+    generalLinkUuid: generalLink.uuid,
+    policyLinkUuid: policyLink.uuid,
   });
 }
 
