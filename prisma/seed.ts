@@ -260,6 +260,43 @@ async function main() {
     data: { registerFormUuid: form.uuid },
   });
 
+  await prisma.auditLog.create({
+    data: {
+      action: "CREATE",
+      entityType: "Event",
+      entityUuid: event.uuid,
+      triggeredBy: "ktos_tu_stringa_dal_a_nie_enum",
+      before: undefined,
+      after: {
+        name: event.name,
+        slug: event.slug,
+        location: event.location,
+        participantsLimit: event.participantsLimit,
+      },
+    },
+  });
+  await prisma.auditLog.create({
+    data: {
+      action: "UPDATE",
+      entityType: "Attribute",
+      entityUuid: attribute.uuid,
+      triggeredBy: admin.email,
+      before: { options: ["S", "M", "L", "XL"] },
+      after: { options: ["S", "M", "L", "XL", "XXL"] },
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      action: "UPDATE",
+      entityType: "Event",
+      entityUuid: event.uuid,
+      triggeredBy: "SYSTEM",
+      before: { registerFormUuid: null },
+      after: { registerFormUuid: form.uuid },
+    },
+  });
+
   console.warn("Seed complete!", {
     adminUuid: admin.uuid,
     eventUuid: event.uuid,
