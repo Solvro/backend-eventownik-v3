@@ -1,3 +1,5 @@
+import { Request, Response } from "express";
+
 import {
   Body,
   Controller,
@@ -5,10 +7,12 @@ import {
   HttpCode,
   HttpStatus,
   Post,
-  Request,
+  Req,
+  Res,
   UnauthorizedException,
   UseGuards,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -24,7 +28,6 @@ import { AuthService } from "./auth.service";
 import { AdminDto } from "./dto/auth-user.dto";
 import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { LoginDto } from "./dto/login.dto";
-import { RefreshTokenDto } from "./dto/refresh-token.dto";
 import { RegisterDto } from "./dto/register.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { TokenResponseDto } from "./dto/token-response.dto";
@@ -34,7 +37,10 @@ import { AuthUser } from "./jwt.strategy";
 @ApiTags("Auth")
 @Controller("auth")
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private configService: ConfigService,
+  ) {}
 
   @Post("register")
   @ApiOperation({ summary: "Register new admin" })
@@ -54,12 +60,32 @@ export class AuthController {
     type: TokenResponseDto,
   })
   @ApiUnauthorizedResponse({ description: "Invalid credentials" })
-  async login(@Body() body: LoginDto): Promise<TokenResponseDto> {
+  async login(
+    @Body() body: LoginDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<TokenResponseDto> {
     const user = await this.authService.validateUser(body.email, body.password);
     if (user === null) {
       throw new UnauthorizedException("Invalid credentials");
     }
-    return this.authService.login(user);
+    const { access_token, refresh_token } = await this.authService.login(user);
+
+    response.cookie("refresh_token", refresh_token, {
+      httpOnly: true,
+      secure:
+        this.configService.getOrThrow<string>("NODE_ENV") === "production",
+      sameSite: "strict",
+      maxAge:
+        this.configService.getOrThrow<number>("REFRESH_TOKEN_TTL_DAYS") *
+        24 *
+        60 *
+        60 *
+        1000,
+      domain: this.configService.getOrThrow<string>("APP_DOMAIN"),
+      path: "/api/v3/auth",
+    });
+
+    return { access_token };
   }
 
   @Post("refresh")
@@ -69,8 +95,33 @@ export class AuthController {
     type: TokenResponseDto,
   })
   @ApiUnauthorizedResponse({ description: "Invalid or expired refresh token" })
-  async refresh(@Body() body: RefreshTokenDto): Promise<TokenResponseDto> {
-    return this.authService.refreshTokens(body.refresh_token);
+  async refresh(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<TokenResponseDto> {
+    const oldToken = request.cookies.refresh_token as string | undefined;
+    if (oldToken === undefined || oldToken === "") {
+      throw new UnauthorizedException("Invalid refresh token");
+    }
+    const { access_token, refresh_token } =
+      await this.authService.refreshTokens(oldToken);
+
+    response.cookie("refresh_token", refresh_token, {
+      httpOnly: true,
+      secure:
+        this.configService.getOrThrow<string>("NODE_ENV") === "production",
+      sameSite: "strict",
+      maxAge:
+        this.configService.getOrThrow<number>("REFRESH_TOKEN_TTL_DAYS") *
+        24 *
+        60 *
+        60 *
+        1000,
+      domain: this.configService.getOrThrow<string>("APP_DOMAIN"),
+      path: "/api/v3/auth",
+    });
+
+    return { access_token };
   }
 
   @UseGuards(JwtAuthGuard)
@@ -79,7 +130,7 @@ export class AuthController {
   @ApiOperation({ summary: "Get current authenticated user profile" })
   @ApiOkResponse({ description: "Current user information", type: AdminDto })
   @ApiUnauthorizedResponse({ description: "Unauthorized" })
-  getMe(@Request() request: { user: AuthUser }): AdminDto {
+  getMe(@Req() request: { user: AuthUser }): AdminDto {
     const {
       password: _password,
       permissions: _permissions,
@@ -119,5 +170,32 @@ export class AuthController {
     return {
       message: "Password has been reset",
     };
+  }
+
+  @Post("logout")
+  @ApiOperation({ summary: "Logs out a user" })
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({
+    description: "Logged out",
+  })
+  async logout(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const refreshToken = request.cookies.refresh_token as string | undefined;
+
+    response.clearCookie("refresh_token", {
+      httpOnly: true,
+      secure:
+        this.configService.getOrThrow<string>("NODE_ENV") === "production",
+      sameSite: "strict",
+      domain: this.configService.getOrThrow<string>("APP_DOMAIN"),
+      path: "/api/v3/auth",
+    });
+    if (refreshToken !== undefined && refreshToken !== "") {
+      return await this.authService.logout(refreshToken);
+    }
+
+    return { message: "Logged out successfully!" };
   }
 }

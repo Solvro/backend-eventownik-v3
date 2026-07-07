@@ -135,16 +135,20 @@ export class AttributesService {
           );
         }
 
-        const invalidParticipantField = participantFields.find(
-          (uuid) => !isUUID(uuid),
+        const normalizedParticipantFields = participantFields.map((field) =>
+          field.trim(),
+        );
+
+        const invalidParticipantField = normalizedParticipantFields.find(
+          (field) => field !== "email" && !isUUID(field),
         );
         if (invalidParticipantField !== undefined) {
           throw new BadRequestException(
-            `Attribute config field participantFields contains an invalid uuid: ${invalidParticipantField}`,
+            `Attribute config field participantFields contains an invalid value: ${invalidParticipantField}`,
           );
         }
 
-        normalizedConfig.participantFields = participantFields;
+        normalizedConfig.participantFields = normalizedParticipantFields;
       }
 
       return normalizedConfig as Prisma.InputJsonValue;

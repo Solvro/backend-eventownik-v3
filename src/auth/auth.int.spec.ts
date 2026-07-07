@@ -1,7 +1,9 @@
+import type { Request, Response } from "express";
 import type { Admin } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import { UnauthorizedException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
@@ -30,6 +32,7 @@ describe("AuthController integration tests", () => {
     refreshTokens: jest.fn(),
     forgotPassword: jest.fn(),
     resetPassword: jest.fn(),
+    logout: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -38,6 +41,17 @@ describe("AuthController integration tests", () => {
       providers: [
         { provide: AuthService, useValue: mockAuthService },
         { provide: PrismaService, useValue: {} }, // Not used directly in controller
+        {
+          provide: ConfigService,
+          useValue: {
+            getOrThrow: jest.fn((key: string) => {
+              if (key === "REFRESH_TOKEN_TTL_DAYS") {
+                return 3;
+              }
+              return "localhost";
+            }),
+          },
+        },
       ],
     }).compile();
 
@@ -77,21 +91,43 @@ describe("AuthController integration tests", () => {
         refresh_token: "rt",
       });
 
-      const result = await controller.login(dto);
+      const mockResponse = {
+        cookie: jest.fn(),
+      } as unknown as Response;
+
+      const result = await controller.login(dto, mockResponse);
+
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(mockResponse.cookie).toHaveBeenCalledWith(
+        "refresh_token",
+        "rt",
+        expect.objectContaining({
+          httpOnly: true,
+          sameSite: "strict",
+          path: "/api/v3/auth",
+          secure: expect.any(Boolean) as boolean,
+          maxAge: expect.any(Number) as number,
+          domain: expect.any(String) as string,
+        }),
+      );
 
       expect(mockAuthService.validateUser).toHaveBeenCalledWith(
         dto.email,
         dto.password,
       );
       expect(mockAuthService.login).toHaveBeenCalledWith(mockAdmin);
-      expect(result).toEqual({ access_token: "at", refresh_token: "rt" });
+      expect(result).toEqual({ access_token: "at" });
     });
 
     it("should throw UnauthorizedException if validation fails", async () => {
       const dto = { email: "test@example.com", password: "wrong" };
       mockAuthService.validateUser.mockResolvedValue(null);
 
-      await expect(controller.login(dto)).rejects.toThrow(
+      const mockResponse = {
+        cookie: jest.fn(),
+      } as unknown as Response;
+
+      await expect(controller.login(dto, mockResponse)).rejects.toThrow(
         UnauthorizedException,
       );
     });
@@ -99,20 +135,24 @@ describe("AuthController integration tests", () => {
 
   describe("refresh", () => {
     it("should call authService.refreshTokens", async () => {
-      const body = { refresh_token: "rt-123" };
       mockAuthService.refreshTokens.mockResolvedValue({
         access_token: "new-at",
         refresh_token: "new-rt",
       });
 
-      const result = await controller.refresh(body);
+      const mockResponse = {
+        cookie: jest.fn(),
+      } as unknown as Response;
 
-      expect(mockAuthService.refreshTokens).toHaveBeenCalledWith(
-        body.refresh_token,
-      );
+      const mockRequest = {
+        cookies: { refresh_token: "old-rt" },
+      } as unknown as Request;
+
+      const result = await controller.refresh(mockRequest, mockResponse);
+
+      expect(mockAuthService.refreshTokens).toHaveBeenCalledWith("old-rt");
       expect(result).toEqual({
         access_token: "new-at",
-        refresh_token: "new-rt",
       });
     });
   });
@@ -148,6 +188,54 @@ describe("AuthController integration tests", () => {
         dto.token,
         dto.password,
       );
+    });
+  });
+  describe("logout", () => {
+    it("should clear the cookie and call authService.logout on success", async () => {
+      const mockRequest = {
+        cookies: { refresh_token: "valid-rt" },
+      } as unknown as Request;
+
+      const mockResponse = {
+        clearCookie: jest.fn(),
+      } as unknown as Response;
+
+      mockAuthService.logout.mockResolvedValue({
+        message: "Logged out successfully!",
+      });
+
+      const result = await controller.logout(mockRequest, mockResponse);
+
+      expect(mockAuthService.logout).toHaveBeenCalledWith("valid-rt");
+
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(mockResponse.clearCookie).toHaveBeenCalledWith(
+        "refresh_token",
+        expect.objectContaining({
+          httpOnly: true,
+          sameSite: "strict",
+          path: "/api/v3/auth",
+          secure: expect.any(Boolean) as boolean,
+          domain: expect.any(String) as string,
+        }),
+      );
+
+      expect(result).toEqual({ message: "Logged out successfully!" });
+    });
+
+    it("should not call service if cookie is missing", async () => {
+      const mockRequest = {
+        cookies: {},
+      } as unknown as Request;
+
+      const mockResponse = {
+        clearCookie: jest.fn(),
+      } as unknown as Response;
+
+      const result = await controller.logout(mockRequest, mockResponse);
+
+      expect(mockAuthService.logout).not.toHaveBeenCalled();
+      expect(result).toEqual({ message: "Logged out successfully!" });
     });
   });
 });

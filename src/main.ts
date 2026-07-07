@@ -1,3 +1,4 @@
+import * as cookieParser from "cookie-parser";
 import type * as express from "express";
 import * as qs from "qs";
 import { swaggerConfig } from "src/config/swagger.config";
@@ -75,6 +76,8 @@ async function bootstrap() {
     },
     credentials: true,
   });
+
+  app.use(cookieParser());
 
   await app.listen(process.env.PORT ?? 3000);
 }

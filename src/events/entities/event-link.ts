@@ -21,6 +21,9 @@ export class EventLink implements PrismaEventLink {
   @ApiProperty({ nullable: true, required: false })
   label: string | null;
 
+  @ApiProperty({ nullable: true, required: false })
+  formUuid: string | null;
+
   @ApiProperty()
   createdAt: Date;
 

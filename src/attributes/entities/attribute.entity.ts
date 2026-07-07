@@ -31,5 +31,8 @@ export class Attribute implements PrismaAttribute {
   order: number;
 
   @ApiProperty({ nullable: true })
+  formUuid: string | null;
+
+  @ApiProperty({ nullable: true })
   config: PrismaAttribute["config"];
 }
