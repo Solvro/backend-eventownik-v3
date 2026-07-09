@@ -11,6 +11,7 @@ import {
 } from "src/generated/prisma/client";
 import { ParticipantUpdateDto } from "src/participants/dto/participant-update.dto";
 import { ParticipantsService } from "src/participants/participants.service";
+import { StorageService } from "src/storage/storage.service";
 
 import {
   BadRequestException,
@@ -18,6 +19,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateFormDto } from "./dto/create-form.dto";
@@ -27,11 +29,78 @@ import { UpdateFormDto } from "./dto/update-form.dto";
 
 @Injectable()
 export class FormsService {
+  private readonly bucket: string;
+
   constructor(
-    private prisma: PrismaService,
-    private participantService: ParticipantsService,
-    private blocksService: BlocksService,
-  ) {}
+    private readonly prisma: PrismaService,
+    private readonly participantService: ParticipantsService,
+    private readonly blocksService: BlocksService,
+    private readonly storageService: StorageService,
+    configService: ConfigService,
+  ) {
+    this.bucket = configService.getOrThrow<string>("S3_BUCKET_FORMS");
+  }
+
+  private async uploadFiles(
+    files: Express.Multer.File[],
+    fileAttributeMap: Record<string, number> = {},
+  ): Promise<Record<string, string>> {
+    const fileKeyMap: Record<string, string> = {};
+    try {
+      const entriesToUpload = Object.entries(fileAttributeMap).map(
+        ([attributeUuid, fileIndex]) => {
+          if (fileIndex < 0 || fileIndex >= files.length) {
+            throw new Error(
+              `File index ${String(fileIndex)} for attribute ${attributeUuid} is out of bounds`,
+            );
+          }
+          const file = files[fileIndex];
+          return { attributeUuid, file };
+        },
+      );
+
+      await Promise.all(
+        entriesToUpload.map(async ({ attributeUuid, file }) => {
+          fileKeyMap[attributeUuid] = await this.storageService.upload(
+            this.bucket,
+            file,
+          );
+        }),
+      );
+      return fileKeyMap;
+    } catch (error) {
+      await Promise.all(
+        Object.values(fileKeyMap).map(async (key) =>
+          this.storageService.delete(this.bucket, key),
+        ),
+      );
+      throw error;
+    }
+  }
+
+  private async deleteOldFileOnUpdate(fileKey: string): Promise<void> {
+    await this.storageService.delete(this.bucket, fileKey);
+  }
+
+  async cleanupUploadedFiles(
+    fileKeyMapByAttributeUuid: Record<string, string>,
+  ): Promise<void> {
+    await Promise.all(
+      Object.values(fileKeyMapByAttributeUuid).map(async (fileKey) =>
+        this.storageService.delete(this.bucket, fileKey),
+      ),
+    );
+  }
+
+  async handleFileUploads(
+    files: Express.Multer.File[] | null,
+    fileAttributeMap: Record<string, number> = {},
+  ): Promise<Record<string, string>> {
+    if (files == null || files.length === 0) {
+      return {};
+    }
+    return this.uploadFiles(files, fileAttributeMap);
+  }
 
   private getConfigObject(config: Prisma.JsonValue | null) {
     if (config == null || typeof config !== "object" || Array.isArray(config)) {
@@ -709,7 +778,7 @@ export class FormsService {
     eventSlug: string,
     formUuid: string,
     submissionData: FormSubmitionDto,
-    fileUrlMap: Record<string, string | undefined>,
+    fileKeyMapByAttributeUuid: Record<string, string>,
   ) {
     return await this.prisma.$transaction(async (prisma) => {
       const event = await prisma.event.findUnique({
@@ -775,13 +844,34 @@ export class FormsService {
           attributeValue,
         );
 
-        if (
-          foundAttribute.attribute.type === AttributeType.file &&
-          isString(normalizedValue)
-        ) {
-          const url = fileUrlMap[normalizedValue];
-          if (url !== undefined) {
-            normalizedAttributes[attributeUuid] = url;
+        if (foundAttribute.attribute.type === AttributeType.file) {
+          if (attributeUuid in fileKeyMapByAttributeUuid) {
+            const fileKey = fileKeyMapByAttributeUuid[attributeUuid];
+            const publicUrl = this.storageService.getUrl(this.bucket, fileKey);
+            normalizedAttributes[attributeUuid] = publicUrl;
+
+            if (submissionData.participantId !== undefined) {
+              const existingAttribute =
+                await this.prisma.participantAttribute.findUnique({
+                  where: {
+                    participantUuid_attributeUuid: {
+                      participantUuid: submissionData.participantId,
+                      attributeUuid,
+                    },
+                  },
+                });
+              if (
+                existingAttribute?.value != null &&
+                isString(existingAttribute.value)
+              ) {
+                const oldFileKey = existingAttribute.value.split("/").pop();
+                if (oldFileKey != null) {
+                  await this.deleteOldFileOnUpdate(oldFileKey);
+                }
+              }
+            }
+          } else {
+            normalizedAttributes[attributeUuid] = Prisma.JsonNull;
           }
         } else {
           normalizedAttributes[attributeUuid] = normalizedValue;

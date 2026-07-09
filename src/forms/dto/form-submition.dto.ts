@@ -2,6 +2,7 @@ import { Transform, Type, plainToInstance } from "class-transformer";
 import {
   IsArray,
   IsEmail,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -68,6 +69,28 @@ export class FormSubmitionDto {
     return value as unknown;
   })
   attributes: ParticipantAttributeDto[];
+
+  @ApiPropertyOptional({
+    description:
+      "Maps file attribute UUIDs to their index in the uploaded files array. Example: {'attr-uuid-1': 0, 'attr-uuid-2': 1}",
+  })
+  @IsOptional()
+  @IsObject()
+  @Transform(({ value }) => {
+    if (value === null || value === undefined || value === "") {
+      return {};
+    }
+    if (typeof value === "string") {
+      try {
+        const parsed: unknown = JSON.parse(value);
+        return parsed as Record<string, unknown>;
+      } catch {
+        return {};
+      }
+    }
+    return value as Record<string, unknown>;
+  })
+  fileAttributeMap?: Record<string, number>;
 
   // @ApiProperty({
   //   description: "hCaptcha response token",

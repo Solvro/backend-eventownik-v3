@@ -1,8 +1,10 @@
 import { BlocksService } from "src/blocks/blocks.service";
 import { AttributeType } from "src/generated/prisma/client";
 import { ParticipantsService } from "src/participants/participants.service";
+import { StorageService } from "src/storage/storage.service";
 
 import { BadRequestException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
@@ -51,6 +53,16 @@ describe("FormsService", () => {
     canSignInToBlock: jest.fn(),
   };
 
+  const mockStorageService = {
+    upload: jest.fn(),
+    delete: jest.fn(),
+    getUrl: jest.fn(),
+  };
+
+  const mockConfigService = {
+    getOrThrow: jest.fn(() => "forms-bucket"),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -58,6 +70,8 @@ describe("FormsService", () => {
         PrismaService,
         ParticipantsService,
         BlocksService,
+        StorageService,
+        ConfigService,
       ],
     })
       .overrideProvider(PrismaService)
@@ -66,6 +80,10 @@ describe("FormsService", () => {
       .useValue(mockParticipantsService)
       .overrideProvider(BlocksService)
       .useValue(mockBlocksService)
+      .overrideProvider(StorageService)
+      .useValue(mockStorageService)
+      .overrideProvider(ConfigService)
+      .useValue(mockConfigService)
       .compile();
 
     service = module.get<FormsService>(FormsService);

@@ -1,5 +1,3 @@
-import { StorageService } from "src/storage/storage.service";
-
 import {
   Body,
   Controller,
@@ -11,7 +9,6 @@ import {
   Post,
   UploadedFiles,
 } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -36,11 +33,7 @@ import { UploadFiles } from "./utils/upload-files-decorator";
 @ApiTags("Forms")
 @Controller("/public/events/:eventSlug/forms")
 export class FormsPublicController {
-  constructor(
-    private readonly formsService: FormsService,
-    private readonly storageService: StorageService,
-    private readonly configService: ConfigService,
-  ) {}
+  constructor(private readonly formsService: FormsService) {}
 
   @Get(":id")
   @HttpCode(HttpStatus.OK)
@@ -89,10 +82,16 @@ export class FormsPublicController {
             "- number: number\n" +
             "- multiSelect/block: string[] (Array of UUIDs or options)\n" +
             "- checkbox: boolean\n" +
-            "- for files write filename with extension (e.g., 'document.pdf')",
+            "- file: ignored (use fileAttributeMap to link files)",
           items: {
             $ref: getSchemaPath(ParticipantAttributeDto),
           },
+        },
+        fileAttributeMap: {
+          type: "object",
+          description:
+            "Maps file attribute UUIDs to their index in the files array. Example: {'attr-uuid-1': 0, 'attr-uuid-2': 1}",
+          example: { "attr-uuid-123": 0 },
         },
         files: {
           type: "array",
@@ -116,31 +115,19 @@ export class FormsPublicController {
     files: Express.Multer.File[] | null,
     @Body() submissionData: FormSubmitionDto,
   ) {
-    const fileUrlMap: Record<string, string | undefined> = {};
-    const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
+    const fileKeyMapByAttributeUuid = await this.formsService.handleFileUploads(
+      files,
+      submissionData.fileAttributeMap,
+    );
     try {
-      if (files != null && files.length > 0) {
-        await Promise.all(
-          files.map(async (file) => {
-            fileUrlMap[file.originalname] = await this.storageService.upload(
-              bucket,
-              file,
-            );
-          }),
-        );
-      }
       return await this.formsService.formSubmit(
         eventSlug,
         formId,
         submissionData,
-        fileUrlMap,
+        fileKeyMapByAttributeUuid,
       );
     } catch (error) {
-      await Promise.all(
-        Object.values(fileUrlMap)
-          .filter((key): key is string => key !== undefined)
-          .map(async (key) => this.storageService.delete(bucket, key)),
-      );
+      await this.formsService.cleanupUploadedFiles(fileKeyMapByAttributeUuid);
       throw error;
     }
   }

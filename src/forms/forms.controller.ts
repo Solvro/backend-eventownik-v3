@@ -20,6 +20,7 @@ import {
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiConsumes,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNoContentResponse,
@@ -48,6 +49,7 @@ export class FormsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @ApiConsumes("application/json")
   @ApiOperation({ summary: "Creates a form for the specified event" })
   @ApiParam({ name: "eventId", description: "UUID of the event" })
   @ApiCreatedResponse({ description: "Form created successfully." })
@@ -91,6 +93,7 @@ export class FormsController {
 
   @Patch(":id")
   @HttpCode(HttpStatus.OK)
+  @ApiConsumes("application/json")
   @ApiOperation({ summary: "Update a form for an event" })
   @ApiParam({ name: "eventId", description: "UUID of the event" })
   @ApiParam({ name: "id", description: "UUID of the form" })
