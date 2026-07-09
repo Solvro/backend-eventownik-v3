@@ -1,3 +1,5 @@
+import { HcaptchaGuard } from "@gvrs/nestjs-hcaptcha";
+
 import {
   Body,
   Controller,
@@ -7,8 +9,14 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Req,
+  UploadedFile,
   UploadedFiles,
+  UseInterceptors,
 } from "@nestjs/common";
+import { UseGuards } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { FileInterceptor } from "@nestjs/platform-express";
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -25,6 +33,7 @@ import {
   FormSubmitionDto,
   ParticipantAttributeDto,
 } from "./dto/form-submition.dto";
+import { FileUploadResponseDto } from "./dto/upload-file.dto";
 import { FormsService } from "./forms.service";
 import { UploadFiles } from "./utils/upload-files-decorator";
 
@@ -33,7 +42,10 @@ import { UploadFiles } from "./utils/upload-files-decorator";
 @ApiTags("Forms")
 @Controller("/public/events/:eventSlug/forms")
 export class FormsPublicController {
-  constructor(private readonly formsService: FormsService) {}
+  constructor(
+    private readonly formsService: FormsService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Get(":id")
   @HttpCode(HttpStatus.OK)
@@ -49,8 +61,31 @@ export class FormsPublicController {
     return this.formsService.findOneBySlug(formId, eventSlug);
   }
 
+  @Post(":id/files")
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: "Upload a single file for a form" })
+  @ApiParam({ name: "eventSlug", description: "Event slug of the event" })
+  @ApiParam({ name: "id", description: "UUID of the form" })
+  @UseInterceptors(FileInterceptor("file"))
+  async uploadFile(
+    @Param("eventSlug") eventSlug: string,
+    @Param("id", ParseUUIDPipe) formId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: any,
+  ) {
+    await this.formsService.findOneBySlug(formId, eventSlug);
+    const sourceIp = req.ip || req.socket.remoteAddress || "unknown";
+    return this.formsService.uploadSingleFile(
+      file,
+      formId,
+      sourceIp,
+      this.configService,
+    );
+  }
+
   @Post(":id/submit")
   @HttpCode(HttpStatus.OK)
+  @UseGuards(HcaptchaGuard)
   @ApiOperation({ summary: "Submit a form for an event" })
   @ApiParam({ name: "eventSlug", description: "Event slug of the event" })
   @ApiParam({ name: "id", description: "UUID of the form" })
@@ -119,16 +154,11 @@ export class FormsPublicController {
       files,
       submissionData.fileAttributeMap,
     );
-    try {
-      return await this.formsService.formSubmit(
-        eventSlug,
-        formId,
-        submissionData,
-        fileKeyMapByAttributeUuid,
-      );
-    } catch (error) {
-      await this.formsService.cleanupUploadedFiles(fileKeyMapByAttributeUuid);
-      throw error;
-    }
+    return this.formsService.formSubmit(
+      eventSlug,
+      formId,
+      submissionData,
+      fileKeyMapByAttributeUuid,
+    );
   }
 }

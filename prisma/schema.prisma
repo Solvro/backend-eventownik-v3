@@ -234,8 +234,26 @@ model Form {
   participants        Participant[]
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
+  uploadedFiles       UploadedFile[]
 
   @@map("Forms")
+}
+
+model UploadedFile {
+  uuid        String    @id @default(uuid()) @db.Uuid
+  fileKey     String
+  originalName String
+  mimeType    String
+  size        Int
+  formUuid    String    @db.Uuid
+  sourceIp    String
+  createdAt   DateTime  @default(now())
+  claimedAt   DateTime?
+
+  form Form @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
+
+  @@index([claimedAt, createdAt])
+  @@map("UploadedFiles")
 }
 
 model FormDefinition {

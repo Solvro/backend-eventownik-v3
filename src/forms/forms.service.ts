@@ -102,6 +102,53 @@ export class FormsService {
     return this.uploadFiles(files, fileAttributeMap);
   }
 
+  async uploadSingleFile(
+    file: Express.Multer.File,
+    formUuid: string,
+    sourceIp: string,
+    configService: ConfigService,
+  ): Promise<{ fileToken: string; expiresAt: number }> {
+    const maxSize = configService.getOrThrow<number>("UPLOAD_MAX_FILE_SIZE");
+    const allowedMimes = configService
+      .getOrThrow<string>("UPLOAD_ALLOWED_MIME")
+      .split(",")
+      .map((m) => m.trim());
+    const ttlHours = configService.getOrThrow<number>("UPLOAD_TTL_HOURS");
+
+    if (file.size > maxSize) {
+      throw new BadRequestException(
+        `File size exceeds maximum of ${maxSize} bytes`,
+      );
+    }
+
+    if (!allowedMimes.includes(file.mimetype)) {
+      throw new BadRequestException(
+        `File type not allowed. Allowed types: ${allowedMimes.join(", ")}`,
+      );
+    }
+
+    const fileKey = await this.storageService.upload(this.bucket, file);
+
+    const uploadedFile = await this.prisma.uploadedFile.create({
+      data: {
+        fileKey,
+        originalName: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
+        formUuid,
+        sourceIp,
+      },
+    });
+
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + ttlHours);
+
+    return {
+      fileToken: uploadedFile.uuid,
+      expiresAt: expiresAt.getTime(),
+    };
+  }
+
   private getConfigObject(config: Prisma.JsonValue | null) {
     if (config == null || typeof config !== "object" || Array.isArray(config)) {
       return null;
