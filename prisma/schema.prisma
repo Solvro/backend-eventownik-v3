@@ -77,7 +77,7 @@ model Event {
   description       String?
   primaryColor      String?
   organizerName     String?
-  photoUrl          String?
+  photoKey          String?
   location          String?
   contactEmail      String?
   organizerUuid     String?   @db.Uuid

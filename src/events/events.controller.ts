@@ -5,7 +5,6 @@ import { PermissionsGuard } from "src/auth/permissions.guard";
 import { ApiPaginatedResponse } from "src/common/decorators/api-paginated-response.decorator";
 import { PageDto } from "src/common/dto/page.dto";
 import { PermissionType } from "src/generated/prisma/enums";
-import { StorageService } from "src/storage/storage.service";
 
 import {
   Body,
@@ -22,7 +21,6 @@ import {
   UploadedFile,
   UseGuards,
 } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -49,23 +47,7 @@ import { UploadPhoto } from "./utils/upload-photo.decorator";
 @ApiTags("Events")
 @Controller("events")
 export class EventsController {
-  constructor(
-    private readonly eventsService: EventsService,
-    private readonly storageService: StorageService,
-    private readonly configService: ConfigService,
-  ) {}
-
-  private resolvePhotoUrl(event: Event): Event {
-    if (event.photoUrl === null) {
-      return event;
-    }
-    return Object.assign({} as Event, event, {
-      photoUrl: this.storageService.getUrl(
-        this.configService.getOrThrow("S3_BUCKET_EVENTS"),
-        event.photoUrl,
-      ),
-    });
-  }
+  constructor(private readonly eventsService: EventsService) {}
 
   @Get()
   @ApiOperation({ summary: "Get list of events with pagination and filtering" })
@@ -76,48 +58,24 @@ export class EventsController {
   ): Promise<PageDto<Event>> {
     // z auth'em, zwracać swoje eventy / wszystkie dla superadmina
     const eventsIds = request.user.permissions.map((p) => p.eventId);
-    const result = await this.eventsService.findAll(
-      dto,
-      eventsIds,
-      request.user.type,
-    );
-    return new PageDto<Event>(
-      result.data.map((event_) => this.resolvePhotoUrl(event_ as Event)),
-      result.meta,
-    );
+    return this.eventsService.findAll(dto, eventsIds, request.user.type);
   }
 
   @Post()
-  @UploadPhoto()
+  @UploadPhoto(EventCreateDto)
   @ApiOperation({ summary: "Create a new event" })
   @ApiCreatedResponse({ description: "The created event", type: Event })
   async create(
-    @UploadedFile()
-    photo: Express.Multer.File | undefined,
+    @UploadedFile() photo: Express.Multer.File | undefined,
     @Body() eventDto: EventCreateDto,
     @Request() request: { user: AuthUser },
   ): Promise<Event> {
-    let photoKey = eventDto.photoUrl ?? null;
-    const bucket = this.configService.getOrThrow<string>("S3_BUCKET_EVENTS");
-
-    if (photo !== undefined) {
-      photoKey = await this.storageService.upload(bucket, photo);
-    }
-
-    eventDto.applyUserTypeRestrictions(request.user.type);
-    try {
-      const event = await this.eventsService.create(
-        eventDto,
-        photoKey,
-        request.user.uuid,
-      );
-      return this.resolvePhotoUrl(event);
-    } catch (error) {
-      if (photo !== undefined && photoKey !== null) {
-        await this.storageService.delete(bucket, photoKey);
-      }
-      throw error;
-    }
+    return this.eventsService.create(
+      eventDto,
+      photo,
+      request.user.uuid,
+      request.user.type,
+    );
   }
 
   @Get(":eventId")
@@ -128,52 +86,31 @@ export class EventsController {
   async findOne(
     @Param("eventId", ParseUUIDPipe) eventUUID: string,
   ): Promise<Event> {
-    return this.resolvePhotoUrl(await this.eventsService.findOne(eventUUID));
+    return this.eventsService.findOne(eventUUID);
   }
 
   @Patch(":eventId")
   @RequirePermission(PermissionType.MANAGE_EVENT)
-  @UploadPhoto()
-  @ApiOperation({ summary: "Update event by UUID" })
+  @UploadPhoto(EventUpdateDto)
+  @ApiOperation({
+    summary: "Update event by UUID",
+    description:
+      "Accepts multipart/form-data with an optional 'photo' file. To remove the current photo, send a JSON body with photoUrl set to null.",
+  })
   @ApiParam({ name: "eventId", description: "UUID of the event" })
   @ApiOkResponse({ description: "The updated event", type: Event })
   async update(
     @Param("eventId", ParseUUIDPipe) eventUUID: string,
-    @UploadedFile()
-    photo: Express.Multer.File | undefined,
+    @UploadedFile() photo: Express.Multer.File | undefined,
     @Body() eventDto: EventUpdateDto,
     @Request() request: { user: AuthUser },
   ): Promise<Event> {
-    let photoKey: string | null | undefined;
-    let previousPhotoKey: string | null = null;
-    const bucket = this.configService.getOrThrow<string>("S3_BUCKET_EVENTS");
-
-    if (photo !== undefined) {
-      const existing = await this.eventsService.findOne(eventUUID);
-      previousPhotoKey = existing.photoUrl;
-      photoKey = await this.storageService.upload(bucket, photo);
-    } else if (eventDto.photoUrl === null) {
-      const existing = await this.eventsService.findOne(eventUUID);
-      previousPhotoKey = existing.photoUrl;
-      photoKey = null;
-    }
-
-    eventDto.applyUserTypeRestrictions?.(request.user.type);
-
-    let event: Event;
-    try {
-      event = await this.eventsService.update(eventUUID, eventDto, photoKey);
-    } catch (error) {
-      if (photoKey != null) {
-        await this.storageService.delete(bucket, photoKey);
-      }
-      throw error;
-    }
-
-    if (previousPhotoKey !== null) {
-      await this.storageService.delete(bucket, previousPhotoKey);
-    }
-    return this.resolvePhotoUrl(event);
+    return this.eventsService.update(
+      eventUUID,
+      eventDto,
+      photo,
+      request.user.type,
+    );
   }
 
   @Delete(":eventId")
@@ -185,15 +122,7 @@ export class EventsController {
   @HttpCode(204)
   async remove(
     @Param("eventId", ParseUUIDPipe) eventUUID: string,
-  ): Promise<Event> {
-    const existing = await this.eventsService.findOne(eventUUID);
-    const removed = await this.eventsService.remove(eventUUID);
-    if (existing.photoUrl !== null) {
-      await this.storageService.delete(
-        this.configService.getOrThrow("S3_BUCKET_EVENTS"),
-        existing.photoUrl,
-      );
-    }
-    return removed;
+  ): Promise<void> {
+    await this.eventsService.remove(eventUUID);
   }
 }

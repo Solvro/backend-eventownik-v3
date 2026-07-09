@@ -78,7 +78,7 @@ async function main() {
       organizerUuid: admin.uuid,
       organizerName: "Test Org",
       participantsLimit: 100,
-      photoUrl: "https://placehold.co/200x200",
+      photoKey: "https://placehold.co/200x200",
       location: "Test City",
       contactEmail: "contact@example.com",
       slug: "sample-event",
