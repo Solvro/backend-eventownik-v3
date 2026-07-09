@@ -1,12 +1,10 @@
 import { Response } from "express";
-import { existsSync } from "node:fs";
-// eslint-disable-next-line unicorn/import-style
-import * as path from "node:path";
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
 import { PermissionType } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
+import { StorageService } from "src/storage/storage.service";
 
 import {
   Body,
@@ -20,12 +18,13 @@ import {
   Res,
   UseGuards,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   ApiBearerAuth,
   ApiForbiddenResponse,
+  ApiFoundResponse,
   ApiNoContentResponse,
   ApiNotFoundResponse,
-  ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
@@ -45,6 +44,8 @@ export class ParticipantsAttributesController {
   constructor(
     private readonly participantsService: ParticipantsService,
     private readonly prisma: PrismaService,
+    private readonly storageService: StorageService,
+    private readonly configService: ConfigService,
   ) {}
 
   @Get(":participantId/attributes/:attributeId/download")
@@ -53,7 +54,7 @@ export class ParticipantsAttributesController {
   @ApiParam({ name: "eventId", description: "UUID of the event" })
   @ApiParam({ name: "participantId", description: "UUID of the participant" })
   @ApiParam({ name: "attributeId", description: "UUID of the attribute" })
-  @ApiOkResponse({ description: "The requested file" })
+  @ApiFoundResponse({ description: "Redirect to the file in storage" })
   @ApiNotFoundResponse({ description: "Attribute file not found" })
   async downloadFile(
     @Param("eventId", ParseUUIDPipe) eventUuid: string,
@@ -72,24 +73,18 @@ export class ParticipantsAttributesController {
 
     if (
       participantAttribute?.value == null ||
-      typeof participantAttribute.value !== "string"
+      typeof participantAttribute.value !== "string" ||
+      participantAttribute.value.length === 0
     ) {
       throw new NotFoundException("Attribute doesn't have a file");
     }
 
-    const filename = path.basename(participantAttribute.value);
-    const filePath = path.join(
-      process.cwd(),
-      "uploads",
-      "attributes",
-      filename,
+    const fileUrl = this.storageService.getUrl(
+      this.configService.getOrThrow<string>("S3_BUCKET_FORMS"),
+      participantAttribute.value,
     );
 
-    if (existsSync(filePath)) {
-      response.download(filePath);
-    } else {
-      throw new NotFoundException("File not found on server");
-    }
+    response.redirect(fileUrl);
   }
 
   @Patch("attributes/:attributeId/bulk-update")

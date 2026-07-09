@@ -1,8 +1,9 @@
 import type { Response } from "express";
-import * as fs from "node:fs";
 import { PrismaService } from "src/prisma/prisma.service";
+import { StorageService } from "src/storage/storage.service";
 
 import { NotFoundException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
@@ -10,11 +11,9 @@ import type { ParticipantBulkUpdateDto } from "./dto/participant-bulk-update.dto
 import { ParticipantsAttributesController } from "./participants-attributes.controller";
 import { ParticipantsService } from "./participants.service";
 
-jest.mock("node:fs");
-
 const mockResponseFunction = () => {
   const response: Partial<Response> = {};
-  response.download = jest.fn().mockReturnValue(response);
+  response.redirect = jest.fn().mockReturnValue(response);
   return response as Response;
 };
 
@@ -31,6 +30,14 @@ describe("ParticipantsAttributesController", () => {
     },
   };
 
+  const mockStorageService = {
+    getUrl: jest.fn(),
+  };
+
+  const mockConfigService = {
+    getOrThrow: jest.fn().mockReturnValue("forms-bucket"),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ParticipantsAttributesController],
@@ -43,6 +50,14 @@ describe("ParticipantsAttributesController", () => {
           provide: PrismaService,
           useValue: mockPrismaService,
         },
+        {
+          provide: StorageService,
+          useValue: mockStorageService,
+        },
+        {
+          provide: ConfigService,
+          useValue: mockConfigService,
+        },
       ],
     }).compile();
 
@@ -50,6 +65,7 @@ describe("ParticipantsAttributesController", () => {
       ParticipantsAttributesController,
     );
     jest.clearAllMocks();
+    mockConfigService.getOrThrow.mockReturnValue("forms-bucket");
   });
 
   it("should be defined", () => {
@@ -77,11 +93,10 @@ describe("ParticipantsAttributesController", () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it("should throw NotFoundException if file does not exist on disk", async () => {
+    it("should throw NotFoundException if attribute value is empty", async () => {
       mockPrismaService.participantAttribute.findFirst.mockResolvedValue({
-        value: "test.pdf",
+        value: "",
       });
-      (fs.existsSync as jest.Mock).mockReturnValue(false);
       const response = mockResponseFunction();
 
       await expect(
@@ -94,11 +109,13 @@ describe("ParticipantsAttributesController", () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it("should download the file if it exists", async () => {
+    it("should redirect to the storage URL if the attribute has a file", async () => {
       mockPrismaService.participantAttribute.findFirst.mockResolvedValue({
         value: "test.pdf",
       });
-      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      mockStorageService.getUrl.mockReturnValue(
+        "https://storage.example.com/forms-bucket/test.pdf",
+      );
       const response = mockResponseFunction();
 
       await controller.downloadFile(
@@ -108,8 +125,14 @@ describe("ParticipantsAttributesController", () => {
         response,
       );
 
+      expect(mockStorageService.getUrl).toHaveBeenCalledWith(
+        "forms-bucket",
+        "test.pdf",
+      );
       // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(response.download).toHaveBeenCalled();
+      expect(response.redirect).toHaveBeenCalledWith(
+        "https://storage.example.com/forms-bucket/test.pdf",
+      );
     });
   });
 

@@ -117,22 +117,31 @@ export class FormsPublicController {
     @Body() submissionData: FormSubmitionDto,
   ) {
     const fileUrlMap: Record<string, string | undefined> = {};
-    if (files != null && files.length > 0) {
-      const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
-      await Promise.all(
-        files.map(async (file) => {
-          fileUrlMap[file.originalname] = await this.storageService.upload(
-            bucket,
-            file,
-          );
-        }),
+    const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
+    try {
+      if (files != null && files.length > 0) {
+        await Promise.all(
+          files.map(async (file) => {
+            fileUrlMap[file.originalname] = await this.storageService.upload(
+              bucket,
+              file,
+            );
+          }),
+        );
+      }
+      return await this.formsService.formSubmit(
+        eventSlug,
+        formId,
+        submissionData,
+        fileUrlMap,
       );
+    } catch (error) {
+      await Promise.all(
+        Object.values(fileUrlMap)
+          .filter((key): key is string => key !== undefined)
+          .map(async (key) => this.storageService.delete(bucket, key)),
+      );
+      throw error;
     }
-    return this.formsService.formSubmit(
-      eventSlug,
-      formId,
-      submissionData,
-      fileUrlMap,
-    );
   }
 }

@@ -501,7 +501,8 @@ export class ParticipantsService {
     }
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const fileKeysToDelete: string[] = [];
+      const result = await this.prisma.$transaction(async (tx) => {
         const dataToUpdate: Prisma.ParticipantUpdateInput = { ...updates };
 
         if (participantAttributes !== undefined) {
@@ -531,14 +532,12 @@ export class ParticipantsService {
               },
             });
 
-            const bucket =
-              this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
             for (const attribute of existingFileAttributes) {
               if (
                 typeof attribute.value === "string" &&
                 attribute.value.length > 0
               ) {
-                await this.storageService.delete(bucket, attribute.value);
+                fileKeysToDelete.push(attribute.value);
               }
             }
           }
@@ -560,6 +559,15 @@ export class ParticipantsService {
 
         return this.mapToEntity(updatedParticipant);
       });
+
+      if (fileKeysToDelete.length > 0) {
+        const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
+        for (const key of fileKeysToDelete) {
+          await this.storageService.delete(bucket, key);
+        }
+      }
+
+      return result;
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&

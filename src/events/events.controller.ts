@@ -87,7 +87,6 @@ export class EventsController {
     );
   }
 
-  // TODO: usuwanie zdjęcia z serwera przy aktualizacji, usuwaniu eventu i gdy nie przejdzie walidacji, to samo dla PUT
   @Post()
   @UploadPhoto()
   @ApiOperation({ summary: "Create a new event" })
@@ -99,21 +98,26 @@ export class EventsController {
     @Request() request: { user: AuthUser },
   ): Promise<Event> {
     let photoKey = eventDto.photoUrl ?? null;
+    const bucket = this.configService.getOrThrow<string>("S3_BUCKET_EVENTS");
 
     if (photo !== undefined) {
-      photoKey = await this.storageService.upload(
-        this.configService.getOrThrow("S3_BUCKET_EVENTS"),
-        photo,
-      );
+      photoKey = await this.storageService.upload(bucket, photo);
     }
 
     eventDto.applyUserTypeRestrictions(request.user.type);
-    const event = await this.eventsService.create(
-      eventDto,
-      photoKey,
-      request.user.uuid,
-    );
-    return this.resolvePhotoUrl(event);
+    try {
+      const event = await this.eventsService.create(
+        eventDto,
+        photoKey,
+        request.user.uuid,
+      );
+      return this.resolvePhotoUrl(event);
+    } catch (error) {
+      if (photo !== undefined && photoKey !== null) {
+        await this.storageService.delete(bucket, photoKey);
+      }
+      throw error;
+    }
   }
 
   @Get(":eventId")
@@ -141,26 +145,35 @@ export class EventsController {
     @Request() request: { user: AuthUser },
   ): Promise<Event> {
     let photoKey: string | null | undefined;
+    let previousPhotoKey: string | null = null;
     const bucket = this.configService.getOrThrow<string>("S3_BUCKET_EVENTS");
 
     if (photo !== undefined) {
       const existing = await this.eventsService.findOne(eventUUID);
-      if (existing.photoUrl !== null) {
-        await this.storageService.delete(bucket, existing.photoUrl);
-      }
+      previousPhotoKey = existing.photoUrl;
       photoKey = await this.storageService.upload(bucket, photo);
     } else if (eventDto.photoUrl === null) {
       const existing = await this.eventsService.findOne(eventUUID);
-      if (existing.photoUrl !== null) {
-        await this.storageService.delete(bucket, existing.photoUrl);
-      }
+      previousPhotoKey = existing.photoUrl;
       photoKey = null;
     }
 
     eventDto.applyUserTypeRestrictions?.(request.user.type);
-    return this.resolvePhotoUrl(
-      await this.eventsService.update(eventUUID, eventDto, photoKey),
-    );
+
+    let event: Event;
+    try {
+      event = await this.eventsService.update(eventUUID, eventDto, photoKey);
+    } catch (error) {
+      if (photoKey != null) {
+        await this.storageService.delete(bucket, photoKey);
+      }
+      throw error;
+    }
+
+    if (previousPhotoKey !== null) {
+      await this.storageService.delete(bucket, previousPhotoKey);
+    }
+    return this.resolvePhotoUrl(event);
   }
 
   @Delete(":eventId")
@@ -174,12 +187,13 @@ export class EventsController {
     @Param("eventId", ParseUUIDPipe) eventUUID: string,
   ): Promise<Event> {
     const existing = await this.eventsService.findOne(eventUUID);
+    const removed = await this.eventsService.remove(eventUUID);
     if (existing.photoUrl !== null) {
       await this.storageService.delete(
         this.configService.getOrThrow("S3_BUCKET_EVENTS"),
         existing.photoUrl,
       );
     }
-    return this.eventsService.remove(eventUUID);
+    return removed;
   }
 }
