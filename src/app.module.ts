@@ -57,7 +57,7 @@ import { StorageModule } from "./storage/storage.module";
         S3_BUCKET_EVENTS: Joi.string().required(),
         S3_BUCKET_FORMS: Joi.string().required(),
         S3_PUBLIC_URL: Joi.string().required(),
-        UPLOAD_MAX_FILE_SIZE: Joi.number().default(10485760),
+        UPLOAD_MAX_FILE_SIZE: Joi.number().default(10_485_760),
         UPLOAD_ALLOWED_MIME: Joi.string().default(
           "application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         ),
@@ -68,7 +68,7 @@ import { StorageModule } from "./storage/storage.module";
     }),
     ThrottlerModule.forRoot([
       {
-        ttl: 60000,
+        ttl: 60_000,
         limit: 100,
       },
     ]),

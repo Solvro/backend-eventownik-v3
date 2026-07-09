@@ -825,7 +825,6 @@ export class FormsService {
     eventSlug: string,
     formUuid: string,
     submissionData: FormSubmitionDto,
-    fileKeyMapByAttributeUuid: Record<string, string>,
   ) {
     return await this.prisma.$transaction(async (prisma) => {
       const event = await prisma.event.findUnique({
@@ -892,14 +891,35 @@ export class FormsService {
         );
 
         if (foundAttribute.attribute.type === AttributeType.file) {
-          if (attributeUuid in fileKeyMapByAttributeUuid) {
-            const fileKey = fileKeyMapByAttributeUuid[attributeUuid];
-            const publicUrl = this.storageService.getUrl(this.bucket, fileKey);
+          if (isString(attributeValue) && attributeValue.trim().length > 0) {
+            const fileToken = attributeValue.trim();
+            const uploadedFile = await prisma.uploadedFile.findUnique({
+              where: { uuid: fileToken },
+            });
+
+            if (
+              uploadedFile?.formUuid !== formUuid ||
+              uploadedFile.claimedAt !== null
+            ) {
+              throw new BadRequestException(
+                `File token ${fileToken} for attribute ${attributeUuid} is invalid or already claimed`,
+              );
+            }
+
+            const publicUrl = this.storageService.getUrl(
+              this.bucket,
+              uploadedFile.fileKey,
+            );
             normalizedAttributes[attributeUuid] = publicUrl;
+
+            await prisma.uploadedFile.update({
+              where: { uuid: fileToken },
+              data: { claimedAt: new Date() },
+            });
 
             if (submissionData.participantId !== undefined) {
               const existingAttribute =
-                await this.prisma.participantAttribute.findUnique({
+                await prisma.participantAttribute.findUnique({
                   where: {
                     participantUuid_attributeUuid: {
                       participantUuid: submissionData.participantId,

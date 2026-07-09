@@ -403,14 +403,9 @@ describe("FormsService", () => {
       jest.spyOn(service, "isOpen").mockResolvedValue(false);
 
       await expect(
-        service.formSubmit(
-          eventSlug,
-          formUuid,
-          {
-            attributes: [],
-          },
-          {},
-        ),
+        service.formSubmit(eventSlug, formUuid, {
+          attributes: [],
+        }),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -446,7 +441,7 @@ describe("FormsService", () => {
       jest.spyOn(service, "isOpen").mockResolvedValue(true);
 
       await expect(
-        service.formSubmit(eventSlug, formUuid, submissionData, {}),
+        service.formSubmit(eventSlug, formUuid, submissionData),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -482,7 +477,7 @@ describe("FormsService", () => {
       jest.spyOn(service, "isOpen").mockResolvedValue(true);
 
       await expect(
-        service.formSubmit(eventSlug, formUuid, submissionData, {}),
+        service.formSubmit(eventSlug, formUuid, submissionData),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -525,7 +520,7 @@ describe("FormsService", () => {
       jest.spyOn(service, "isOpen").mockResolvedValue(true);
 
       await expect(
-        service.formSubmit(eventSlug, formUuid, submissionData, {}),
+        service.formSubmit(eventSlug, formUuid, submissionData),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -583,7 +578,6 @@ describe("FormsService", () => {
         eventSlug,
         formUuid,
         submissionData,
-        {},
       );
 
       expect(mockParticipantsService.register).toHaveBeenCalledWith(
@@ -644,7 +638,7 @@ describe("FormsService", () => {
       jest.spyOn(service, "isOpen").mockResolvedValue(true);
 
       await expect(
-        service.formSubmit(eventSlug, formUuid, submissionData, {}),
+        service.formSubmit(eventSlug, formUuid, submissionData),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -682,7 +676,6 @@ describe("FormsService", () => {
         eventSlug,
         formUuid,
         submissionData,
-        {},
       );
 
       expect(mockParticipantsService.register).toHaveBeenCalledWith(
@@ -721,7 +714,7 @@ describe("FormsService", () => {
         status: "updated",
       });
 
-      await service.formSubmit(eventSlug, formUuid, submissionData, {});
+      await service.formSubmit(eventSlug, formUuid, submissionData);
 
       expect(mockParticipantsService.update).toHaveBeenCalledWith(
         eventUuid,
@@ -754,7 +747,7 @@ describe("FormsService", () => {
       } as unknown as FormSubmitionDto;
 
       await expect(
-        service.formSubmit(eventSlug, formUuid, submissionData, {}),
+        service.formSubmit(eventSlug, formUuid, submissionData),
       ).rejects.toThrow(
         `Event with a slug: ${eventSlug} has reached the participants limit`,
       );
