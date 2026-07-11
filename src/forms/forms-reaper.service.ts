@@ -27,7 +27,7 @@ export class FormsReaperService {
       ) as ttl_hours`,
     );
 
-    const ttl = ttlHours?.[0]?.ttl_hours ?? 24;
+    const ttl = ttlHours[0]?.ttl_hours ?? 24;
     const expiryDate = new Date();
     expiryDate.setHours(expiryDate.getHours() - ttl);
 
@@ -46,7 +46,9 @@ export class FormsReaperService {
         return;
       }
 
-      this.logger.log(`Found ${expiredFiles.length} expired files to reap`);
+      this.logger.log(
+        `Found ${String(expiredFiles.length)} expired files to reap`,
+      );
 
       await Promise.all(
         expiredFiles.map(async (file) => {
@@ -54,7 +56,7 @@ export class FormsReaperService {
             await this.storageService.delete(this.bucket, file.fileKey);
           } catch (error) {
             this.logger.warn(
-              `Failed to delete S3 object ${file.fileKey}: ${error}`,
+              `Failed to delete S3 object ${file.fileKey}: ${String(error)}`,
             );
           }
         }),
@@ -69,10 +71,10 @@ export class FormsReaperService {
       });
 
       this.logger.log(
-        `Successfully reaped ${expiredFiles.length} expired files`,
+        `Successfully reaped ${String(expiredFiles.length)} expired files`,
       );
     } catch (error) {
-      this.logger.error(`Error during reaping: ${error}`);
+      this.logger.error(`Error during reaping: ${String(error)}`);
     }
   }
 }

@@ -1,4 +1,5 @@
 import { HcaptchaGuard } from "@gvrs/nestjs-hcaptcha";
+import type { Request } from "express";
 
 import {
   Body,
@@ -63,10 +64,10 @@ export class FormsPublicController {
     @Param("eventSlug") eventSlug: string,
     @Param("id", ParseUUIDPipe) formId: string,
     @UploadedFile() file: Express.Multer.File,
-    @Req() request: any,
+    @Req() request: Request,
   ) {
     await this.formsService.findOneBySlug(formId, eventSlug);
-    const sourceIp = request.ip || request.socket.remoteAddress || "unknown";
+    const sourceIp = request.ip ?? request.socket.remoteAddress ?? "unknown";
     return this.formsService.uploadSingleFile(
       file,
       formId,

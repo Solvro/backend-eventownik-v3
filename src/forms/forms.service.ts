@@ -48,7 +48,7 @@ export class FormsService {
     const fileKeyMap: Record<string, string> = {};
     try {
       const entriesToUpload = Object.entries(fileAttributeMap).map(
-        ([attributeUuid, fileIndex]) => {
+        ([attributeUuid, fileIndex]: [string, number]) => {
           if (fileIndex < 0 || fileIndex >= files.length) {
             throw new Error(
               `File index ${String(fileIndex)} for attribute ${attributeUuid} is out of bounds`,
@@ -117,7 +117,7 @@ export class FormsService {
 
     if (file.size > maxSize) {
       throw new BadRequestException(
-        `File size exceeds maximum of ${maxSize} bytes`,
+        `File size exceeds maximum of ${String(maxSize)} bytes`,
       );
     }
 
