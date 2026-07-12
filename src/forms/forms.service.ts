@@ -906,11 +906,7 @@ export class FormsService {
               );
             }
 
-            const publicUrl = this.storageService.getUrl(
-              this.bucket,
-              uploadedFile.fileKey,
-            );
-            normalizedAttributes[attributeUuid] = publicUrl;
+            normalizedAttributes[attributeUuid] = uploadedFile.fileKey;
 
             await prisma.uploadedFile.update({
               where: { uuid: fileToken },
@@ -929,12 +925,10 @@ export class FormsService {
                 });
               if (
                 existingAttribute?.value != null &&
-                isString(existingAttribute.value)
+                isString(existingAttribute.value) &&
+                existingAttribute.value.length > 0
               ) {
-                const oldFileKey = existingAttribute.value.split("/").pop();
-                if (oldFileKey != null) {
-                  await this.deleteOldFileOnUpdate(oldFileKey);
-                }
+                await this.deleteOldFileOnUpdate(existingAttribute.value);
               }
             }
           } else {

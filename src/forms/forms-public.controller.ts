@@ -26,6 +26,7 @@ import {
   ApiParam,
   ApiTags,
 } from "@nestjs/swagger";
+import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 
 import { FormSubmitionDto } from "./dto/form-submition.dto";
 import { FormsService } from "./forms.service";
@@ -59,6 +60,8 @@ export class FormsPublicController {
   @ApiOperation({ summary: "Upload a single file for a form" })
   @ApiParam({ name: "eventSlug", description: "Event slug of the event" })
   @ApiParam({ name: "id", description: "UUID of the form" })
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @UseInterceptors(FileInterceptor("file"))
   async uploadFile(
     @Param("eventSlug") eventSlug: string,
