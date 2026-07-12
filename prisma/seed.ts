@@ -275,7 +275,6 @@ async function main() {
     data: {
       email: "participant@example.com",
       eventUuid: event.uuid,
-      formUuid: form.uuid,
     },
   });
 
