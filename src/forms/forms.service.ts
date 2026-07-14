@@ -3,6 +3,7 @@ import { BlocksService } from "src/blocks/blocks.service";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { parseSortInput } from "src/common/utils/prisma.utility";
+import { FORM_FILLED_EVENT } from "src/common/events/event-names.constants";
 import { FormFilledEvent } from "src/common/events/form-filled.event";
 import {
   Attribute,
@@ -1064,7 +1065,7 @@ export class FormsService {
     });
 
     this.eventEmitter.emit(
-      "form.filled",
+      FORM_FILLED_EVENT,
       new FormFilledEvent(formUuid, participant.uuid, eventUuid),
     );
 

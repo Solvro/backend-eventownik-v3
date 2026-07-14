@@ -2,15 +2,19 @@ import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 
+import { EmailContentParserService } from "./email-content-parser.service";
+import { EmailDeliveryService } from "./email-delivery.service";
+import { EmailTemplatesService } from "./email-templates.service";
 import { EmailsConsumer } from "./emails.consumer";
+import { EMAIL_QUEUE_NAME } from "./emails.constants";
 import { EmailsController } from "./emails.controller";
-import { EmailsService } from "./emails.service";
+import { EmailsListeners } from "./emails.listeners";
 
 @Module({
   imports: [
     ConfigModule,
     BullModule.registerQueue({
-      name: "automatic-emails",
+      name: EMAIL_QUEUE_NAME,
       defaultJobOptions: {
         attempts: 3,
         backoff: {
@@ -23,6 +27,12 @@ import { EmailsService } from "./emails.service";
     }),
   ],
   controllers: [EmailsController],
-  providers: [EmailsService, EmailsConsumer],
+  providers: [
+    EmailTemplatesService,
+    EmailContentParserService,
+    EmailDeliveryService,
+    EmailsConsumer,
+    EmailsListeners,
+  ],
 })
 export class EmailsModule {}

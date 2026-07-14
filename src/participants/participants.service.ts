@@ -1,4 +1,9 @@
 import { AttributeChangedEvent } from "src/common/events/attribute-changed.event";
+import {
+  ATTRIBUTE_CHANGED_EVENT,
+  PARTICIPANT_DELETED_EVENT,
+  PARTICIPANT_REGISTERED_EVENT,
+} from "src/common/events/event-names.constants";
 import { ParticipantDeletedEvent } from "src/common/events/participant-deleted.event";
 import { ParticipantRegisteredEvent } from "src/common/events/participant-registered.event";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
@@ -474,7 +479,7 @@ export class ParticipantsService {
       });
 
       this.eventEmitter.emit(
-        "participant.registered",
+        PARTICIPANT_REGISTERED_EVENT,
         new ParticipantRegisteredEvent(participant.uuid, eventUuid),
       );
 
@@ -586,7 +591,7 @@ export class ParticipantsService {
             : (attribute.value as Prisma.JsonValue);
 
         this.eventEmitter.emit(
-          "attribute.changed",
+          ATTRIBUTE_CHANGED_EVENT,
           new AttributeChangedEvent(
             attribute.attributeUuid,
             participantUuid,
@@ -629,7 +634,7 @@ export class ParticipantsService {
     });
 
     this.eventEmitter.emit(
-      "participant.deleted",
+      PARTICIPANT_DELETED_EVENT,
       new ParticipantDeletedEvent(
         {
           uuid: participant.uuid,
@@ -676,7 +681,7 @@ export class ParticipantsService {
 
     for (const participant of participants) {
       this.eventEmitter.emit(
-        "participant.deleted",
+        PARTICIPANT_DELETED_EVENT,
         new ParticipantDeletedEvent(
           {
             uuid: participant.uuid,
