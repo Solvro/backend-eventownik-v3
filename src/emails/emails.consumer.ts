@@ -15,6 +15,7 @@ export class EmailsConsumer extends WorkerHost {
     await this.emailsService.deliverEmailToParticipants(
       job.data.emailUuid,
       job.data.participantUuid,
+      job.data.participantSnapshot,
     );
   }
 }

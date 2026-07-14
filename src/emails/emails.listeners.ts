@@ -57,9 +57,11 @@ export class EmailsListeners {
 
     await Promise.all(
       templates.map(async (template) =>
-        this.emailsService.sendEmailToParticipants(template.uuid, [
-          event.participantUuid,
-        ]),
+        this.emailsService.sendEmailToParticipants(
+          template.uuid,
+          [event.participant.uuid],
+          event.participant,
+        ),
       ),
     );
   }

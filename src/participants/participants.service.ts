@@ -1,3 +1,6 @@
+import { AttributeChangedEvent } from "src/common/events/attribute-changed.event";
+import { ParticipantDeletedEvent } from "src/common/events/participant-deleted.event";
+import { ParticipantRegisteredEvent } from "src/common/events/participant-registered.event";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import {
@@ -19,6 +22,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 
 import {
   ParticipantAttributeDto,
@@ -43,6 +47,7 @@ export class ParticipantsService {
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
     private readonly configService: ConfigService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   private getStringConfigValues(
@@ -413,9 +418,6 @@ export class ParticipantsService {
         attribute.value,
       );
 
-      // TODO: Integrate EmailService for attribute_changed trigger
-      // EmailService.sendOnTrigger(event, participant, "attribute_changed", attr.attributeUuid, valueToSave);
-
       transformedAttributes.push({
         attributeUuid: attribute.attributeUuid,
         value: valueToSave,
@@ -442,7 +444,7 @@ export class ParticipantsService {
     participantAttributes?: ParticipantAttributeDto[],
   ): Promise<Participant> {
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const participant = await this.prisma.$transaction(async (tx) => {
         const event = await tx.event.findUnique({ where: { uuid: eventUuid } });
         if (event == null) {
           throw new NotFoundException(`Event NOT FOUND`);
@@ -453,7 +455,7 @@ export class ParticipantsService {
           participantAttributes,
         );
 
-        const participant = await tx.participant.create({
+        const createdParticipant = await tx.participant.create({
           data: {
             email,
             eventUuid,
@@ -468,10 +470,15 @@ export class ParticipantsService {
           },
         });
 
-        // TODO: Integrate EmailService -> trigger 'participant_registered'
-
-        return this.mapToEntity(participant);
+        return this.mapToEntity(createdParticipant);
       });
+
+      this.eventEmitter.emit(
+        "participant.registered",
+        new ParticipantRegisteredEvent(participant.uuid, eventUuid),
+      );
+
+      return participant;
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -502,6 +509,8 @@ export class ParticipantsService {
 
     try {
       const fileKeysToDelete: string[] = [];
+      let savedAttributes: Prisma.ParticipantAttributeUncheckedCreateWithoutParticipantInput[] =
+        [];
       const result = await this.prisma.$transaction(async (tx) => {
         const dataToUpdate: Prisma.ParticipantUpdateInput = { ...updates };
 
@@ -510,6 +519,7 @@ export class ParticipantsService {
             eventUuid,
             participantAttributes,
           );
+          savedAttributes = attributesToSave;
 
           const attributeUuidsToUpdate = attributesToSave.map(
             (a) => a.attributeUuid,
@@ -567,6 +577,25 @@ export class ParticipantsService {
         }
       }
 
+      for (const attribute of savedAttributes) {
+        const emittedValue =
+          attribute.value == null ||
+          attribute.value === Prisma.JsonNull ||
+          attribute.value === Prisma.DbNull
+            ? null
+            : (attribute.value as Prisma.JsonValue);
+
+        this.eventEmitter.emit(
+          "attribute.changed",
+          new AttributeChangedEvent(
+            attribute.attributeUuid,
+            participantUuid,
+            eventUuid,
+            emittedValue,
+          ),
+        );
+      }
+
       return result;
     } catch (error) {
       if (
@@ -586,7 +615,7 @@ export class ParticipantsService {
       where: { uuid: participantUuid, eventUuid },
       include: {
         attributes: {
-          where: { attribute: { type: AttributeType.file } },
+          include: { attribute: true },
         },
       },
     });
@@ -595,28 +624,45 @@ export class ParticipantsService {
       throw new NotFoundException("Participant not found");
     }
 
-    // TODO: Integrate EmailService.sendOnTrigger(event, participant, "participant_deleted");
-
     await this.prisma.participant.delete({
       where: { uuid: participantUuid },
     });
 
+    this.eventEmitter.emit(
+      "participant.deleted",
+      new ParticipantDeletedEvent(
+        {
+          uuid: participant.uuid,
+          email: participant.email,
+          createdAt: participant.createdAt,
+          updatedAt: participant.updatedAt,
+          attributes: participant.attributes.map((attribute) => ({
+            attributeUuid: attribute.attributeUuid,
+            value: attribute.value,
+          })),
+        },
+        eventUuid,
+      ),
+    );
+
     const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
     for (const attribute of participant.attributes) {
-      if (typeof attribute.value === "string" && attribute.value.length > 0) {
+      if (
+        typeof attribute.value === "string" &&
+        attribute.value.length > 0 &&
+        attribute.attribute.type === AttributeType.file
+      ) {
         await this.storageService.delete(bucket, attribute.value);
       }
     }
   }
 
   async removeMany(eventUuid: string, participantsToUnregisterIds: string[]) {
-    // TODO: Send emails for each unregister (requires fetching emails or moving logic to a job)
-
     const participants = await this.prisma.participant.findMany({
       where: { uuid: { in: participantsToUnregisterIds }, eventUuid },
       include: {
         attributes: {
-          where: { attribute: { type: AttributeType.file } },
+          include: { attribute: true },
         },
       },
     });
@@ -628,10 +674,33 @@ export class ParticipantsService {
       },
     });
 
+    for (const participant of participants) {
+      this.eventEmitter.emit(
+        "participant.deleted",
+        new ParticipantDeletedEvent(
+          {
+            uuid: participant.uuid,
+            email: participant.email,
+            createdAt: participant.createdAt,
+            updatedAt: participant.updatedAt,
+            attributes: participant.attributes.map((attribute) => ({
+              attributeUuid: attribute.attributeUuid,
+              value: attribute.value,
+            })),
+          },
+          eventUuid,
+        ),
+      );
+    }
+
     const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
     for (const participant of participants) {
       for (const attribute of participant.attributes) {
-        if (typeof attribute.value === "string" && attribute.value.length > 0) {
+        if (
+          typeof attribute.value === "string" &&
+          attribute.value.length > 0 &&
+          attribute.attribute.type === AttributeType.file
+        ) {
           await this.storageService.delete(bucket, attribute.value);
         }
       }

@@ -3,6 +3,7 @@ import { BlocksService } from "src/blocks/blocks.service";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { parseSortInput } from "src/common/utils/prisma.utility";
+import { FormFilledEvent } from "src/common/events/form-filled.event";
 import {
   Attribute,
   AttributeType,
@@ -20,6 +21,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateFormDto } from "./dto/create-form.dto";
@@ -36,6 +38,7 @@ export class FormsService {
     private readonly participantService: ParticipantsService,
     private readonly blocksService: BlocksService,
     private readonly storageService: StorageService,
+    private readonly eventEmitter: EventEmitter2,
     configService: ConfigService,
   ) {
     this.bucket = configService.getOrThrow<string>("S3_BUCKET_FORMS");
@@ -826,7 +829,8 @@ export class FormsService {
     formUuid: string,
     submissionData: FormSubmitionDto,
   ) {
-    return await this.prisma.$transaction(async (prisma) => {
+    let eventUuid = "";
+    const participant = await this.prisma.$transaction(async (prisma) => {
       const event = await prisma.event.findUnique({
         where: { slug: eventSlug },
         include: { participants: true },
@@ -834,6 +838,7 @@ export class FormsService {
       if (event == null) {
         throw new NotFoundException(`Event with slug: ${eventSlug} not found`);
       }
+      eventUuid = event.uuid;
       const form = await prisma.form.findUnique({
         where: { uuid: formUuid, event: { slug: eventSlug } },
         include: {
@@ -1057,5 +1062,12 @@ export class FormsService {
         `Unexpected error in form submission.`,
       );
     });
+
+    this.eventEmitter.emit(
+      "form.filled",
+      new FormFilledEvent(formUuid, participant.uuid, eventUuid),
+    );
+
+    return participant;
   }
 }

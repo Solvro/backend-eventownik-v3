@@ -5,12 +5,15 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  MaxLength,
   ValidateIf,
 } from "class-validator";
 import type { Prisma } from "src/generated/prisma/client";
 import { EmailTrigger } from "src/generated/prisma/enums";
 
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+
+export const EMAIL_CONTENT_MAX_LENGTH = 14_000_000;
 
 export class CreateEmailDto {
   @ApiProperty({ example: "Email template name" })
@@ -21,6 +24,9 @@ export class CreateEmailDto {
   @ApiProperty({ example: "<p>Content</p>" })
   @IsString()
   @IsNotEmpty()
+  @MaxLength(EMAIL_CONTENT_MAX_LENGTH, {
+    message: "content must not exceed 10MB of embedded image data",
+  })
   content: string;
 
   @ApiPropertyOptional()

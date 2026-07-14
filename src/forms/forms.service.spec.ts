@@ -5,6 +5,7 @@ import { StorageService } from "src/storage/storage.service";
 
 import { BadRequestException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
@@ -63,6 +64,10 @@ describe("FormsService", () => {
     getOrThrow: jest.fn(() => "forms-bucket"),
   };
 
+  const mockEventEmitter = {
+    emit: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -72,6 +77,7 @@ describe("FormsService", () => {
         BlocksService,
         StorageService,
         ConfigService,
+        EventEmitter2,
       ],
     })
       .overrideProvider(PrismaService)
@@ -84,6 +90,8 @@ describe("FormsService", () => {
       .useValue(mockStorageService)
       .overrideProvider(ConfigService)
       .useValue(mockConfigService)
+      .overrideProvider(EventEmitter2)
+      .useValue(mockEventEmitter)
       .compile();
 
     service = module.get<FormsService>(FormsService);

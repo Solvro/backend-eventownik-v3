@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { MailerService } from "@nestjs-modules/mailer";
 import { Queue } from "bullmq";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
@@ -29,6 +31,7 @@ import { UpdateEmailDto } from "./dto/update-email.dto";
 export interface EmailSendJobData {
   emailUuid: string;
   participantUuid: string;
+  participantSnapshot?: ParticipantForParsing;
 }
 
 interface EmailTemplateForParsing {
@@ -49,6 +52,10 @@ interface EmailTemplateForParsing {
     forms: {
       uuid: string;
     }[];
+    blocks: {
+      uuid: string;
+      name: string;
+    }[];
   };
 }
 
@@ -61,6 +68,19 @@ interface ParticipantForParsing {
     attributeUuid: string;
     value: Prisma.JsonValue | null;
   }[];
+}
+
+export interface ParsedEmailAttachment {
+  content: Buffer;
+  encoding: "base64";
+  filename: string;
+  cid: string;
+  contentType: string;
+}
+
+export interface ParsedEmailContent {
+  html: string;
+  attachments: ParsedEmailAttachment[];
 }
 
 @Injectable()
@@ -430,7 +450,7 @@ export class EmailsService {
   parseEmailContent(
     emailTemplate: EmailTemplateForParsing,
     participant: ParticipantForParsing,
-  ): string {
+  ): ParsedEmailContent {
     let content = emailTemplate.content;
     const tagRegex = /<span[^>]*data-id="([^"]+)"[^>]*>.*?<\/span>/g;
 
@@ -461,10 +481,10 @@ export class EmailsService {
         case "/participant_email": {
           return participant.email;
         }
-        case "participant_created_at": {
+        case "/participant_created_at": {
           return participant.createdAt.toISOString();
         }
-        case "participant_updated_at": {
+        case "/participant_updated_at": {
           return participant.updatedAt.toISOString();
         }
         default: {
@@ -507,7 +527,26 @@ export class EmailsService {
             );
           }
         } else if (attribute.type === AttributeType.block) {
-          // TODO: implement block name replacement by uuids
+          const selectedUuids = Array.isArray(rawValue)
+            ? rawValue.filter(
+                (value): value is string => typeof value === "string",
+              )
+            : typeof rawValue === "string"
+              ? [rawValue]
+              : [];
+          const blockNames = selectedUuids
+            .map(
+              (blockUuid) =>
+                emailTemplate.event.blocks.find(
+                  (block) => block.uuid === blockUuid,
+                )?.name,
+            )
+            .filter((name): name is string => name != null);
+
+          content = content.replaceAll(
+            new RegExp(dynamicTag, "g"),
+            blockNames.join(", "),
+          );
         } else {
           content = content.replaceAll(
             new RegExp(dynamicTag, "g"),
@@ -532,11 +571,29 @@ export class EmailsService {
       },
     );
 
-    return content;
+    // inline base64 images replacement -> extracted as cid attachments
+    const attachments: ParsedEmailAttachment[] = [];
+    content = content.replaceAll(
+      /data:image\/(\w+);base64,([^"')\s]+)/g,
+      (_match: string, format: string, base64: string) => {
+        const cid = randomUUID();
+        attachments.push({
+          content: Buffer.from(base64, "base64"),
+          encoding: "base64",
+          filename: `${cid}.${format}`,
+          cid,
+          contentType: `image/${format}`,
+        });
+        return `cid:${cid}`;
+      },
+    );
+
+    return { html: content, attachments };
   }
   async sendEmailToParticipants(
     emailUuid: string,
     participantUuids: string[],
+    participantSnapshot?: ParticipantForParsing,
   ): Promise<void> {
     if (participantUuids.length === 0) {
       return;
@@ -544,7 +601,11 @@ export class EmailsService {
 
     const jobs = participantUuids.map((participantUuid) => ({
       name: "send-email-to-participant",
-      data: { emailUuid, participantUuid } satisfies EmailSendJobData,
+      data: {
+        emailUuid,
+        participantUuid,
+        participantSnapshot,
+      } satisfies EmailSendJobData,
       opts: {
         attempts: 3,
         backoff: {
@@ -562,13 +623,14 @@ export class EmailsService {
   async deliverEmailToParticipants(
     emailUuid: string,
     participantUuid: string,
+    participantSnapshot?: ParticipantForParsing,
   ): Promise<void> {
     const emailTemplate = await this.prisma.emailTemplate.findUnique({
       where: { uuid: emailUuid },
       include: {
         event: {
           include: {
-            attributes: true,
+            attributes: { include: { blocks: true } },
             forms: true,
           },
         },
@@ -581,10 +643,25 @@ export class EmailsService {
       );
     }
 
-    const participant = await this.prisma.participant.findUnique({
-      where: { uuid: participantUuid },
-      include: { attributes: true },
-    });
+    const emailTemplateForParsing: EmailTemplateForParsing = {
+      ...emailTemplate,
+      event: {
+        ...emailTemplate.event,
+        blocks: emailTemplate.event.attributes.flatMap((attribute) =>
+          attribute.blocks.map((block) => ({
+            uuid: block.uuid,
+            name: block.name,
+          })),
+        ),
+      },
+    };
+
+    const participant =
+      participantSnapshot ??
+      (await this.prisma.participant.findUnique({
+        where: { uuid: participantUuid },
+        include: { attributes: true },
+      }));
 
     if (participant == null) {
       // participant not found, record failed status
@@ -599,13 +676,20 @@ export class EmailsService {
       return;
     }
 
+    const statusParticipantUuid =
+      participantSnapshot == null ? participant.uuid : null;
+
     try {
-      const parsedContent = this.parseEmailContent(emailTemplate, participant);
+      const parsedContent = this.parseEmailContent(
+        emailTemplateForParsing,
+        participant,
+      );
 
       await this.mailerService.sendMail({
         to: participant.email,
         subject: emailTemplate.name,
-        html: parsedContent,
+        html: parsedContent.html,
+        attachments: parsedContent.attachments,
         from: this.config.get<string>("SMTP_FROM") ?? undefined,
         replyTo:
           emailTemplate.event.contactEmail ??
@@ -617,7 +701,7 @@ export class EmailsService {
         data: {
           status: EmailStatus.sent,
           sendAt: new Date(),
-          participantUuid: participant.uuid,
+          participantUuid: statusParticipantUuid,
           emailUuid,
         },
       });
@@ -627,7 +711,7 @@ export class EmailsService {
         data: {
           status: EmailStatus.failed,
           sendAt: new Date(),
-          participantUuid: participant.uuid,
+          participantUuid: statusParticipantUuid,
           emailUuid,
         },
       });

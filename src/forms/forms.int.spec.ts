@@ -4,6 +4,7 @@ import { PrismaService } from "src/prisma/prisma.service";
 import { StorageService } from "src/storage/storage.service";
 
 import { ConfigService } from "@nestjs/config";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
@@ -61,6 +62,7 @@ describe("Forms Integration", () => {
         BlocksService,
         { provide: StorageService, useValue: mockStorageService },
         { provide: ConfigService, useValue: mockConfigService },
+        EventEmitter2,
       ],
     }).compile();
     formsController = module.get<FormsController>(FormsController);
