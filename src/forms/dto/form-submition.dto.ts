@@ -2,7 +2,6 @@ import { Transform, Type, plainToInstance } from "class-transformer";
 import {
   IsArray,
   IsEmail,
-  IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
@@ -24,7 +23,7 @@ export class ParticipantAttributeDto {
       "- number: number\n" +
       "- multiSelect/block: string[] (Array of UUIDs or options)\n" +
       "- checkbox: boolean\n" +
-      "- for files write filename with extension (e.g., 'document.pdf')",
+      "- file: fileToken (UUID returned from upload endpoint)",
   })
   @IsOptional()
   value?: unknown;
@@ -70,10 +69,10 @@ export class FormSubmitionDto {
   })
   attributes: ParticipantAttributeDto[];
 
-  @ApiProperty({
-    description: "hCaptcha response token",
-  })
-  @IsString()
-  @IsNotEmpty()
-  "h-captcha-response": string;
+  // @ApiProperty({
+  //   description: "hCaptcha response token",
+  // })
+  // @IsString()
+  // @IsNotEmpty()
+  // "h-captcha-response": string;
 }

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 import type { AuthUser } from "src/auth/jwt.strategy";
 import { OrganizerType } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
@@ -70,7 +69,7 @@ describe("AdminsService", () => {
 
       const result = await service.findAll(query);
 
-      expect(prisma.admin.findMany).toHaveBeenCalledWith(
+      expect(mockPrismaService.admin.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           skip: 0,
           take: 10,
@@ -104,9 +103,11 @@ describe("AdminsService", () => {
         firstName: { contains: "John", mode: "insensitive" },
       };
 
-      expect(prisma.admin.count).toHaveBeenCalledWith({ where: expectedWhere });
+      expect(mockPrismaService.admin.count).toHaveBeenCalledWith({
+        where: expectedWhere,
+      });
 
-      expect(prisma.admin.findMany).toHaveBeenCalledWith(
+      expect(mockPrismaService.admin.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expectedWhere,
         }),
@@ -128,7 +129,7 @@ describe("AdminsService", () => {
       ]);
 
       await service.findAll(query);
-      expect(prisma.admin.findMany).toHaveBeenCalledWith(
+      expect(mockPrismaService.admin.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           orderBy: [{ email: "asc" }],
         }),
@@ -151,7 +152,7 @@ describe("AdminsService", () => {
 
       const result = await service.findOne(mockId);
 
-      expect(prisma.admin.findUnique).toHaveBeenCalledWith({
+      expect(mockPrismaService.admin.findUnique).toHaveBeenCalledWith({
         where: { uuid: mockId },
       });
       expect(result).toEqual(mockAdmin);
@@ -164,7 +165,7 @@ describe("AdminsService", () => {
       await expect(service.findOne(mockId)).rejects.toThrow(
         "Admin with given ID was not found.",
       );
-      expect(prisma.admin.findUnique).toHaveBeenCalledWith({
+      expect(mockPrismaService.admin.findUnique).toHaveBeenCalledWith({
         where: { uuid: mockId },
       });
     });
@@ -186,7 +187,7 @@ describe("AdminsService", () => {
 
       const result = await service.create(createAdminDto);
 
-      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(mockPrismaService.$transaction).toHaveBeenCalled();
       expect(result).toEqual(mockAdmin);
     });
 
@@ -207,7 +208,7 @@ describe("AdminsService", () => {
       await expect(service.create(createAdminDto)).rejects.toThrow(
         `Admin with email ${createAdminDto.email} already exists`,
       );
-      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(mockPrismaService.$transaction).toHaveBeenCalled();
     });
   });
 
@@ -231,7 +232,7 @@ describe("AdminsService", () => {
 
       const result = await service.update(mockId, updateAdminDto);
 
-      expect(prisma.admin.update).toHaveBeenCalled();
+      expect(mockPrismaService.admin.update).toHaveBeenCalled();
       expect(result).toEqual(mockAdmin);
     });
     it("should throw NotFoundException if admin to update not found", async () => {
@@ -259,7 +260,7 @@ describe("AdminsService", () => {
 
       const result = await service.remove(mockId, 2 as unknown as AuthUser);
 
-      expect(prisma.admin.delete).toHaveBeenCalled();
+      expect(mockPrismaService.admin.delete).toHaveBeenCalled();
       expect(typeof result).toEqual("object");
     });
   });

@@ -1,35 +1,24 @@
-import { diskStorage } from "multer";
-import { existsSync, mkdirSync } from "node:fs";
-// eslint-disable-next-line unicorn/import-style
-import { extname } from "node:path";
+import { memoryStorage } from "multer";
 
+import type { Type } from "@nestjs/common";
 import {
   BadRequestException,
   UseInterceptors,
   applyDecorators,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
+import {
+  ApiBody,
+  ApiConsumes,
+  ApiExtraModels,
+  getSchemaPath,
+} from "@nestjs/swagger";
 
-export function UploadPhoto() {
+export function UploadPhoto(bodyDto: Type<unknown>) {
   return applyDecorators(
     UseInterceptors(
       FileInterceptor("photo", {
-        storage: diskStorage({
-          destination: (_request, _file, callback) => {
-            const uploadPath = "./uploads/events";
-            if (!existsSync(uploadPath)) {
-              mkdirSync(uploadPath, { recursive: true });
-            }
-            callback(null, uploadPath);
-          },
-          filename: (_request, file, callback) => {
-            const now = Date.now().toString();
-            const random = Math.round(Math.random() * 1e9).toString();
-            const uniqueSuffix = `${now}-${random}`;
-            const extension = extname(file.originalname);
-            callback(null, `${uniqueSuffix}${extension}`);
-          },
-        }),
+        storage: memoryStorage(),
         limits: { fileSize: 10 * 1024 * 1024 },
         fileFilter: (_request, file, callback) => {
           const allowedTypes = [
@@ -51,5 +40,24 @@ export function UploadPhoto() {
         },
       }),
     ),
+    ApiConsumes("multipart/form-data"),
+    ApiExtraModels(bodyDto),
+    ApiBody({
+      schema: {
+        allOf: [
+          { $ref: getSchemaPath(bodyDto) },
+          {
+            type: "object",
+            properties: {
+              photo: {
+                type: "string",
+                format: "binary",
+                description: "Event photo (PNG, JPG, JPEG or GIF, max 10 MB)",
+              },
+            },
+          },
+        ],
+      },
+    }),
   );
 }

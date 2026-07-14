@@ -1,13 +1,23 @@
 import { BlocksService } from "src/blocks/blocks.service";
 import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
+import { StorageService } from "src/storage/storage.service";
 
+import { ConfigService } from "@nestjs/config";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
 import { FormListingDto } from "./dto/form-listing.dto";
 import { FormsController } from "./forms.controller";
 import { FormsService } from "./forms.service";
+
+const mockStorageService: Pick<StorageService, "upload" | "delete"> = {
+  upload: jest.fn(),
+  delete: jest.fn(),
+};
+const mockConfigService: Pick<ConfigService, "getOrThrow"> = {
+  getOrThrow: jest.fn().mockReturnValue("test-bucket") as never,
+};
 
 describe("Forms Integration", () => {
   let formsController: FormsController;
@@ -49,6 +59,8 @@ describe("Forms Integration", () => {
         },
         ParticipantsService,
         BlocksService,
+        { provide: StorageService, useValue: mockStorageService },
+        { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile();
     formsController = module.get<FormsController>(FormsController);

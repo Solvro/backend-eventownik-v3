@@ -51,7 +51,8 @@ export class EventCreateDto {
   isPublic: boolean;
 
   @ApiPropertyOptional({
-    description: "Verification status of the public event, defaults to false",
+    description:
+      "Verification status of the public event, defaults to false. Only superadmins can set it; ignored for organizers.",
     type: Boolean,
     example: true,
   })
@@ -59,17 +60,6 @@ export class EventCreateDto {
   @Type(() => Boolean)
   @IsBoolean()
   isVerified?: boolean;
-
-  @ApiPropertyOptional({
-    description:
-      "Date when the event was verified, adds automatically when isVerified is set to true",
-    type: String,
-    example: "2022-12-12 12:12:12",
-  })
-  @IsOptional()
-  @Type(() => Date)
-  @IsDate()
-  verifiedAt?: Date | null;
 
   @ApiPropertyOptional({
     description: "Participants limit for the event",
@@ -109,11 +99,6 @@ export class EventCreateDto {
   organizerName?: string | null;
 
   @ApiPropertyOptional({
-    description: "Photo URL of the event",
-    type: String,
-    example: "https://event-photo.com/photo.jpg",
-  })
-  @ApiPropertyOptional({
     description: "Location of the event",
     type: String,
     example: "PWr, Poland",
@@ -121,15 +106,6 @@ export class EventCreateDto {
   @IsOptional()
   @IsString()
   location?: string | null;
-
-  @ApiPropertyOptional({
-    description: "URL of the event photo",
-    type: String,
-    example: "https://event-photo.com/photo.jpg",
-  })
-  @IsOptional()
-  @IsString()
-  photoUrl?: string | null;
 
   @ApiPropertyOptional({
     description: "Contact email for the event",
@@ -154,16 +130,4 @@ export class EventCreateDto {
   @ValidateNested({ each: true })
   @Type(() => EventLinkCreateDto)
   links?: EventLinkCreateDto[];
-
-  applyUserTypeRestrictions(userType: string) {
-    if (userType === "organizer") {
-      this.isVerified = false;
-      this.verifiedAt = null;
-    } else if (userType === "superadmin" && this.isVerified === true) {
-      this.verifiedAt = new Date();
-    } else if (this.isVerified === false) {
-      this.verifiedAt = null;
-    }
-    return this;
-  }
 }

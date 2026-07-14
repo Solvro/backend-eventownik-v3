@@ -2,9 +2,12 @@ import { HcaptchaGuard } from "@gvrs/nestjs-hcaptcha";
 import { BlocksService } from "src/blocks/blocks.service";
 import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
+import { StorageService } from "src/storage/storage.service";
 
+import { ConfigService } from "@nestjs/config";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
+import { ThrottlerModule } from "@nestjs/throttler";
 
 import { FormsPublicController } from "./forms-public.controller";
 import { FormsService } from "./forms.service";
@@ -40,6 +43,7 @@ describe("Forms Public Integration", () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }])],
       providers: [
         FormsService,
         FormsPublicController,
@@ -49,6 +53,14 @@ describe("Forms Public Integration", () => {
         },
         ParticipantsService,
         BlocksService,
+        {
+          provide: StorageService,
+          useValue: { upload: jest.fn(), delete: jest.fn() },
+        },
+        {
+          provide: ConfigService,
+          useValue: { getOrThrow: jest.fn().mockReturnValue("test-bucket") },
+        },
       ],
     })
       .overrideGuard(HcaptchaGuard)

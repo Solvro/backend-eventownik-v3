@@ -6,6 +6,8 @@ import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { EventEmitterModule } from "@nestjs/event-emitter";
+import { ScheduleModule } from "@nestjs/schedule";
+import { ThrottlerModule } from "@nestjs/throttler";
 
 import { AdminsModule } from "./admins/admins.module";
 import { AppController } from "./app.controller";
@@ -21,6 +23,7 @@ import { ImportExportModule } from "./import-export/import-export.module";
 import { OrganizersModule } from "./organizers/organizers.module";
 import { ParticipantsModule } from "./participants/participants.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { StorageModule } from "./storage/storage.module";
 
 @Module({
   imports: [
@@ -48,9 +51,28 @@ import { PrismaModule } from "./prisma/prisma.module";
         SMTP_USER: Joi.string().required(),
         SMTP_PASS: Joi.string().required(),
         SMTP_FROM: Joi.string().required(),
+        S3_ENDPOINT: Joi.string().required(),
+        S3_ACCESS_KEY: Joi.string().required(),
+        S3_SECRET_KEY: Joi.string().required(),
+        S3_BUCKET_EVENTS: Joi.string().required(),
+        S3_BUCKET_FORMS: Joi.string().required(),
+        S3_PUBLIC_URL: Joi.string().required(),
+        UPLOAD_MAX_FILE_SIZE: Joi.number().default(10_485_760),
+        UPLOAD_ALLOWED_MIME: Joi.string().default(
+          "application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ),
+        UPLOAD_TTL_HOURS: Joi.number().default(24),
+        HCAPTCHA_ENABLED: Joi.boolean().default(true),
       }),
       isGlobal: true,
     }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60_000,
+        limit: 100,
+      },
+    ]),
+    ScheduleModule.forRoot(),
     MailerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
@@ -99,6 +121,7 @@ import { PrismaModule } from "./prisma/prisma.module";
       }),
     }),
     EmailsModule,
+    StorageModule,
   ],
   controllers: [AppController],
   providers: [AppService],

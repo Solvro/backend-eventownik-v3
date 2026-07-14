@@ -10,6 +10,7 @@ import {
   Participant as PrismaParticipant,
 } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
+import { StorageService } from "src/storage/storage.service";
 
 import {
   BadRequestException,
@@ -17,6 +18,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
 import {
   ParticipantAttributeDto,
@@ -37,7 +39,11 @@ type ParticipantWithRelations = PrismaParticipant & {
 
 @Injectable()
 export class ParticipantsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storageService: StorageService,
+    private readonly configService: ConfigService,
+  ) {}
 
   private getStringConfigValues(
     config: Prisma.JsonValue | null,
@@ -328,7 +334,15 @@ export class ParticipantsService {
         participant.attributes?.map((attribute) => ({
           uuid: attribute.attributeUuid,
           name: attribute.attribute?.name ?? "",
-          value: attribute.value,
+          value:
+            attribute.attribute?.type === AttributeType.file &&
+            typeof attribute.value === "string" &&
+            attribute.value.length > 0
+              ? this.storageService.getUrl(
+                  this.configService.getOrThrow("S3_BUCKET_FORMS"),
+                  attribute.value,
+                )
+              : attribute.value,
           createdAt: attribute.createdAt,
           updatedAt: attribute.updatedAt,
         })) ?? [],
@@ -487,7 +501,8 @@ export class ParticipantsService {
     }
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const fileKeysToDelete: string[] = [];
+      const result = await this.prisma.$transaction(async (tx) => {
         const dataToUpdate: Prisma.ParticipantUpdateInput = { ...updates };
 
         if (participantAttributes !== undefined) {
@@ -501,12 +516,30 @@ export class ParticipantsService {
           );
 
           if (attributeUuidsToUpdate.length > 0) {
+            const existingFileAttributes =
+              await tx.participantAttribute.findMany({
+                where: {
+                  participantUuid,
+                  attributeUuid: { in: attributeUuidsToUpdate },
+                  attribute: { type: AttributeType.file },
+                },
+              });
+
             await tx.participantAttribute.deleteMany({
               where: {
                 participantUuid,
                 attributeUuid: { in: attributeUuidsToUpdate },
               },
             });
+
+            for (const attribute of existingFileAttributes) {
+              if (
+                typeof attribute.value === "string" &&
+                attribute.value.length > 0
+              ) {
+                fileKeysToDelete.push(attribute.value);
+              }
+            }
           }
 
           dataToUpdate.attributes = {
@@ -526,6 +559,15 @@ export class ParticipantsService {
 
         return this.mapToEntity(updatedParticipant);
       });
+
+      if (fileKeysToDelete.length > 0) {
+        const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
+        for (const key of fileKeysToDelete) {
+          await this.storageService.delete(bucket, key);
+        }
+      }
+
+      return result;
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -542,6 +584,11 @@ export class ParticipantsService {
   async remove(eventUuid: string, participantUuid: string) {
     const participant = await this.prisma.participant.findFirst({
       where: { uuid: participantUuid, eventUuid },
+      include: {
+        attributes: {
+          where: { attribute: { type: AttributeType.file } },
+        },
+      },
     });
 
     if (participant == null) {
@@ -553,10 +600,26 @@ export class ParticipantsService {
     await this.prisma.participant.delete({
       where: { uuid: participantUuid },
     });
+
+    const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
+    for (const attribute of participant.attributes) {
+      if (typeof attribute.value === "string" && attribute.value.length > 0) {
+        await this.storageService.delete(bucket, attribute.value);
+      }
+    }
   }
 
   async removeMany(eventUuid: string, participantsToUnregisterIds: string[]) {
     // TODO: Send emails for each unregister (requires fetching emails or moving logic to a job)
+
+    const participants = await this.prisma.participant.findMany({
+      where: { uuid: { in: participantsToUnregisterIds }, eventUuid },
+      include: {
+        attributes: {
+          where: { attribute: { type: AttributeType.file } },
+        },
+      },
+    });
 
     await this.prisma.participant.deleteMany({
       where: {
@@ -564,6 +627,15 @@ export class ParticipantsService {
         eventUuid,
       },
     });
+
+    const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
+    for (const participant of participants) {
+      for (const attribute of participant.attributes) {
+        if (typeof attribute.value === "string" && attribute.value.length > 0) {
+          await this.storageService.delete(bucket, attribute.value);
+        }
+      }
+    }
   }
 
   async findAll(

@@ -11,6 +11,7 @@ import {
 } from "src/generated/prisma/client";
 import { ParticipantUpdateDto } from "src/participants/dto/participant-update.dto";
 import { ParticipantsService } from "src/participants/participants.service";
+import { StorageService } from "src/storage/storage.service";
 
 import {
   BadRequestException,
@@ -18,6 +19,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateFormDto } from "./dto/create-form.dto";
@@ -27,11 +29,125 @@ import { UpdateFormDto } from "./dto/update-form.dto";
 
 @Injectable()
 export class FormsService {
+  private readonly bucket: string;
+
   constructor(
-    private prisma: PrismaService,
-    private participantService: ParticipantsService,
-    private blocksService: BlocksService,
-  ) {}
+    private readonly prisma: PrismaService,
+    private readonly participantService: ParticipantsService,
+    private readonly blocksService: BlocksService,
+    private readonly storageService: StorageService,
+    configService: ConfigService,
+  ) {
+    this.bucket = configService.getOrThrow<string>("S3_BUCKET_FORMS");
+  }
+
+  private async uploadFiles(
+    files: Express.Multer.File[],
+    fileAttributeMap: Record<string, number> = {},
+  ): Promise<Record<string, string>> {
+    const fileKeyMap: Record<string, string> = {};
+    try {
+      const entriesToUpload = Object.entries(fileAttributeMap).map(
+        ([attributeUuid, fileIndex]: [string, number]) => {
+          if (fileIndex < 0 || fileIndex >= files.length) {
+            throw new Error(
+              `File index ${String(fileIndex)} for attribute ${attributeUuid} is out of bounds`,
+            );
+          }
+          const file = files[fileIndex];
+          return { attributeUuid, file };
+        },
+      );
+
+      await Promise.all(
+        entriesToUpload.map(async ({ attributeUuid, file }) => {
+          fileKeyMap[attributeUuid] = await this.storageService.upload(
+            this.bucket,
+            file,
+          );
+        }),
+      );
+      return fileKeyMap;
+    } catch (error) {
+      await Promise.all(
+        Object.values(fileKeyMap).map(async (key) =>
+          this.storageService.delete(this.bucket, key),
+        ),
+      );
+      throw error;
+    }
+  }
+
+  private async deleteOldFileOnUpdate(fileKey: string): Promise<void> {
+    await this.storageService.delete(this.bucket, fileKey);
+  }
+
+  async cleanupUploadedFiles(
+    fileKeyMapByAttributeUuid: Record<string, string>,
+  ): Promise<void> {
+    await Promise.all(
+      Object.values(fileKeyMapByAttributeUuid).map(async (fileKey) =>
+        this.storageService.delete(this.bucket, fileKey),
+      ),
+    );
+  }
+
+  async handleFileUploads(
+    files: Express.Multer.File[] | null,
+    fileAttributeMap: Record<string, number> = {},
+  ): Promise<Record<string, string>> {
+    if (files == null || files.length === 0) {
+      return {};
+    }
+    return this.uploadFiles(files, fileAttributeMap);
+  }
+
+  async uploadSingleFile(
+    file: Express.Multer.File,
+    formUuid: string,
+    sourceIp: string,
+    configService: ConfigService,
+  ): Promise<{ fileToken: string; expiresAt: number }> {
+    const maxSize = configService.getOrThrow<number>("UPLOAD_MAX_FILE_SIZE");
+    const allowedMimes = configService
+      .getOrThrow<string>("UPLOAD_ALLOWED_MIME")
+      .split(",")
+      .map((m) => m.trim());
+    const ttlHours = configService.getOrThrow<number>("UPLOAD_TTL_HOURS");
+
+    if (file.size > maxSize) {
+      throw new BadRequestException(
+        `File size exceeds maximum of ${String(maxSize)} bytes`,
+      );
+    }
+
+    if (!allowedMimes.includes(file.mimetype)) {
+      throw new BadRequestException(
+        `File type not allowed. Allowed types: ${allowedMimes.join(", ")}`,
+      );
+    }
+
+    const fileKey = await this.storageService.upload(this.bucket, file);
+
+    const uploadedFile = await this.prisma.uploadedFile.create({
+      data: {
+        fileKey,
+        originalName: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
+        formUuid,
+        sourceIp,
+      },
+    });
+
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + ttlHours);
+
+    return {
+      fileToken: uploadedFile.uuid,
+      expiresAt: expiresAt.getTime(),
+    };
+  }
 
   private getConfigObject(config: Prisma.JsonValue | null) {
     if (config == null || typeof config !== "object" || Array.isArray(config)) {
@@ -709,7 +825,6 @@ export class FormsService {
     eventSlug: string,
     formUuid: string,
     submissionData: FormSubmitionDto,
-    fileNames: string[],
   ) {
     return await this.prisma.$transaction(async (prisma) => {
       const event = await prisma.event.findUnique({
@@ -775,17 +890,49 @@ export class FormsService {
           attributeValue,
         );
 
-        if (
-          foundAttribute.attribute.type === AttributeType.file &&
-          isString(normalizedValue)
-        ) {
-          const fileName = fileNames.find((f) =>
-            f.endsWith(`#####${normalizedValue}`),
-          );
-          if (fileName !== undefined) {
-            fileNames.splice(fileNames.indexOf(fileName), 1);
-            normalizedAttributes[attributeUuid] =
-              `./uploads/forms/${event.uuid}/${formUuid}/#####${fileName}`;
+        if (foundAttribute.attribute.type === AttributeType.file) {
+          if (isString(attributeValue) && attributeValue.trim().length > 0) {
+            const fileToken = attributeValue.trim();
+            const uploadedFile = await prisma.uploadedFile.findUnique({
+              where: { uuid: fileToken },
+            });
+
+            if (
+              uploadedFile?.formUuid !== formUuid ||
+              uploadedFile.claimedAt !== null
+            ) {
+              throw new BadRequestException(
+                `File token ${fileToken} for attribute ${attributeUuid} is invalid or already claimed`,
+              );
+            }
+
+            normalizedAttributes[attributeUuid] = uploadedFile.fileKey;
+
+            await prisma.uploadedFile.update({
+              where: { uuid: fileToken },
+              data: { claimedAt: new Date() },
+            });
+
+            if (submissionData.participantId !== undefined) {
+              const existingAttribute =
+                await prisma.participantAttribute.findUnique({
+                  where: {
+                    participantUuid_attributeUuid: {
+                      participantUuid: submissionData.participantId,
+                      attributeUuid,
+                    },
+                  },
+                });
+              if (
+                existingAttribute?.value != null &&
+                isString(existingAttribute.value) &&
+                existingAttribute.value.length > 0
+              ) {
+                await this.deleteOldFileOnUpdate(existingAttribute.value);
+              }
+            }
+          } else {
+            normalizedAttributes[attributeUuid] = Prisma.JsonNull;
           }
         } else {
           normalizedAttributes[attributeUuid] = normalizedValue;

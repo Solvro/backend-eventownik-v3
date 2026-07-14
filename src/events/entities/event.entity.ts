@@ -2,7 +2,7 @@ import { ApiProperty } from "@nestjs/swagger";
 
 import { Event as PrismaEvent } from "../../generated/prisma/client";
 
-export class Event implements PrismaEvent {
+export class Event implements Omit<PrismaEvent, "photoKey"> {
   @ApiProperty()
   name: string;
 
@@ -45,7 +45,11 @@ export class Event implements PrismaEvent {
   @ApiProperty({ nullable: true, required: false })
   organizerName: string | null;
 
-  @ApiProperty({ nullable: true, required: false })
+  @ApiProperty({
+    nullable: true,
+    required: false,
+    description: "Public URL of the event photo",
+  })
   photoUrl: string | null;
 
   @ApiProperty({ nullable: true, required: false })

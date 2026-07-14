@@ -35,6 +35,7 @@ import {
 
 import { EventCreateDto } from "./dto/event-create.dto";
 import { EventListingDto } from "./dto/event-listing.dto";
+import { EventUpdateDto } from "./dto/event-update.dto";
 import { Event } from "./entities/event.entity";
 import { EventsService } from "./events.service";
 import { UploadPhoto } from "./utils/upload-photo.decorator";
@@ -60,25 +61,21 @@ export class EventsController {
     return this.eventsService.findAll(dto, eventsIds, request.user.type);
   }
 
-  // TODO: usuwanie zdjęcia z serwera przy aktualizacji, usuwaniu eventu i gdy nie przejdzie walidacji, to samo dla PUT
   @Post()
-  @UploadPhoto()
+  @UploadPhoto(EventCreateDto)
   @ApiOperation({ summary: "Create a new event" })
   @ApiCreatedResponse({ description: "The created event", type: Event })
   async create(
-    @UploadedFile()
-    photo: Express.Multer.File | undefined,
+    @UploadedFile() photo: Express.Multer.File | undefined,
     @Body() eventDto: EventCreateDto,
     @Request() request: { user: AuthUser },
   ): Promise<Event> {
-    let photoUrl = eventDto.photoUrl ?? null;
-
-    if (photo !== undefined) {
-      photoUrl = `/uploads/events/${photo.filename}`;
-    }
-    eventDto.applyUserTypeRestrictions(request.user.type);
-
-    return this.eventsService.create(eventDto, photoUrl, request.user.uuid);
+    return this.eventsService.create(
+      eventDto,
+      photo,
+      request.user.uuid,
+      request.user.type,
+    );
   }
 
   @Get(":eventId")
@@ -94,25 +91,26 @@ export class EventsController {
 
   @Patch(":eventId")
   @RequirePermission(PermissionType.MANAGE_EVENT)
-  @UploadPhoto()
-  @ApiOperation({ summary: "Update event by UUID" })
+  @UploadPhoto(EventUpdateDto)
+  @ApiOperation({
+    summary: "Update event by UUID",
+    description:
+      "Accepts multipart/form-data with an optional 'photo' file. To remove the current photo, send a JSON body with photoUrl set to null.",
+  })
   @ApiParam({ name: "eventId", description: "UUID of the event" })
   @ApiOkResponse({ description: "The updated event", type: Event })
   async update(
     @Param("eventId", ParseUUIDPipe) eventUUID: string,
-    @UploadedFile()
-    photo: Express.Multer.File | undefined,
-    @Body() eventDto: EventCreateDto,
+    @UploadedFile() photo: Express.Multer.File | undefined,
+    @Body() eventDto: EventUpdateDto,
     @Request() request: { user: AuthUser },
   ): Promise<Event> {
-    let photoUrl = eventDto.photoUrl ?? null;
-
-    if (photo !== undefined) {
-      photoUrl = `/uploads/events/${photo.filename}`;
-    }
-    eventDto.applyUserTypeRestrictions(request.user.type);
-
-    return this.eventsService.update(eventUUID, eventDto, photoUrl);
+    return this.eventsService.update(
+      eventUUID,
+      eventDto,
+      photo,
+      request.user.type,
+    );
   }
 
   @Delete(":eventId")
@@ -124,7 +122,7 @@ export class EventsController {
   @HttpCode(204)
   async remove(
     @Param("eventId", ParseUUIDPipe) eventUUID: string,
-  ): Promise<Event> {
-    return this.eventsService.remove(eventUUID);
+  ): Promise<void> {
+    await this.eventsService.remove(eventUUID);
   }
 }
