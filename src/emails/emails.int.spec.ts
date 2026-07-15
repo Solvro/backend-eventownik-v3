@@ -75,6 +75,7 @@ describe("EmailsController", () => {
           provide: ConfigService,
           useValue: {
             get: jest.fn(),
+            getOrThrow: jest.fn(),
           },
         },
       ],

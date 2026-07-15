@@ -18,11 +18,11 @@ import { EmailListingDto } from "./dto/email-listing.dto";
 import { EmailResponseDto } from "./dto/email-response.dto";
 import { UpdateEmailDto } from "./dto/update-email.dto";
 
-type StatusCounts = {
+interface StatusCounts {
   failedCount: number;
   pendingCount: number;
   sentCount: number;
-};
+}
 
 @Injectable()
 export class EmailTemplatesService {

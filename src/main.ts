@@ -8,6 +8,7 @@ import {
   ValidationPipe,
   VersioningType,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
 import { SwaggerModule } from "@nestjs/swagger";
 
@@ -18,6 +19,7 @@ const BODY_SIZE_LIMIT = "15mb";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
+  const configService = app.get(ConfigService);
 
   app.use(express.json({ limit: BODY_SIZE_LIMIT }));
   app.use(express.urlencoded({ limit: BODY_SIZE_LIMIT, extended: true }));
@@ -46,7 +48,8 @@ async function bootstrap() {
     SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup("api/docs", app, documentFactory);
 
-  const corsEntries = (process.env.CORS_ORIGINS ?? "")
+  const corsEntries = configService
+    .getOrThrow<string>("CORS_ORIGINS")
     .split(",")
     .map((o) => o.trim())
     .filter(Boolean);
@@ -84,6 +87,6 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(configService.getOrThrow<number>("PORT"));
 }
 bootstrap();

@@ -5,6 +5,7 @@ import type { Prisma } from "src/generated/prisma/client";
 import { AttributeType } from "src/generated/prisma/enums";
 
 import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
 export type EmailTemplateForParsing = Prisma.EmailTemplateGetPayload<{
   include: {
@@ -43,6 +44,8 @@ export interface ParsedEmailContent {
 
 @Injectable()
 export class EmailContentParserService {
+  constructor(private readonly config: ConfigService) {}
+
   private getStringArray(
     value: Prisma.JsonValue | null,
     key: string,
@@ -194,7 +197,7 @@ export class EmailContentParserService {
     }
 
     // form links replacement eg /form_{formUuid} will be replaced with a link
-    // to {APP_DOMAIN}/{eventSlug}/{formUuid}/{participantUuid}
+    // to {FRONTEND_URL}/{eventSlug}/{formUuid}/{participantUuid}
     const formLinkRegex = /<span[^>]*data-id="\/form_([^"]+)"[^>]*><\/span>/g;
     content = content.replaceAll(
       formLinkRegex,
@@ -204,8 +207,8 @@ export class EmailContentParserService {
           return match; // if form not found, return the original tag
         }
 
-        const appDomain = process.env.APP_DOMAIN ?? "http://localhost:3000";
-        const formUrl = `${appDomain}/${emailTemplate.event.slug}/${form.uuid}/${participant.uuid}`;
+        const frontendUrl = this.config.getOrThrow<string>("FRONTEND_URL");
+        const formUrl = `${frontendUrl}/${emailTemplate.event.slug}/${form.uuid}/${participant.uuid}`;
         return `<a href="${formUrl}">${this.escapeHtml(form.name)}</a>`;
       },
     );
