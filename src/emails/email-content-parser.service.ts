@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-
 import { getJsonObject } from "src/common/utils/prisma.utility";
 import type { Prisma } from "src/generated/prisma/client";
 import { AttributeType } from "src/generated/prisma/enums";

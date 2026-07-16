@@ -1,4 +1,6 @@
 import { normalizeParticipantAttributeValue } from "src/attributes/attribute-value-normalizer";
+import { PageMetaDto } from "src/common/dto/page-meta.dto";
+import { PageDto } from "src/common/dto/page.dto";
 import { AttributeChangedEvent } from "src/common/events/attribute-changed.event";
 import {
   ATTRIBUTE_CHANGED_EVENT,
@@ -7,8 +9,6 @@ import {
 } from "src/common/events/event-names.constants";
 import { ParticipantDeletedEvent } from "src/common/events/participant-deleted.event";
 import { ParticipantRegisteredEvent } from "src/common/events/participant-registered.event";
-import { PageMetaDto } from "src/common/dto/page-meta.dto";
-import { PageDto } from "src/common/dto/page.dto";
 import {
   Attribute,
   AttributeType,

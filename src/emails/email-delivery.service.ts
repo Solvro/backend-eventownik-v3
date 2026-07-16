@@ -1,9 +1,8 @@
-import { randomUUID } from "node:crypto";
-
 import { MailerService } from "@nestjs-modules/mailer";
 import { Queue } from "bullmq";
-import type { PageOptionsDto } from "src/common/dto/page-options.dto";
+import { randomUUID } from "node:crypto";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
+import type { PageOptionsDto } from "src/common/dto/page-options.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { EmailStatus } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";

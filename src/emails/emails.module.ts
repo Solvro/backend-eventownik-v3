@@ -5,8 +5,8 @@ import { ConfigModule } from "@nestjs/config";
 import { EmailContentParserService } from "./email-content-parser.service";
 import { EmailDeliveryService } from "./email-delivery.service";
 import { EmailTemplatesService } from "./email-templates.service";
-import { EmailsConsumer } from "./emails.consumer";
 import { EMAIL_QUEUE_NAME } from "./emails.constants";
+import { EmailsConsumer } from "./emails.consumer";
 import { EmailsController } from "./emails.controller";
 import { EmailsListeners } from "./emails.listeners";
 

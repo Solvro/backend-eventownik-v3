@@ -2,8 +2,8 @@ import { EmailContentParserService } from "./email-content-parser.service";
 import { EmailDeliveryService } from "./email-delivery.service";
 import { EmailTemplatesService } from "./email-templates.service";
 import { EmailsConsumer } from "./emails.consumer";
-import { EmailsModule } from "./emails.module";
 import { EmailsListeners } from "./emails.listeners";
+import { EmailsModule } from "./emails.module";
 
 describe("EmailsModule wiring", () => {
   // EmailsListeners' @OnEvent handlers are only ever discovered by

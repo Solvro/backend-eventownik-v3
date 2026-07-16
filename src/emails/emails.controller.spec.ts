@@ -14,8 +14,8 @@ import type { UpdateEmailDto } from "./dto/update-email.dto";
 import { EmailContentParserService } from "./email-content-parser.service";
 import { EmailDeliveryService } from "./email-delivery.service";
 import { EmailTemplatesService } from "./email-templates.service";
-import { EmailsController } from "./emails.controller";
 import { EMAIL_QUEUE_NAME } from "./emails.constants";
+import { EmailsController } from "./emails.controller";
 
 describe("EmailsController", () => {
   let controller: EmailsController;
