@@ -5,6 +5,7 @@ import { PrismaService } from "src/prisma/prisma.service";
 import { StorageService } from "src/storage/storage.service";
 
 import { ConfigService } from "@nestjs/config";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 import { ThrottlerModule } from "@nestjs/throttler";
@@ -61,6 +62,7 @@ describe("Forms Public Integration", () => {
           provide: ConfigService,
           useValue: { getOrThrow: jest.fn().mockReturnValue("test-bucket") },
         },
+        EventEmitter2,
       ],
     })
       .overrideGuard(HcaptchaGuard)

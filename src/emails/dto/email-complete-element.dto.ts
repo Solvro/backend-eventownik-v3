@@ -13,9 +13,7 @@ class EmailParticipant {
   email?: string;
   createdAt?: string;
   updatedAt?: string;
-  meta: {
-    pivot_status: EmailStatus;
-    pivot_send_at: string;
-    pivot_send_by: string | null;
-  };
+  status: EmailStatus;
+  sendAt: string;
+  sendBy: string | null;
 }

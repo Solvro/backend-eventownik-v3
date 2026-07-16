@@ -1,5 +1,5 @@
 import { MailerService } from "@nestjs-modules/mailer";
-import { EmailStatus, EmailTrigger } from "src/generated/prisma/enums";
+import { EmailTrigger } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import { getQueueToken } from "@nestjs/bullmq";
@@ -11,8 +11,11 @@ import { Test } from "@nestjs/testing";
 import type { CreateEmailDto } from "./dto/create-email.dto";
 import { EmailListingDto } from "./dto/email-listing.dto";
 import type { UpdateEmailDto } from "./dto/update-email.dto";
+import { EmailContentParserService } from "./email-content-parser.service";
+import { EmailDeliveryService } from "./email-delivery.service";
+import { EmailTemplatesService } from "./email-templates.service";
+import { EMAIL_QUEUE_NAME } from "./emails.constants";
 import { EmailsController } from "./emails.controller";
-import { EmailsService } from "./emails.service";
 
 describe("EmailsController", () => {
   let controller: EmailsController;
@@ -26,6 +29,9 @@ describe("EmailsController", () => {
     form: {
       findUnique: jest.fn(),
     },
+    participant: {
+      count: jest.fn(),
+    },
     emailTemplate: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
@@ -35,6 +41,13 @@ describe("EmailsController", () => {
       create: jest.fn(),
       delete: jest.fn(),
       count: jest.fn(),
+    },
+    participantEmailStatus: {
+      groupBy: jest.fn().mockResolvedValue([]),
+      count: jest.fn(),
+      findMany: jest.fn(),
+      createMany: jest.fn(),
+      updateMany: jest.fn(),
     },
     $transaction: jest.fn(),
   };
@@ -46,20 +59,23 @@ describe("EmailsController", () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        EmailsService,
+        EmailTemplatesService,
+        EmailDeliveryService,
+        EmailContentParserService,
         PrismaService,
         {
           provide: MailerService,
           useValue: mockMailerService,
         },
         {
-          provide: getQueueToken("automatic-emails"),
+          provide: getQueueToken(EMAIL_QUEUE_NAME),
           useValue: {},
         },
         {
           provide: ConfigService,
           useValue: {
             get: jest.fn(),
+            getOrThrow: jest.fn(),
           },
         },
       ],
@@ -83,6 +99,7 @@ describe("EmailsController", () => {
   afterEach(() => {
     jest.clearAllMocks();
     jest.resetAllMocks();
+    mockPrismaService.participantEmailStatus.groupBy.mockResolvedValue([]);
   });
 
   it("should be defined", () => {
@@ -108,11 +125,6 @@ describe("EmailsController", () => {
 
           createdAt: mockDate,
           updatedAt: mockDate,
-          participantEmails: [
-            { status: EmailStatus.sent },
-            { status: EmailStatus.sent },
-            { status: EmailStatus.failed },
-          ],
         },
       ];
 
@@ -125,6 +137,18 @@ describe("EmailsController", () => {
       mockPrismaService.emailTemplate.findMany.mockResolvedValue(
         mockPrismaOutput,
       );
+      mockPrismaService.participantEmailStatus.groupBy.mockResolvedValue([
+        {
+          emailUuid: mockEmailId,
+          status: "sent",
+          _count: { _all: 2 },
+        },
+        {
+          emailUuid: mockEmailId,
+          status: "failed",
+          _count: { _all: 1 },
+        },
+      ]);
 
       const result = await controller.findAll(mockEventId, query);
 
@@ -241,7 +265,6 @@ describe("EmailsController", () => {
         order: null,
         createdAt: new Date(),
         updatedAt: new Date(),
-        participantEmails: [],
       };
 
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue(

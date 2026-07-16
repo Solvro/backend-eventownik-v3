@@ -6,8 +6,8 @@ import { PrismaService } from "src/prisma/prisma.service";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
+import { EmailDeliveryService } from "./email-delivery.service";
 import { EmailsListeners } from "./emails.listeners";
-import { EmailsService } from "./emails.service";
 
 describe("EmailsListeners", () => {
   let listeners: EmailsListeners;
@@ -22,7 +22,7 @@ describe("EmailsListeners", () => {
       providers: [
         EmailsListeners,
         {
-          provide: EmailsService,
+          provide: EmailDeliveryService,
           useValue: {
             sendEmailToParticipants: sendEmailMock,
           },

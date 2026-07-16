@@ -1,7 +1,9 @@
-import { isString } from "class-validator";
+import { isString, isUUID } from "class-validator";
 import { BlocksService } from "src/blocks/blocks.service";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
+import { FORM_FILLED_EVENT } from "src/common/events/event-names.constants";
+import { FormFilledEvent } from "src/common/events/form-filled.event";
 import { parseSortInput } from "src/common/utils/prisma.utility";
 import {
   Attribute,
@@ -20,12 +22,15 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateFormDto } from "./dto/create-form.dto";
 import { FormListingDto } from "./dto/form-listing.dto";
 import { FormSubmitionDto } from "./dto/form-submition.dto";
 import { UpdateFormDto } from "./dto/update-form.dto";
+
+const IMAGE_MIME_PREFIX = "image/";
 
 @Injectable()
 export class FormsService {
@@ -36,6 +41,7 @@ export class FormsService {
     private readonly participantService: ParticipantsService,
     private readonly blocksService: BlocksService,
     private readonly storageService: StorageService,
+    private readonly eventEmitter: EventEmitter2,
     configService: ConfigService,
   ) {
     this.bucket = configService.getOrThrow<string>("S3_BUCKET_FORMS");
@@ -76,10 +82,6 @@ export class FormsService {
       );
       throw error;
     }
-  }
-
-  private async deleteOldFileOnUpdate(fileKey: string): Promise<void> {
-    await this.storageService.delete(this.bucket, fileKey);
   }
 
   async cleanupUploadedFiles(
@@ -147,346 +149,6 @@ export class FormsService {
       fileToken: uploadedFile.uuid,
       expiresAt: expiresAt.getTime(),
     };
-  }
-
-  private getConfigObject(config: Prisma.JsonValue | null) {
-    if (config == null || typeof config !== "object" || Array.isArray(config)) {
-      return null;
-    }
-
-    return config as Record<string, unknown>;
-  }
-
-  private getStringArray(config: Record<string, unknown> | null, key: string) {
-    if (config == null) {
-      return [] as string[];
-    }
-
-    const values = config[key];
-    if (!Array.isArray(values)) {
-      return [] as string[];
-    }
-
-    return values.filter(
-      (value): value is string =>
-        typeof value === "string" && value.trim().length > 0,
-    );
-  }
-
-  private getPositiveIntegerValue(
-    config: Record<string, unknown> | null,
-    key: string,
-    fallback?: number,
-  ) {
-    if (config == null) {
-      return fallback;
-    }
-
-    const value = config[key];
-    if (value === undefined) {
-      return fallback;
-    }
-
-    if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
-      throw new BadRequestException(
-        `Attribute config field ${key} must be a positive integer.`,
-      );
-    }
-
-    return value;
-  }
-
-  private normalizeSelectValue(attribute: Attribute, value: unknown) {
-    const config = this.getConfigObject(attribute.config);
-    const options = this.getStringArray(config, "options");
-    const allowOther = config?.allowOther === true;
-
-    if (this.isMissingAttributeValue(value)) {
-      return Prisma.JsonNull;
-    }
-
-    if (options.length === 0) {
-      throw new BadRequestException(
-        `Attribute with id: ${attribute.uuid} has no selectable options.`,
-      );
-    }
-
-    if (!isString(value)) {
-      throw new BadRequestException(
-        `Attribute with id: ${attribute.uuid} must be a string value.`,
-      );
-    }
-
-    if (!allowOther && !options.includes(value)) {
-      throw new BadRequestException(
-        `Invalid value for attribute with id: ${attribute.uuid}. Allowed values are: ${options.join(", ")}`,
-      );
-    }
-
-    return value;
-  }
-
-  private normalizeMultiSelectValue(attribute: Attribute, value: unknown) {
-    const config = this.getConfigObject(attribute.config);
-    const options = this.getStringArray(config, "options");
-    const allowOther = config?.allowOther === true;
-    const maxSelections = this.getPositiveIntegerValue(config, "maxSelections");
-
-    if (this.isMissingAttributeValue(value)) {
-      return [] as string[];
-    }
-
-    if (options.length === 0) {
-      throw new BadRequestException(
-        `Attribute with id: ${attribute.uuid} has no selectable options.`,
-      );
-    }
-
-    const rawValues = Array.isArray(value)
-      ? value
-      : isString(value)
-        ? value.split(";")
-        : null;
-
-    if (rawValues == null) {
-      throw new BadRequestException(
-        `Attribute with id: ${attribute.uuid} must be a string array or a semicolon-separated string.`,
-      );
-    }
-
-    const normalizedValues = rawValues.map((item) => {
-      if (!isString(item)) {
-        throw new BadRequestException(
-          `Attribute with id: ${attribute.uuid} must contain only string values.`,
-        );
-      }
-
-      return item.trim();
-    });
-
-    if (normalizedValues.some((item) => item.length === 0)) {
-      throw new BadRequestException(
-        `Attribute with id: ${attribute.uuid} cannot contain empty values.`,
-      );
-    }
-
-    if (!allowOther) {
-      const invalidValue = normalizedValues.find(
-        (item) => !options.includes(item),
-      );
-      if (invalidValue !== undefined) {
-        throw new BadRequestException(
-          `Invalid value for attribute with id: ${attribute.uuid}. Allowed values are: ${options.join(", ")}`,
-        );
-      }
-    }
-
-    if (
-      maxSelections !== undefined &&
-      normalizedValues.length > maxSelections
-    ) {
-      throw new BadRequestException(
-        `Attribute with id: ${attribute.uuid} cannot contain more than ${String(maxSelections)} selections.`,
-      );
-    }
-
-    return normalizedValues;
-  }
-
-  private async normalizeBlockValue(attribute: Attribute, value: unknown) {
-    const config = this.getConfigObject(attribute.config);
-    const maxSelections =
-      this.getPositiveIntegerValue(config, "maxSelections", 1) ?? 1;
-
-    if (this.isMissingAttributeValue(value)) {
-      return Prisma.JsonNull;
-    }
-
-    const rawValues = Array.isArray(value)
-      ? value
-      : isString(value)
-        ? value.split(";")
-        : null;
-
-    if (rawValues == null) {
-      throw new BadRequestException(
-        `Attribute with id: ${attribute.uuid} must be an array of block UUIDs.`,
-      );
-    }
-
-    const normalizedValues = rawValues.map((item) => {
-      if (!isString(item)) {
-        throw new BadRequestException(
-          `Attribute with id: ${attribute.uuid} must contain only string values.`,
-        );
-      }
-
-      const trimmedValue = item.trim();
-      if (
-        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-          trimmedValue,
-        )
-      ) {
-        throw new BadRequestException(
-          `Attribute with id: ${attribute.uuid} must contain valid block UUIDs.`,
-        );
-      }
-
-      return trimmedValue;
-    });
-
-    if (normalizedValues.length === 0) {
-      throw new BadRequestException(
-        `Attribute with id: ${attribute.uuid} must contain at least one block UUID.`,
-      );
-    }
-
-    if (normalizedValues.length > maxSelections) {
-      throw new BadRequestException(
-        `Attribute with id: ${attribute.uuid} cannot contain more than ${String(maxSelections)} selections.`,
-      );
-    }
-
-    const existingBlocks = await this.prisma.block.findMany({
-      where: {
-        uuid: { in: normalizedValues },
-        attributeUuid: attribute.uuid,
-      },
-      select: { uuid: true },
-    });
-
-    if (existingBlocks.length !== normalizedValues.length) {
-      throw new BadRequestException(
-        `One or more block UUIDs are invalid for attribute with id: ${attribute.uuid}.`,
-      );
-    }
-
-    return normalizedValues;
-  }
-
-  private normalizeOtherValue(attribute: Attribute, value: unknown) {
-    if (this.isMissingAttributeValue(value)) {
-      return Prisma.JsonNull;
-    }
-
-    switch (attribute.type) {
-      case AttributeType.number: {
-        if (typeof value === "number") {
-          return value;
-        }
-
-        const parsedValue = isString(value) ? Number(value) : Number.NaN;
-        if (Number.isNaN(parsedValue)) {
-          throw new BadRequestException(
-            `Attribute with id: ${attribute.uuid} must be a valid number.`,
-          );
-        }
-
-        return parsedValue;
-      }
-      case AttributeType.checkbox: {
-        if (typeof value === "boolean") {
-          return value;
-        }
-
-        if (typeof value === "number") {
-          if (value === 1) {
-            return true;
-          }
-          if (value === 0) {
-            return false;
-          }
-        }
-
-        if (isString(value)) {
-          const normalizedValue = value.toLowerCase();
-          if (["true", "1", "on"].includes(normalizedValue)) {
-            return true;
-          }
-          if (["false", "0", "off"].includes(normalizedValue)) {
-            return false;
-          }
-        }
-
-        throw new BadRequestException(
-          `Attribute with id: ${attribute.uuid} must be a boolean value.`,
-        );
-      }
-      case AttributeType.date:
-      case AttributeType.datetime: {
-        const normalizedValue =
-          value instanceof Date
-            ? value.toISOString()
-            : isString(value)
-              ? value
-              : null;
-
-        if (
-          normalizedValue == null ||
-          Number.isNaN(Date.parse(normalizedValue))
-        ) {
-          throw new BadRequestException(
-            `Attribute with id: ${attribute.uuid} must be a valid date/time format.`,
-          );
-        }
-
-        return normalizedValue;
-      }
-      case AttributeType.file: {
-        if (isString(value)) {
-          return value;
-        }
-
-        throw new BadRequestException(
-          `Attribute with id: ${attribute.uuid} must be a string value.`,
-        );
-      }
-      case AttributeType.text:
-      case AttributeType.textArea:
-      case AttributeType.drawing:
-      case AttributeType.select:
-      case AttributeType.block:
-      case AttributeType.time:
-      case AttributeType.multiSelect:
-      case AttributeType.email:
-      case AttributeType.tel:
-      case AttributeType.color: {
-        if (isString(value)) {
-          return value;
-        }
-        throw new BadRequestException(
-          `Attribute with id: ${attribute.uuid} must be a string value.`,
-        );
-      }
-      default: {
-        if (isString(value)) {
-          return value;
-        }
-
-        throw new BadRequestException(
-          `Attribute with id: ${attribute.uuid} must be a string value.`,
-        );
-      }
-    }
-  }
-
-  private async normalizeSubmissionAttributeValue(
-    attribute: Attribute,
-    value: unknown,
-  ) {
-    if (attribute.type === AttributeType.select) {
-      return this.normalizeSelectValue(attribute, value);
-    }
-
-    if (attribute.type === AttributeType.multiSelect) {
-      return this.normalizeMultiSelectValue(attribute, value);
-    }
-
-    if (attribute.type === AttributeType.block) {
-      return this.normalizeBlockValue(attribute, value);
-    }
-
-    return this.normalizeOtherValue(attribute, value);
   }
 
   private isMissingAttributeValue(value: unknown) {
@@ -826,7 +488,8 @@ export class FormsService {
     formUuid: string,
     submissionData: FormSubmitionDto,
   ) {
-    return await this.prisma.$transaction(async (prisma) => {
+    let eventUuid = "";
+    const participant = await this.prisma.$transaction(async (prisma) => {
       const event = await prisma.event.findUnique({
         where: { slug: eventSlug },
         include: { participants: true },
@@ -834,6 +497,7 @@ export class FormsService {
       if (event == null) {
         throw new NotFoundException(`Event with slug: ${eventSlug} not found`);
       }
+      eventUuid = event.uuid;
       const form = await prisma.form.findUnique({
         where: { uuid: formUuid, event: { slug: eventSlug } },
         include: {
@@ -866,7 +530,7 @@ export class FormsService {
         );
       }
 
-      const normalizedAttributes: Record<string, unknown> =
+      const submittedAttributes: Record<string, unknown> =
         submissionData.attributes
           .flat()
           .reduce<Record<string, unknown>>((accumulator, attribute) => {
@@ -875,7 +539,7 @@ export class FormsService {
           }, {});
 
       for (const [attributeUuid, attributeValue] of Object.entries(
-        normalizedAttributes,
+        submittedAttributes,
       )) {
         const foundAttribute = form.formDefinitions.find(
           (formDefinition) => formDefinition.attributeUuid === attributeUuid,
@@ -885,64 +549,58 @@ export class FormsService {
             `Attribute with id: ${attributeUuid} is not part of the form`,
           );
         }
-        const normalizedValue = await this.normalizeSubmissionAttributeValue(
-          foundAttribute.attribute,
-          attributeValue,
-        );
 
-        if (foundAttribute.attribute.type === AttributeType.file) {
-          if (isString(attributeValue) && attributeValue.trim().length > 0) {
-            const fileToken = attributeValue.trim();
-            const uploadedFile = await prisma.uploadedFile.findUnique({
-              where: { uuid: fileToken },
-            });
+        const isFileLikeAttribute =
+          foundAttribute.attribute.type === AttributeType.file ||
+          foundAttribute.attribute.type === AttributeType.drawing;
 
-            if (
-              uploadedFile?.formUuid !== formUuid ||
-              uploadedFile.claimedAt !== null
-            ) {
-              throw new BadRequestException(
-                `File token ${fileToken} for attribute ${attributeUuid} is invalid or already claimed`,
-              );
-            }
+        if (
+          isFileLikeAttribute &&
+          isString(attributeValue) &&
+          attributeValue.trim().length > 0
+        ) {
+          const fileToken = attributeValue.trim();
+          const uploadedFile = isUUID(fileToken)
+            ? await prisma.uploadedFile.findUnique({
+                where: { uuid: fileToken },
+              })
+            : null;
 
-            normalizedAttributes[attributeUuid] = uploadedFile.fileKey;
-
-            await prisma.uploadedFile.update({
-              where: { uuid: fileToken },
-              data: { claimedAt: new Date() },
-            });
-
-            if (submissionData.participantId !== undefined) {
-              const existingAttribute =
-                await prisma.participantAttribute.findUnique({
-                  where: {
-                    participantUuid_attributeUuid: {
-                      participantUuid: submissionData.participantId,
-                      attributeUuid,
-                    },
-                  },
-                });
-              if (
-                existingAttribute?.value != null &&
-                isString(existingAttribute.value) &&
-                existingAttribute.value.length > 0
-              ) {
-                await this.deleteOldFileOnUpdate(existingAttribute.value);
-              }
-            }
-          } else {
-            normalizedAttributes[attributeUuid] = Prisma.JsonNull;
+          if (
+            uploadedFile?.formUuid !== formUuid ||
+            uploadedFile.claimedAt !== null
+          ) {
+            throw new BadRequestException(
+              `File token ${fileToken} for attribute ${attributeUuid} is invalid or already claimed`,
+            );
           }
-        } else {
-          normalizedAttributes[attributeUuid] = normalizedValue;
+
+          if (
+            foundAttribute.attribute.type === AttributeType.drawing &&
+            !uploadedFile.mimeType.startsWith(IMAGE_MIME_PREFIX)
+          ) {
+            throw new BadRequestException(
+              `Attribute ${attributeUuid} is a drawing attribute and only accepts image uploads`,
+            );
+          }
+
+          submittedAttributes[attributeUuid] = uploadedFile.fileKey;
+
+          await prisma.uploadedFile.update({
+            where: { uuid: fileToken },
+            data: { claimedAt: new Date() },
+          });
         }
 
         if (
           foundAttribute.attribute.type === AttributeType.block &&
-          normalizedValue !== Prisma.JsonNull
+          !this.isMissingAttributeValue(attributeValue)
         ) {
-          const blockIds = normalizedValue as string[];
+          const blockIds = Array.isArray(attributeValue)
+            ? attributeValue
+            : typeof attributeValue === "string"
+              ? attributeValue.split(";")
+              : [];
 
           let previousBlockIds: string[] = [];
           if (submissionData.participantId !== undefined) {
@@ -964,18 +622,24 @@ export class FormsService {
           }
 
           for (const blockId of blockIds) {
-            if (previousBlockIds.includes(blockId)) {
+            if (typeof blockId !== "string") {
               continue;
             }
-            const canSignIn = await this.blocksService.canSignInToBlock(
-              event.uuid,
-              attributeUuid,
-              blockId,
-              prisma,
-            );
+            const trimmedBlockId = blockId.trim();
+            if (previousBlockIds.includes(trimmedBlockId)) {
+              continue;
+            }
+            const canSignIn =
+              isUUID(trimmedBlockId) &&
+              (await this.blocksService.canSignInToBlock(
+                event.uuid,
+                attributeUuid,
+                trimmedBlockId,
+                prisma,
+              ));
             if (!canSignIn) {
               throw new BadRequestException(
-                `Cannot sign in to block ${blockId} because it is at full capacity, is a root block, or does not belong to the correct event/attribute.`,
+                `Cannot sign in to block ${trimmedBlockId} because it is at full capacity, is a root block, or does not belong to the correct event/attribute.`,
               );
             }
           }
@@ -989,10 +653,31 @@ export class FormsService {
         )
         .map((formDefinition) => formDefinition.attribute) as Attribute[];
 
+      let existingAttributeValues: Map<string, Prisma.JsonValue> | null = null;
+      if (
+        submissionData.participantId !== undefined &&
+        requiredAttributes.length > 0
+      ) {
+        const existingAttributeRows =
+          await prisma.participantAttribute.findMany({
+            where: { participantUuid: submissionData.participantId },
+            select: { attributeUuid: true, value: true },
+          });
+        existingAttributeValues = new Map(
+          existingAttributeRows.map((existing) => [
+            existing.attributeUuid,
+            existing.value,
+          ]),
+        );
+      }
+
       for (const attribute of requiredAttributes) {
-        if (
-          this.isMissingAttributeValue(normalizedAttributes[attribute.uuid])
-        ) {
+        const wasSubmitted = Object.hasOwn(submittedAttributes, attribute.uuid);
+        const effectiveValue = wasSubmitted
+          ? submittedAttributes[attribute.uuid]
+          : existingAttributeValues?.get(attribute.uuid);
+
+        if (this.isMissingAttributeValue(effectiveValue)) {
           if (attribute.type === AttributeType.block) {
             const selectableBlocksCount = await prisma.block.count({
               where: { attributeUuid: attribute.uuid, isRootBlock: false },
@@ -1016,7 +701,7 @@ export class FormsService {
       ) {
         const participantDtoAttributes: ParticipantUpdateDto = {
           email: submissionData.email,
-          participantAttributes: Object.entries(normalizedAttributes).map(
+          participantAttributes: Object.entries(submittedAttributes).map(
             ([attributeUuid, value]) => ({
               attributeUuid,
               value,
@@ -1028,6 +713,7 @@ export class FormsService {
           event.uuid,
           submissionData.participantId,
           participantDtoAttributes,
+          { trustedFileValues: true },
         );
       } else if (
         event.registerFormUuid === formUuid &&
@@ -1044,12 +730,11 @@ export class FormsService {
         return await this.participantService.register(
           event.uuid,
           submissionData.email,
-          Object.entries(normalizedAttributes).map(
-            ([attributeUuid, value]) => ({
-              attributeUuid,
-              value,
-            }),
-          ),
+          Object.entries(submittedAttributes).map(([attributeUuid, value]) => ({
+            attributeUuid,
+            value,
+          })),
+          { trustedFileValues: true },
         );
       }
 
@@ -1057,5 +742,12 @@ export class FormsService {
         `Unexpected error in form submission.`,
       );
     });
+
+    this.eventEmitter.emit(
+      FORM_FILLED_EVENT,
+      new FormFilledEvent(formUuid, participant.uuid, eventUuid),
+    );
+
+    return participant;
   }
 }

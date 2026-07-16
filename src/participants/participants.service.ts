@@ -1,5 +1,14 @@
+import { normalizeParticipantAttributeValue } from "src/attributes/attribute-value-normalizer";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
+import { AttributeChangedEvent } from "src/common/events/attribute-changed.event";
+import {
+  ATTRIBUTE_CHANGED_EVENT,
+  PARTICIPANT_DELETED_EVENT,
+  PARTICIPANT_REGISTERED_EVENT,
+} from "src/common/events/event-names.constants";
+import { ParticipantDeletedEvent } from "src/common/events/participant-deleted.event";
+import { ParticipantRegisteredEvent } from "src/common/events/participant-registered.event";
 import {
   Attribute,
   AttributeType,
@@ -19,6 +28,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 
 import {
   ParticipantAttributeDto,
@@ -37,293 +47,25 @@ type ParticipantWithRelations = PrismaParticipant & {
   })[];
 };
 
+const FILE_LIKE_ATTRIBUTE_TYPES: AttributeType[] = [
+  AttributeType.file,
+  AttributeType.drawing,
+];
+
+function isFileLikeAttributeType(
+  type: AttributeType | null | undefined,
+): boolean {
+  return type != null && FILE_LIKE_ATTRIBUTE_TYPES.includes(type);
+}
+
 @Injectable()
 export class ParticipantsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
     private readonly configService: ConfigService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
-
-  private getStringConfigValues(
-    config: Prisma.JsonValue | null,
-    key: string,
-  ): string[] {
-    if (config == null || typeof config !== "object" || Array.isArray(config)) {
-      return [];
-    }
-
-    const values = (config as Record<string, unknown>)[key];
-    if (!Array.isArray(values)) {
-      return [];
-    }
-
-    return values.filter(
-      (value): value is string =>
-        typeof value === "string" && value.trim().length > 0,
-    );
-  }
-
-  private getBooleanConfigValue(
-    config: Prisma.JsonValue | null,
-    key: string,
-  ): boolean {
-    if (config == null || typeof config !== "object" || Array.isArray(config)) {
-      return false;
-    }
-
-    return (config as Record<string, unknown>)[key] === true;
-  }
-
-  private async normalizeParticipantAttributeValue(
-    eventUuid: string,
-    attribute: {
-      attributeUuid: string;
-      type: AttributeType;
-      config: Prisma.JsonValue | null;
-    },
-    value: unknown,
-  ): Promise<Prisma.InputJsonValue | typeof Prisma.JsonNull> {
-    if (attribute.type === AttributeType.select) {
-      if (value == null || value === "") {
-        return Prisma.JsonNull;
-      }
-      if (typeof value !== "string") {
-        throw new BadRequestException(
-          `Attribute ${attribute.attributeUuid} must be a string value.`,
-        );
-      }
-
-      const options = this.getStringConfigValues(attribute.config, "options");
-      const allowOther = this.getBooleanConfigValue(
-        attribute.config,
-        "allowOther",
-      );
-      if (!allowOther && options.length > 0 && !options.includes(value)) {
-        throw new BadRequestException(
-          `Invalid value for attribute ${attribute.attributeUuid}. Allowed values are: ${options.join(", ")}`,
-        );
-      }
-
-      return value;
-    }
-
-    if (attribute.type === AttributeType.multiSelect) {
-      if (value == null || value === "") {
-        return Prisma.JsonNull;
-      }
-
-      const rawValues = Array.isArray(value)
-        ? value
-        : typeof value === "string"
-          ? value.split(";")
-          : null;
-
-      if (rawValues == null) {
-        throw new BadRequestException(
-          `Attribute ${attribute.attributeUuid} must be a string array or a semicolon-separated string.`,
-        );
-      }
-
-      const normalizedValues = rawValues.map((item) => {
-        if (typeof item !== "string") {
-          throw new BadRequestException(
-            `Attribute ${attribute.attributeUuid} must contain only string values.`,
-          );
-        }
-        return item.trim();
-      });
-
-      if (normalizedValues.some((item) => item.length === 0)) {
-        throw new BadRequestException(
-          `Attribute ${attribute.attributeUuid} cannot contain empty values.`,
-        );
-      }
-
-      const options = this.getStringConfigValues(attribute.config, "options");
-      const allowOther = this.getBooleanConfigValue(
-        attribute.config,
-        "allowOther",
-      );
-      if (!allowOther && options.length > 0) {
-        const invalidValue = normalizedValues.find(
-          (item) => !options.includes(item),
-        );
-        if (invalidValue !== undefined) {
-          throw new BadRequestException(
-            `Invalid value for attribute ${attribute.attributeUuid}. Allowed values are: ${options.join(", ")}`,
-          );
-        }
-      }
-
-      return normalizedValues;
-    }
-
-    if (attribute.type === AttributeType.block) {
-      if (
-        value == null ||
-        value === "null" ||
-        value === "" ||
-        (Array.isArray(value) && value.length === 0)
-      ) {
-        return Prisma.JsonNull;
-      }
-
-      const rawValues = Array.isArray(value)
-        ? value
-        : typeof value === "string"
-          ? value.split(";")
-          : null;
-
-      if (rawValues == null) {
-        throw new BadRequestException(
-          `Attribute ${attribute.attributeUuid} must be an array of block UUIDs.`,
-        );
-      }
-
-      const normalizedValues = rawValues.map((item) => {
-        if (typeof item !== "string") {
-          throw new BadRequestException(
-            `Attribute ${attribute.attributeUuid} must contain only string values.`,
-          );
-        }
-        return item.trim();
-      });
-
-      if (normalizedValues.length === 0) {
-        return Prisma.JsonNull;
-      }
-
-      const blocksCount = await this.prisma.block.count({
-        where: {
-          uuid: { in: normalizedValues },
-          attribute: { eventUuid },
-        },
-      });
-
-      if (blocksCount !== normalizedValues.length) {
-        throw new BadRequestException(
-          `One or more block UUIDs are invalid or do not exist for attribute ${attribute.attributeUuid}.`,
-        );
-      }
-
-      const configObject =
-        attribute.config != null &&
-        typeof attribute.config === "object" &&
-        !Array.isArray(attribute.config)
-          ? (attribute.config as Record<string, unknown>)
-          : null;
-
-      const maxSelections =
-        configObject?.maxSelections !== undefined &&
-        typeof configObject.maxSelections === "number" &&
-        Number.isInteger(configObject.maxSelections) &&
-        configObject.maxSelections > 0
-          ? configObject.maxSelections
-          : 1;
-
-      if (normalizedValues.length > maxSelections) {
-        throw new BadRequestException(
-          `Attribute ${attribute.attributeUuid} cannot contain more than ${String(maxSelections)} selections.`,
-        );
-      }
-
-      return normalizedValues;
-    }
-
-    if (attribute.type === AttributeType.number) {
-      if (value == null || value === "") {
-        return Prisma.JsonNull;
-      }
-
-      const parsedValue =
-        typeof value === "number"
-          ? value
-          : typeof value === "string"
-            ? Number(value)
-            : Number.NaN;
-
-      if (Number.isNaN(parsedValue)) {
-        throw new BadRequestException(
-          `Attribute ${attribute.attributeUuid} must be a valid number.`,
-        );
-      }
-
-      return parsedValue;
-    }
-
-    if (
-      attribute.type === AttributeType.date ||
-      attribute.type === AttributeType.datetime
-    ) {
-      if (value == null || value === "") {
-        return Prisma.JsonNull;
-      }
-
-      const normalizedValue =
-        value instanceof Date
-          ? value.toISOString()
-          : typeof value === "string"
-            ? value
-            : null;
-
-      if (
-        normalizedValue == null ||
-        Number.isNaN(Date.parse(normalizedValue))
-      ) {
-        throw new BadRequestException(
-          `Attribute ${attribute.attributeUuid} must be a valid date/time format.`,
-        );
-      }
-
-      return normalizedValue;
-    }
-
-    if (attribute.type === AttributeType.checkbox) {
-      if (value == null || value === "") {
-        return Prisma.JsonNull;
-      }
-
-      if (typeof value === "boolean") {
-        return value;
-      }
-
-      if (typeof value === "number") {
-        if (value === 1) {
-          return true;
-        }
-        if (value === 0) {
-          return false;
-        }
-      }
-
-      if (typeof value === "string") {
-        const normalizedValue = value.toLowerCase();
-        if (["true", "1", "on"].includes(normalizedValue)) {
-          return true;
-        }
-        if (["false", "0", "off"].includes(normalizedValue)) {
-          return false;
-        }
-      }
-
-      throw new BadRequestException(
-        `Attribute ${attribute.attributeUuid} must be a boolean value.`,
-      );
-    }
-
-    if (value == null || value === "") {
-      return Prisma.JsonNull;
-    }
-
-    if (typeof value === "string") {
-      return value;
-    }
-
-    throw new BadRequestException(
-      `Attribute ${attribute.attributeUuid} must be a string value.`,
-    );
-  }
 
   private mapToEntity(participant: ParticipantWithRelations): Participant {
     return {
@@ -335,7 +77,7 @@ export class ParticipantsService {
           uuid: attribute.attributeUuid,
           name: attribute.attribute?.name ?? "",
           value:
-            attribute.attribute?.type === AttributeType.file &&
+            isFileLikeAttributeType(attribute.attribute?.type) &&
             typeof attribute.value === "string" &&
             attribute.value.length > 0
               ? this.storageService.getUrl(
@@ -359,15 +101,55 @@ export class ParticipantsService {
     };
   }
 
+  private resolveUntrustedFileValue(
+    attributeUuid: string,
+    rawValue: unknown,
+    currentValue: Prisma.JsonValue | null,
+  ): unknown {
+    if (rawValue == null || rawValue === "") {
+      return rawValue;
+    }
+
+    if (typeof rawValue !== "string") {
+      throw new BadRequestException(
+        `Attribute ${attributeUuid} must be a string value.`,
+      );
+    }
+
+    const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
+    const strippedValue = this.storageService.extractKey(bucket, rawValue);
+    const strippedCurrentValue =
+      typeof currentValue === "string"
+        ? this.storageService.extractKey(bucket, currentValue)
+        : null;
+
+    if (
+      strippedCurrentValue == null ||
+      strippedValue !== strippedCurrentValue
+    ) {
+      throw new BadRequestException(
+        `Attribute ${attributeUuid} cannot be set to a new value directly; upload a new file through a form instead.`,
+      );
+    }
+
+    return strippedValue;
+  }
+
   private async prepareAttributesForSave(
     eventUuid: string,
     participantAttributes?: ParticipantAttributeDto[],
+    options: {
+      trustedFileValues?: boolean;
+      currentParticipantUuid?: string;
+    } = {},
   ): Promise<
     Prisma.ParticipantAttributeUncheckedCreateWithoutParticipantInput[]
   > {
     if (participantAttributes == null || participantAttributes.length === 0) {
       return [];
     }
+
+    const { trustedFileValues = false, currentParticipantUuid } = options;
 
     const attributeUuids = participantAttributes.map(
       (attribute) => attribute.attributeUuid,
@@ -394,6 +176,33 @@ export class ParticipantsService {
       });
     }
 
+    let currentFileValues: Map<string, Prisma.JsonValue> | null = null;
+    if (!trustedFileValues && currentParticipantUuid !== undefined) {
+      const fileAttributeUuids = participantAttributes
+        .filter((attribute) =>
+          isFileLikeAttributeType(
+            validAttributeMap.get(attribute.attributeUuid)?.type,
+          ),
+        )
+        .map((attribute) => attribute.attributeUuid);
+
+      if (fileAttributeUuids.length > 0) {
+        const existingValues = await this.prisma.participantAttribute.findMany({
+          where: {
+            participantUuid: currentParticipantUuid,
+            attributeUuid: { in: fileAttributeUuids },
+          },
+          select: { attributeUuid: true, value: true },
+        });
+        currentFileValues = new Map(
+          existingValues.map((existing) => [
+            existing.attributeUuid,
+            existing.value,
+          ]),
+        );
+      }
+    }
+
     const transformedAttributes: Prisma.ParticipantAttributeUncheckedCreateWithoutParticipantInput[] =
       [];
 
@@ -403,18 +212,24 @@ export class ParticipantsService {
         continue;
       }
 
-      const valueToSave = await this.normalizeParticipantAttributeValue(
-        eventUuid,
+      const valueToNormalize =
+        isFileLikeAttributeType(matchingAttribute.type) && !trustedFileValues
+          ? this.resolveUntrustedFileValue(
+              attribute.attributeUuid,
+              attribute.value,
+              currentFileValues?.get(attribute.attributeUuid) ?? null,
+            )
+          : attribute.value;
+
+      const valueToSave = await normalizeParticipantAttributeValue(
+        this.prisma,
         {
           attributeUuid: attribute.attributeUuid,
           type: matchingAttribute.type,
           config: matchingAttribute.config,
         },
-        attribute.value,
+        valueToNormalize,
       );
-
-      // TODO: Integrate EmailService for attribute_changed trigger
-      // EmailService.sendOnTrigger(event, participant, "attribute_changed", attr.attributeUuid, valueToSave);
 
       transformedAttributes.push({
         attributeUuid: attribute.attributeUuid,
@@ -440,9 +255,10 @@ export class ParticipantsService {
     eventUuid: string,
     email: string,
     participantAttributes?: ParticipantAttributeDto[],
+    options: { trustedFileValues?: boolean } = {},
   ): Promise<Participant> {
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const participant = await this.prisma.$transaction(async (tx) => {
         const event = await tx.event.findUnique({ where: { uuid: eventUuid } });
         if (event == null) {
           throw new NotFoundException(`Event NOT FOUND`);
@@ -451,9 +267,10 @@ export class ParticipantsService {
         const attributesToCreate = await this.prepareAttributesForSave(
           eventUuid,
           participantAttributes,
+          { trustedFileValues: options.trustedFileValues },
         );
 
-        const participant = await tx.participant.create({
+        const createdParticipant = await tx.participant.create({
           data: {
             email,
             eventUuid,
@@ -468,10 +285,15 @@ export class ParticipantsService {
           },
         });
 
-        // TODO: Integrate EmailService -> trigger 'participant_registered'
-
-        return this.mapToEntity(participant);
+        return this.mapToEntity(createdParticipant);
       });
+
+      this.eventEmitter.emit(
+        PARTICIPANT_REGISTERED_EVENT,
+        new ParticipantRegisteredEvent(participant.uuid, eventUuid),
+      );
+
+      return participant;
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -489,6 +311,7 @@ export class ParticipantsService {
     eventUuid: string,
     participantUuid: string,
     updateDto: ParticipantUpdateDto,
+    options: { trustedFileValues?: boolean } = {},
   ): Promise<Participant> {
     const { participantAttributes, ...updates } = updateDto;
 
@@ -502,6 +325,8 @@ export class ParticipantsService {
 
     try {
       const fileKeysToDelete: string[] = [];
+      let savedAttributes: Prisma.ParticipantAttributeUncheckedCreateWithoutParticipantInput[] =
+        [];
       const result = await this.prisma.$transaction(async (tx) => {
         const dataToUpdate: Prisma.ParticipantUpdateInput = { ...updates };
 
@@ -509,7 +334,12 @@ export class ParticipantsService {
           const attributesToSave = await this.prepareAttributesForSave(
             eventUuid,
             participantAttributes,
+            {
+              trustedFileValues: options.trustedFileValues,
+              currentParticipantUuid: participantUuid,
+            },
           );
+          savedAttributes = attributesToSave;
 
           const attributeUuidsToUpdate = attributesToSave.map(
             (a) => a.attributeUuid,
@@ -521,9 +351,16 @@ export class ParticipantsService {
                 where: {
                   participantUuid,
                   attributeUuid: { in: attributeUuidsToUpdate },
-                  attribute: { type: AttributeType.file },
+                  attribute: { type: { in: FILE_LIKE_ATTRIBUTE_TYPES } },
                 },
               });
+
+            const newValueByAttributeUuid = new Map(
+              attributesToSave.map((attribute) => [
+                attribute.attributeUuid,
+                attribute.value,
+              ]),
+            );
 
             await tx.participantAttribute.deleteMany({
               where: {
@@ -535,7 +372,9 @@ export class ParticipantsService {
             for (const attribute of existingFileAttributes) {
               if (
                 typeof attribute.value === "string" &&
-                attribute.value.length > 0
+                attribute.value.length > 0 &&
+                attribute.value !==
+                  newValueByAttributeUuid.get(attribute.attributeUuid)
               ) {
                 fileKeysToDelete.push(attribute.value);
               }
@@ -563,8 +402,30 @@ export class ParticipantsService {
       if (fileKeysToDelete.length > 0) {
         const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
         for (const key of fileKeysToDelete) {
-          await this.storageService.delete(bucket, key);
+          await this.storageService.delete(
+            bucket,
+            this.storageService.extractKey(bucket, key),
+          );
         }
+      }
+
+      for (const attribute of savedAttributes) {
+        const emittedValue =
+          attribute.value == null ||
+          attribute.value === Prisma.JsonNull ||
+          attribute.value === Prisma.DbNull
+            ? null
+            : (attribute.value as Prisma.JsonValue);
+
+        this.eventEmitter.emit(
+          ATTRIBUTE_CHANGED_EVENT,
+          new AttributeChangedEvent(
+            attribute.attributeUuid,
+            participantUuid,
+            eventUuid,
+            emittedValue,
+          ),
+        );
       }
 
       return result;
@@ -586,7 +447,7 @@ export class ParticipantsService {
       where: { uuid: participantUuid, eventUuid },
       include: {
         attributes: {
-          where: { attribute: { type: AttributeType.file } },
+          include: { attribute: true },
         },
       },
     });
@@ -595,28 +456,48 @@ export class ParticipantsService {
       throw new NotFoundException("Participant not found");
     }
 
-    // TODO: Integrate EmailService.sendOnTrigger(event, participant, "participant_deleted");
-
     await this.prisma.participant.delete({
       where: { uuid: participantUuid },
     });
 
+    this.eventEmitter.emit(
+      PARTICIPANT_DELETED_EVENT,
+      new ParticipantDeletedEvent(
+        {
+          uuid: participant.uuid,
+          email: participant.email,
+          createdAt: participant.createdAt,
+          updatedAt: participant.updatedAt,
+          attributes: participant.attributes.map((attribute) => ({
+            attributeUuid: attribute.attributeUuid,
+            value: attribute.value,
+          })),
+        },
+        eventUuid,
+      ),
+    );
+
     const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
     for (const attribute of participant.attributes) {
-      if (typeof attribute.value === "string" && attribute.value.length > 0) {
-        await this.storageService.delete(bucket, attribute.value);
+      if (
+        typeof attribute.value === "string" &&
+        attribute.value.length > 0 &&
+        isFileLikeAttributeType(attribute.attribute.type)
+      ) {
+        await this.storageService.delete(
+          bucket,
+          this.storageService.extractKey(bucket, attribute.value),
+        );
       }
     }
   }
 
   async removeMany(eventUuid: string, participantsToUnregisterIds: string[]) {
-    // TODO: Send emails for each unregister (requires fetching emails or moving logic to a job)
-
     const participants = await this.prisma.participant.findMany({
       where: { uuid: { in: participantsToUnregisterIds }, eventUuid },
       include: {
         attributes: {
-          where: { attribute: { type: AttributeType.file } },
+          include: { attribute: true },
         },
       },
     });
@@ -628,11 +509,37 @@ export class ParticipantsService {
       },
     });
 
+    for (const participant of participants) {
+      this.eventEmitter.emit(
+        PARTICIPANT_DELETED_EVENT,
+        new ParticipantDeletedEvent(
+          {
+            uuid: participant.uuid,
+            email: participant.email,
+            createdAt: participant.createdAt,
+            updatedAt: participant.updatedAt,
+            attributes: participant.attributes.map((attribute) => ({
+              attributeUuid: attribute.attributeUuid,
+              value: attribute.value,
+            })),
+          },
+          eventUuid,
+        ),
+      );
+    }
+
     const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
     for (const participant of participants) {
       for (const attribute of participant.attributes) {
-        if (typeof attribute.value === "string" && attribute.value.length > 0) {
-          await this.storageService.delete(bucket, attribute.value);
+        if (
+          typeof attribute.value === "string" &&
+          attribute.value.length > 0 &&
+          isFileLikeAttributeType(attribute.attribute.type)
+        ) {
+          await this.storageService.delete(
+            bucket,
+            this.storageService.extractKey(bucket, attribute.value),
+          );
         }
       }
     }
@@ -774,13 +681,25 @@ export class ParticipantsService {
       throw new NotFoundException("Participant not found");
     }
 
-    return participant;
+    const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
+    return {
+      ...participant,
+      attributes: participant.attributes.map((attribute) => ({
+        ...attribute,
+        value:
+          isFileLikeAttributeType(attribute.attribute.type) &&
+          typeof attribute.value === "string" &&
+          attribute.value.length > 0
+            ? this.storageService.getUrl(bucket, attribute.value)
+            : attribute.value,
+      })),
+    };
   }
 
   async bulkUpdateAttributes(
     eventUuid: string,
     attributeUuid: string,
-    newValue: string,
+    newValue: string | undefined,
     participantIds: string[],
   ) {
     // Verify event and attribute
@@ -818,7 +737,30 @@ export class ParticipantsService {
 
     const valueToSave = validatedAttributes[0].value;
 
+    const fileKeysToDelete: string[] = [];
+
     await this.prisma.$transaction(async (tx) => {
+      if (isFileLikeAttributeType(attribute.type)) {
+        const existingFileAttributes = await tx.participantAttribute.findMany({
+          where: {
+            attributeUuid,
+            participantUuid: { in: uniqueParticipantIds },
+          },
+        });
+
+        const staleKeys = new Set(
+          existingFileAttributes
+            .map((existing) => existing.value)
+            .filter(
+              (value): value is string =>
+                typeof value === "string" &&
+                value.length > 0 &&
+                value !== valueToSave,
+            ),
+        );
+        fileKeysToDelete.push(...staleKeys);
+      }
+
       // Delete existing
       await tx.participantAttribute.deleteMany({
         where: {
@@ -836,6 +778,35 @@ export class ParticipantsService {
         })),
       });
     });
+
+    if (fileKeysToDelete.length > 0) {
+      const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
+      for (const key of fileKeysToDelete) {
+        await this.storageService.delete(
+          bucket,
+          this.storageService.extractKey(bucket, key),
+        );
+      }
+    }
+
+    const emittedValue =
+      valueToSave == null ||
+      valueToSave === Prisma.JsonNull ||
+      valueToSave === Prisma.DbNull
+        ? null
+        : (valueToSave as Prisma.JsonValue);
+
+    for (const participantUuid of uniqueParticipantIds) {
+      this.eventEmitter.emit(
+        ATTRIBUTE_CHANGED_EVENT,
+        new AttributeChangedEvent(
+          attributeUuid,
+          participantUuid,
+          eventUuid,
+          emittedValue,
+        ),
+      );
+    }
   }
   async getPublicBlockAttributes(
     eventId: string,

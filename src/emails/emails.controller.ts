@@ -20,6 +20,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import {
+  ApiAcceptedResponse,
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -38,8 +39,11 @@ import { EmailCompleteElementDto } from "./dto/email-complete-element.dto";
 import { EmailListElementDto } from "./dto/email-list-element.dto";
 import { EmailListingDto } from "./dto/email-listing.dto";
 import { EmailResponseDto } from "./dto/email-response.dto";
+import { SendEmailDto } from "./dto/send-email.dto";
+import { SendTestEmailDto } from "./dto/send-test-email.dto";
 import { UpdateEmailDto } from "./dto/update-email.dto";
-import { EmailsService } from "./emails.service";
+import { EmailDeliveryService } from "./email-delivery.service";
+import { EmailTemplatesService } from "./email-templates.service";
 
 @ApiTags("EmailTemplates")
 @ApiBearerAuth()
@@ -48,7 +52,10 @@ import { EmailsService } from "./emails.service";
 @ApiForbiddenResponse({ description: "Forbidden - insufficient permissions" })
 @Controller("events/:eventId/emails")
 export class EmailsController {
-  constructor(private readonly emailsService: EmailsService) {}
+  constructor(
+    private readonly emailTemplatesService: EmailTemplatesService,
+    private readonly emailDeliveryService: EmailDeliveryService,
+  ) {}
 
   @Post()
   @RequirePermission(PermissionType.MANAGE_EMAIL)
@@ -64,7 +71,7 @@ export class EmailsController {
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Body() query: CreateEmailDto,
   ) {
-    return this.emailsService.create(eventId, query);
+    return this.emailTemplatesService.create(eventId, query);
   }
 
   @Get()
@@ -78,7 +85,7 @@ export class EmailsController {
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Query() query: EmailListingDto,
   ) {
-    return this.emailsService.findAll(eventId, query);
+    return this.emailTemplatesService.findAll(eventId, query);
   }
 
   @Get(":emailId")
@@ -96,7 +103,7 @@ export class EmailsController {
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("emailId", ParseUUIDPipe) emailId: string,
   ) {
-    return this.emailsService.findOne(eventId, emailId);
+    return this.emailTemplatesService.findOne(eventId, emailId);
   }
 
   @Get(":emailId/participants")
@@ -113,7 +120,11 @@ export class EmailsController {
     @Param("emailId", ParseUUIDPipe) emailId: string,
     @Query() query: PageOptionsDto,
   ) {
-    return this.emailsService.findParticipantsForEmail(eventId, emailId, query);
+    return this.emailDeliveryService.findParticipantsForEmail(
+      eventId,
+      emailId,
+      query,
+    );
   }
 
   @Patch(":emailId")
@@ -134,7 +145,7 @@ export class EmailsController {
     @Param("emailId", ParseUUIDPipe) emailId: string,
     @Body() query: UpdateEmailDto,
   ) {
-    return this.emailsService.update(eventId, emailId, query);
+    return this.emailTemplatesService.update(eventId, emailId, query);
   }
 
   @Delete(":emailId")
@@ -151,6 +162,58 @@ export class EmailsController {
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("emailId", ParseUUIDPipe) emailId: string,
   ) {
-    return this.emailsService.remove(eventId, emailId);
+    return this.emailTemplatesService.remove(eventId, emailId);
+  }
+
+  @Post(":emailId/send")
+  @RequirePermission(PermissionType.MANAGE_EMAIL)
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary: "Manually queue this email template for a set of participants",
+  })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "emailId", description: "UUID of the email" })
+  @ApiAcceptedResponse({
+    description: "Email queued for the given participants",
+  })
+  @ApiNotFoundResponse({ description: "Email template not found" })
+  @ApiBadRequestResponse({
+    description: "One or more participants were not found in this event",
+  })
+  async send(
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @Param("emailId", ParseUUIDPipe) emailId: string,
+    @Body() query: SendEmailDto,
+  ) {
+    return this.emailDeliveryService.sendManualEmail(
+      eventId,
+      emailId,
+      query.participantUuids,
+    );
+  }
+
+  @Post(":emailId/test-send")
+  @RequirePermission(PermissionType.MANAGE_EMAIL)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary:
+      "Send a test rendering of this email template to an arbitrary address",
+  })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "emailId", description: "UUID of the email" })
+  @ApiNoContentResponse({ description: "Test email sent" })
+  @ApiNotFoundResponse({ description: "Email template not found" })
+  @ApiBadRequestResponse({ description: "Participant not found in this event" })
+  async testSend(
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @Param("emailId", ParseUUIDPipe) emailId: string,
+    @Body() query: SendTestEmailDto,
+  ) {
+    return this.emailDeliveryService.sendTestEmail(
+      eventId,
+      emailId,
+      query.email,
+      query.participantUuid,
+    );
   }
 }

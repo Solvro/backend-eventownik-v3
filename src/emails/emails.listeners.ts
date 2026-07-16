@@ -1,34 +1,30 @@
 import { AttributeChangedEvent } from "src/common/events/attribute-changed.event";
+import {
+  ATTRIBUTE_CHANGED_EVENT,
+  FORM_FILLED_EVENT,
+  PARTICIPANT_DELETED_EVENT,
+  PARTICIPANT_REGISTERED_EVENT,
+} from "src/common/events/event-names.constants";
 import { FormFilledEvent } from "src/common/events/form-filled.event";
 import { ParticipantDeletedEvent } from "src/common/events/participant-deleted.event";
 import { ParticipantRegisteredEvent } from "src/common/events/participant-registered.event";
-import type { Prisma } from "src/generated/prisma/client";
+import { getJsonObject } from "src/common/utils/prisma.utility";
 import { EmailTrigger } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import { Injectable } from "@nestjs/common";
 import { OnEvent } from "@nestjs/event-emitter";
 
-import { EmailsService } from "./emails.service";
+import { EmailDeliveryService } from "./email-delivery.service";
 
 @Injectable()
 export class EmailsListeners {
   constructor(
-    private readonly emailsService: EmailsService,
+    private readonly emailDeliveryService: EmailDeliveryService,
     private readonly prisma: PrismaService,
   ) {}
 
-  private getTriggerConfig(
-    value: Prisma.JsonValue | null,
-  ): Prisma.JsonObject | null {
-    if (value == null || typeof value !== "object" || Array.isArray(value)) {
-      return null;
-    }
-
-    return value;
-  }
-
-  @OnEvent("participant.registered")
+  @OnEvent(PARTICIPANT_REGISTERED_EVENT)
   async handleParticipantRegisteredEvent(event: ParticipantRegisteredEvent) {
     const templates = await this.prisma.emailTemplate.findMany({
       where: {
@@ -39,14 +35,14 @@ export class EmailsListeners {
 
     await Promise.all(
       templates.map(async (template) =>
-        this.emailsService.sendEmailToParticipants(template.uuid, [
+        this.emailDeliveryService.sendEmailToParticipants(template.uuid, [
           event.participantUuid,
         ]),
       ),
     );
   }
 
-  @OnEvent("participant.deleted")
+  @OnEvent(PARTICIPANT_DELETED_EVENT)
   async handleParticipantDeletedEvent(event: ParticipantDeletedEvent) {
     const templates = await this.prisma.emailTemplate.findMany({
       where: {
@@ -57,14 +53,16 @@ export class EmailsListeners {
 
     await Promise.all(
       templates.map(async (template) =>
-        this.emailsService.sendEmailToParticipants(template.uuid, [
-          event.participantUuid,
-        ]),
+        this.emailDeliveryService.sendEmailToParticipants(
+          template.uuid,
+          [event.participant.uuid],
+          event.participant,
+        ),
       ),
     );
   }
 
-  @OnEvent("form.filled")
+  @OnEvent(FORM_FILLED_EVENT)
   async handleFormFilledEvent(event: FormFilledEvent) {
     const templates = await this.prisma.emailTemplate.findMany({
       where: {
@@ -75,17 +73,18 @@ export class EmailsListeners {
 
     await Promise.all(
       templates.map(async (template) => {
-        const config = this.getTriggerConfig(template.triggerConfig);
+        const config = getJsonObject(template.triggerConfig);
         if (config?.formUuid === event.formUuid) {
-          return this.emailsService.sendEmailToParticipants(template.uuid, [
-            event.participantUuid,
-          ]);
+          return this.emailDeliveryService.sendEmailToParticipants(
+            template.uuid,
+            [event.participantUuid],
+          );
         }
       }),
     );
   }
 
-  @OnEvent("attribute.changed")
+  @OnEvent(ATTRIBUTE_CHANGED_EVENT)
   async handleAttributeChangedEvent(event: AttributeChangedEvent) {
     const templates = await this.prisma.emailTemplate.findMany({
       where: {
@@ -96,14 +95,16 @@ export class EmailsListeners {
 
     await Promise.all(
       templates.map(async (template) => {
-        const config = this.getTriggerConfig(template.triggerConfig);
+        const config = getJsonObject(template.triggerConfig);
         if (
           config?.attributeUuid === event.attributeUuid &&
-          config.expectedValue === event.newValue
+          JSON.stringify(config.expectedValue) ===
+            JSON.stringify(event.newValue)
         ) {
-          return this.emailsService.sendEmailToParticipants(template.uuid, [
-            event.participantUuid,
-          ]);
+          return this.emailDeliveryService.sendEmailToParticipants(
+            template.uuid,
+            [event.participantUuid],
+          );
         }
       }),
     );

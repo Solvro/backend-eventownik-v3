@@ -1,20 +1,17 @@
-import { MailerService } from "@nestjs-modules/mailer";
 import { EmailStatus, EmailTrigger } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
-import { getQueueToken } from "@nestjs/bullmq";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
 import type { CreateEmailDto } from "./dto/create-email.dto";
 import type { EmailListingDto } from "./dto/email-listing.dto";
 import type { UpdateEmailDto } from "./dto/update-email.dto";
-import { EmailsService } from "./emails.service";
+import { EmailTemplatesService } from "./email-templates.service";
 
-describe("EmailsService", () => {
-  let service: EmailsService;
+describe("EmailTemplatesService", () => {
+  let service: EmailTemplatesService;
   const mockEventId = "event-uuid-123";
   const mockEmailId = "email-uuid-123";
 
@@ -35,44 +32,30 @@ describe("EmailsService", () => {
       delete: jest.fn(),
       count: jest.fn(),
     },
+    participantEmailStatus: {
+      groupBy: jest.fn().mockResolvedValue([]),
+    },
     $transaction: jest.fn(),
-  };
-
-  const mockMailerService = {
-    sendMail: jest.fn(),
   };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        EmailsService,
-        PrismaService,
+        EmailTemplatesService,
         {
-          provide: MailerService,
-          useValue: mockMailerService,
-        },
-        {
-          provide: getQueueToken("automatic-emails"),
-          useValue: {},
-        },
-        {
-          provide: ConfigService,
-          useValue: {
-            get: jest.fn(),
-          },
+          provide: PrismaService,
+          useValue: mockPrismaService,
         },
       ],
-    })
-      .overrideProvider(PrismaService)
-      .useValue(mockPrismaService)
-      .compile();
+    }).compile();
 
-    service = module.get<EmailsService>(EmailsService);
+    service = module.get<EmailTemplatesService>(EmailTemplatesService);
   });
 
   afterEach(() => {
     jest.clearAllMocks();
     jest.resetAllMocks();
+    mockPrismaService.participantEmailStatus.groupBy.mockResolvedValue([]);
   });
 
   it("should be defined", () => {
@@ -133,7 +116,7 @@ describe("EmailsService", () => {
   });
 
   describe("findAll", () => {
-    it("should return paginated email templates with a default sort", async () => {
+    it("should return paginated email templates with status counts from groupBy", async () => {
       const query = {
         page: 1,
         take: 10,
@@ -147,13 +130,8 @@ describe("EmailsService", () => {
           name: "test124",
           trigger: EmailTrigger.PARTICIPANT_REGISTERED,
           triggerConfig: undefined,
-
           createdAt: new Date("2025-02-22T19:13:10.471Z"),
           updatedAt: new Date("2025-02-22T19:13:10.471Z"),
-          participantEmails: [
-            { status: EmailStatus.sent },
-            { status: EmailStatus.failed },
-          ],
         },
         {
           uuid: "email-uuid-234",
@@ -161,13 +139,8 @@ describe("EmailsService", () => {
           name: "test245",
           trigger: EmailTrigger.MANUAL,
           triggerConfig: undefined,
-
           createdAt: new Date("2025-02-22T19:13:10.471Z"),
           updatedAt: new Date("2025-02-22T19:13:10.471Z"),
-          participantEmails: [
-            { status: EmailStatus.sent },
-            { status: EmailStatus.failed },
-          ],
         },
       ];
 
@@ -178,7 +151,7 @@ describe("EmailsService", () => {
           name: "test124",
           trigger: EmailTrigger.PARTICIPANT_REGISTERED,
           triggerConfig: undefined,
-
+          schema: undefined,
           createdAt: "2025-02-22T19:13:10.471Z",
           updatedAt: "2025-02-22T19:13:10.471Z",
           meta: {
@@ -193,13 +166,13 @@ describe("EmailsService", () => {
           name: "test245",
           trigger: EmailTrigger.MANUAL,
           triggerConfig: undefined,
-
+          schema: undefined,
           createdAt: "2025-02-22T19:13:10.471Z",
           updatedAt: "2025-02-22T19:13:10.471Z",
           meta: {
-            failedCount: 1,
+            failedCount: 0,
             pendingCount: 0,
-            sentCount: 1,
+            sentCount: 0,
           },
         },
       ];
@@ -208,6 +181,18 @@ describe("EmailsService", () => {
       mockPrismaService.$transaction.mockResolvedValue([
         mockPrismaOutput.length,
         mockPrismaOutput,
+      ]);
+      mockPrismaService.participantEmailStatus.groupBy.mockResolvedValue([
+        {
+          emailUuid: "email-uuid-123",
+          status: EmailStatus.sent,
+          _count: { _all: 1 },
+        },
+        {
+          emailUuid: "email-uuid-123",
+          status: EmailStatus.failed,
+          _count: { _all: 1 },
+        },
       ]);
 
       const result = await service.findAll(mockEventId, query);
@@ -226,84 +211,14 @@ describe("EmailsService", () => {
           schema: true,
           createdAt: true,
           updatedAt: true,
-          participantEmails: {
-            select: { status: true },
-          },
         },
       });
-      expect(result.data).toEqual(expectedOutput);
-      expect(result.meta.itemCount).toBe(expectedOutput.length);
-    });
-
-    it("should return filtered and paginated email templates", async () => {
-      const query = {
-        page: 1,
-        take: 10,
-        skip: 0,
-        trigger: EmailTrigger.MANUAL,
-      } as EmailListingDto;
-
-      const mockPrismaOutput = [
-        {
-          uuid: "email-uuid-234",
-          eventUuid: "event-uuid-123",
-          name: "test245",
-          trigger: EmailTrigger.MANUAL,
-          triggerConfig: undefined,
-
-          createdAt: new Date("2025-02-22T19:13:10.471Z"),
-          updatedAt: new Date("2025-02-22T19:13:10.471Z"),
-          participantEmails: [
-            { status: EmailStatus.sent },
-            { status: EmailStatus.failed },
-          ],
-        },
-      ];
-
-      const expectedOutput = [
-        {
-          id: "email-uuid-234",
-          eventId: mockEventId,
-          name: "test245",
-          trigger: EmailTrigger.MANUAL,
-          triggerConfig: undefined,
-
-          createdAt: "2025-02-22T19:13:10.471Z",
-          updatedAt: "2025-02-22T19:13:10.471Z",
-          meta: {
-            failedCount: 1,
-            pendingCount: 0,
-            sentCount: 1,
-          },
-        },
-      ];
-
-      mockPrismaService.event.findUnique.mockResolvedValue(mockEventId);
-      mockPrismaService.$transaction.mockResolvedValue([
-        mockPrismaOutput.length,
-        mockPrismaOutput,
-      ]);
-
-      const result = await service.findAll(mockEventId, query);
-
-      expect(mockPrismaService.emailTemplate.findMany).toHaveBeenCalledWith({
-        where: { eventUuid: mockEventId, trigger: query.trigger },
-        skip: query.skip,
-        take: query.take,
-        orderBy: [{ createdAt: "desc" }],
-        select: {
-          uuid: true,
-          eventUuid: true,
-          name: true,
-          trigger: true,
-          triggerConfig: true,
-          schema: true,
-          createdAt: true,
-          updatedAt: true,
-          participantEmails: {
-            select: { status: true },
-          },
-        },
+      expect(
+        mockPrismaService.participantEmailStatus.groupBy,
+      ).toHaveBeenCalledWith({
+        by: ["emailUuid", "status"],
+        where: { emailUuid: { in: ["email-uuid-123", "email-uuid-234"] } },
+        _count: { _all: true },
       });
       expect(result.data).toEqual(expectedOutput);
       expect(result.meta.itemCount).toBe(expectedOutput.length);
@@ -332,29 +247,9 @@ describe("EmailsService", () => {
         content: "<p>test</p>",
         trigger: EmailTrigger.MANUAL,
         triggerConfig: undefined,
-
         order: 0,
         createdAt: new Date("2025-02-22T19:13:10.471Z"),
         updatedAt: new Date("2025-02-22T19:13:10.471Z"),
-        participantEmails: [
-          {
-            uuid: "pivot-uuid-123",
-            status: EmailStatus.sent,
-            sendAt: new Date("2025-02-22T19:13:10.471Z"),
-            createdAt: new Date("2025-02-22T19:13:10.471Z"),
-            updatedAt: new Date("2025-02-22T19:13:10.471Z"),
-            sendBy: "Jan Kowalski",
-            participantUuid: "participant-uuid-123",
-            emailUuid: "email-uuid-123",
-            participant: {
-              uuid: "participant-uuid-123",
-              email: "example@example.com",
-              eventUuid: "event-uuid-123",
-              createdAt: new Date("2025-02-22T19:13:10.471Z"),
-              updatedAt: new Date("2025-02-22T19:13:10.471Z"),
-            },
-          },
-        ],
       };
       const expectedOutput = {
         id: mockEmailId,
@@ -363,23 +258,10 @@ describe("EmailsService", () => {
         content: "<p>test</p>",
         trigger: EmailTrigger.MANUAL,
         triggerConfig: undefined,
-
         order: 0,
         createdAt: "2025-02-22T19:13:10.471Z",
         updatedAt: "2025-02-22T19:13:10.471Z",
-        participants: [
-          {
-            id: "participant-uuid-123",
-            email: "example@example.com",
-            createdAt: "2025-02-22T19:13:10.471Z",
-            updatedAt: "2025-02-22T19:13:10.471Z",
-            meta: {
-              pivot_status: EmailStatus.sent,
-              pivot_send_at: "2025-02-22T19:13:10.471Z",
-              pivot_send_by: "Jan Kowalski",
-            },
-          },
-        ],
+        participants: [],
       };
 
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue(
@@ -394,20 +276,10 @@ describe("EmailsService", () => {
           eventUuid: mockEventId,
         },
       });
-      expect(result).toEqual({
-        ...expectedOutput,
-        participants: [],
-      });
+      expect(result).toEqual(expectedOutput);
     });
 
     it("should throw NotFoundException when event with provided eventId does not exist.", async () => {
-      mockPrismaService.emailTemplate.findFirst.mockResolvedValue(null);
-      await expect(service.findOne(mockEventId, mockEmailId)).rejects.toThrow(
-        NotFoundException,
-      );
-    });
-
-    it("should throw NotFoundException when email with provided emailId does not exist.", async () => {
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue(null);
       await expect(service.findOne(mockEventId, mockEmailId)).rejects.toThrow(
         NotFoundException,
@@ -429,7 +301,6 @@ describe("EmailsService", () => {
         content: "<p>test2</p>",
         trigger: EmailTrigger.MANUAL,
         triggerConfig: undefined,
-
         order: 0,
         createdAt: new Date("2025-02-22T19:13:10.471Z"),
         updatedAt: new Date("2025-02-22T19:13:10.471Z"),
@@ -470,14 +341,6 @@ describe("EmailsService", () => {
       });
     });
     it("should throw NotFoundException when event with provided eventId does not exist.", async () => {
-      mockTransaction(mockPrismaService);
-      mockPrismaService.emailTemplate.findFirst.mockResolvedValue(null);
-      await expect(
-        service.update(mockEventId, mockEmailId, {}),
-      ).rejects.toThrow(NotFoundException);
-    });
-
-    it("should throw NotFoundException when email with provided emailId does not exist.", async () => {
       mockTransaction(mockPrismaService);
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue(null);
       await expect(

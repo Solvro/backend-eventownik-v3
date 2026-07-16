@@ -5,12 +5,17 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  MaxLength,
   ValidateIf,
 } from "class-validator";
+import { MaxJsonSize } from "src/common/decorators/max-json-size.decorator";
 import type { Prisma } from "src/generated/prisma/client";
 import { EmailTrigger } from "src/generated/prisma/enums";
 
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+
+export const EMAIL_CONTENT_MAX_LENGTH = 14_000_000;
+export const EMAIL_SCHEMA_MAX_BYTES = 2_000_000;
 
 export class CreateEmailDto {
   @ApiProperty({ example: "Email template name" })
@@ -21,6 +26,9 @@ export class CreateEmailDto {
   @ApiProperty({ example: "<p>Content</p>" })
   @IsString()
   @IsNotEmpty()
+  @MaxLength(EMAIL_CONTENT_MAX_LENGTH, {
+    message: "content must not exceed 10MB of embedded image data",
+  })
   content: string;
 
   @ApiPropertyOptional()
@@ -45,5 +53,8 @@ export class CreateEmailDto {
   @ApiPropertyOptional({ type: Object, example: { version: "1.0" } })
   @IsOptional()
   @IsObject()
+  @MaxJsonSize(EMAIL_SCHEMA_MAX_BYTES, {
+    message: `schema must not exceed ${String(EMAIL_SCHEMA_MAX_BYTES / 1_000_000)}MB when serialized as JSON`,
+  })
   schema?: Prisma.JsonObject;
 }

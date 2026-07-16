@@ -18,4 +18,25 @@ describe("StorageService", () => {
   it("should be defined", () => {
     expect(service).toBeDefined();
   });
+
+  describe("extractKey", () => {
+    const bucket = "test-bucket";
+
+    it("returns the value unchanged when it has no URL prefix", () => {
+      expect(service.extractKey(bucket, "some-key.png")).toBe("some-key.png");
+    });
+
+    it("strips a single matching URL prefix", () => {
+      const url = service.getUrl(bucket, "some-key.png");
+      expect(service.extractKey(bucket, url)).toBe("some-key.png");
+    });
+
+    it("strips a doubled URL prefix, self-healing an already-corrupted value", () => {
+      const doubled = service.getUrl(
+        bucket,
+        service.getUrl(bucket, "some-key.png"),
+      );
+      expect(service.extractKey(bucket, doubled)).toBe("some-key.png");
+    });
+  });
 });

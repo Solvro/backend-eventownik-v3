@@ -33,7 +33,11 @@ import { StorageModule } from "./storage/storage.module";
     FormsModule,
     ConfigModule.forRoot({
       validationSchema: Joi.object({
+        NODE_ENV: Joi.string()
+          .valid("development", "test", "production")
+          .default("development"),
         APP_DOMAIN: Joi.string().required(),
+        FRONTEND_URL: Joi.string().required(),
         CORS_ORIGINS: Joi.string().required(),
         DATABASE_URL: Joi.string().required(),
         HCAPTCHA_SECRET: Joi.string().required(),
@@ -62,7 +66,6 @@ import { StorageModule } from "./storage/storage.module";
           "application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         ),
         UPLOAD_TTL_HOURS: Joi.number().default(24),
-        HCAPTCHA_ENABLED: Joi.boolean().default(true),
       }),
       isGlobal: true,
     }),
