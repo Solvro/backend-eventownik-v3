@@ -13,21 +13,14 @@ export class FormsReaperService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
-    configService: ConfigService,
+    private readonly configService: ConfigService,
   ) {
     this.bucket = configService.getOrThrow<string>("S3_BUCKET_FORMS");
   }
 
   @Cron(CronExpression.EVERY_HOUR)
   async reapExpiredFiles(): Promise<void> {
-    const ttlHours = await this.prisma.$queryRawUnsafe<{ ttl_hours: number }[]>(
-      `SELECT COALESCE(
-        (current_setting('UPLOAD_TTL_HOURS')::integer),
-        24
-      ) as ttl_hours`,
-    );
-
-    const ttl = ttlHours[0]?.ttl_hours ?? 24;
+    const ttl = this.configService.getOrThrow<number>("UPLOAD_TTL_HOURS");
     const expiryDate = new Date();
     expiryDate.setHours(expiryDate.getHours() - ttl);
 
