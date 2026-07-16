@@ -1,4 +1,4 @@
-import { Type } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
   IsBoolean,
   IsDate,
@@ -21,7 +21,7 @@ export class EventCreateDto {
     example: "Tech Conference 2023",
   })
   @IsString()
-  readonly name: string;
+  readonly name!: string;
 
   @ApiProperty({
     description: "Start date of the event",
@@ -30,7 +30,7 @@ export class EventCreateDto {
   })
   @Type(() => Date)
   @IsDate()
-  startDate: Date;
+  startDate!: Date;
 
   @ApiProperty({
     description: "End date of the event",
@@ -39,16 +39,16 @@ export class EventCreateDto {
   })
   @Type(() => Date)
   @IsDate()
-  endDate: Date;
+  endDate!: Date;
 
   @ApiProperty({
     description: "Is the event public, defaults to false",
     type: Boolean,
     example: true,
   })
-  @Type(() => Boolean)
+  @Transform(({ value }) => value === "true" || value === true)
   @IsBoolean()
-  isPublic: boolean;
+  isPublic!: boolean;
 
   @ApiPropertyOptional({
     description:
@@ -57,7 +57,7 @@ export class EventCreateDto {
     example: true,
   })
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(({ value }) => value === "true" || value === true)
   @IsBoolean()
   isVerified?: boolean;
 
@@ -124,7 +124,7 @@ export class EventCreateDto {
   })
   @IsString()
   @MinLength(3)
-  slug: string;
+  slug!: string;
 
   @IsOptional()
   @ValidateNested({ each: true })
