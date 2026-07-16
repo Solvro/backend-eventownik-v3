@@ -13,11 +13,20 @@ export class EmailsConsumer extends WorkerHost {
   }
 
   async process(job: Job<EmailSendJobData>): Promise<void> {
+    const { emailUuid, participantUuid, statusUuid, participantSnapshot } =
+      job.data;
+
     await this.emailDeliveryService.deliverEmailToParticipants(
-      job.data.emailUuid,
-      job.data.participantUuid,
-      job.data.statusUuid,
-      job.data.participantSnapshot,
+      emailUuid,
+      participantUuid,
+      statusUuid,
+      participantSnapshot == null
+        ? undefined
+        : {
+            ...participantSnapshot,
+            createdAt: new Date(participantSnapshot.createdAt),
+            updatedAt: new Date(participantSnapshot.updatedAt),
+          },
     );
   }
 }

@@ -92,7 +92,7 @@ export class EmailDeliveryService {
       opts: {
         attempts: 3,
         backoff: {
-          delay: 1000,
+          delay: 5000,
           type: "exponential",
         },
         removeOnComplete: true,
