@@ -417,7 +417,14 @@ describe("FormsService", () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it("should reject select values that are not allowed", async () => {
+    // Select/multiSelect/block value validation (options membership,
+    // maxSelections, block existence) no longer happens in forms.service —
+    // it's the canonical normalizer's job now (see
+    // attribute-value-normalizer.spec.ts), which participantService.update/
+    // register run internally. Since ParticipantsService is mocked here,
+    // these cases assert forms.service forwards the raw submitted value
+    // through unchanged rather than validating it itself.
+    it("should pass an out-of-options select value through unchanged", async () => {
       const submissionData = {
         email: "test@example.com",
         attributes: [[{ attributeUuid: "attr-select", value: "choice-1" }]],
@@ -447,13 +454,21 @@ describe("FormsService", () => {
         ],
       });
       jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockParticipantsService.register.mockResolvedValue({
+        id: 1,
+        email: submissionData.email,
+      });
 
-      await expect(
-        service.formSubmit(eventSlug, formUuid, submissionData),
-      ).rejects.toThrow(BadRequestException);
+      await service.formSubmit(eventSlug, formUuid, submissionData);
+
+      expect(mockParticipantsService.register).toHaveBeenCalledWith(
+        eventUuid,
+        submissionData.email,
+        [{ attributeUuid: "attr-select", value: "choice-1" }],
+      );
     });
 
-    it("should reject multiSelect values that are not allowed by config", async () => {
+    it("should pass an out-of-options multiSelect value through unchanged", async () => {
       const submissionData = {
         email: "test@example.com",
         attributes: [[{ attributeUuid: "attr-multi", value: ["invalid"] }]],
@@ -483,13 +498,21 @@ describe("FormsService", () => {
         ],
       });
       jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockParticipantsService.register.mockResolvedValue({
+        id: 1,
+        email: submissionData.email,
+      });
 
-      await expect(
-        service.formSubmit(eventSlug, formUuid, submissionData),
-      ).rejects.toThrow(BadRequestException);
+      await service.formSubmit(eventSlug, formUuid, submissionData);
+
+      expect(mockParticipantsService.register).toHaveBeenCalledWith(
+        eventUuid,
+        submissionData.email,
+        [{ attributeUuid: "attr-multi", value: ["invalid"] }],
+      );
     });
 
-    it("should reject multiSelect values that exceed maxSelections", async () => {
+    it("should pass a multiSelect value exceeding maxSelections through unchanged", async () => {
       const submissionData = {
         email: "test@example.com",
         attributes: [
@@ -526,10 +549,23 @@ describe("FormsService", () => {
         ],
       });
       jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockParticipantsService.register.mockResolvedValue({
+        id: 1,
+        email: submissionData.email,
+      });
 
-      await expect(
-        service.formSubmit(eventSlug, formUuid, submissionData),
-      ).rejects.toThrow(BadRequestException);
+      await service.formSubmit(eventSlug, formUuid, submissionData);
+
+      expect(mockParticipantsService.register).toHaveBeenCalledWith(
+        eventUuid,
+        submissionData.email,
+        [
+          {
+            attributeUuid: "attr-multi",
+            value: ["allowed-1", "allowed-2", "allowed-3"],
+          },
+        ],
+      );
     });
 
     it("should validate block submissions and save successfully", async () => {
@@ -570,11 +606,6 @@ describe("FormsService", () => {
           },
         ],
       });
-      mockPrismaService.block.findMany.mockResolvedValue([
-        { uuid: "550e8400-e29b-41d4-a716-446655440000" },
-        { uuid: "550e8400-e29b-41d4-a716-446655440001" },
-      ]);
-      mockPrismaService.block.count.mockResolvedValue(2);
       mockBlocksService.canSignInToBlock.mockResolvedValue(true);
       jest.spyOn(service, "isOpen").mockResolvedValue(true);
       mockParticipantsService.register.mockResolvedValue({
@@ -604,7 +635,7 @@ describe("FormsService", () => {
       expect(result).toBeDefined();
     });
 
-    it("should reject block selections that exceed maxSelections", async () => {
+    it("should pass a block value exceeding maxSelections through unchanged (capacity pre-check still applies)", async () => {
       const submissionData = {
         email: "test@example.com",
         attributes: [
@@ -644,10 +675,28 @@ describe("FormsService", () => {
         ],
       });
       jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockBlocksService.canSignInToBlock.mockResolvedValue(true);
+      mockParticipantsService.register.mockResolvedValue({
+        id: 1,
+        email: submissionData.email,
+      });
 
-      await expect(
-        service.formSubmit(eventSlug, formUuid, submissionData),
-      ).rejects.toThrow(BadRequestException);
+      await service.formSubmit(eventSlug, formUuid, submissionData);
+
+      expect(mockParticipantsService.register).toHaveBeenCalledWith(
+        eventUuid,
+        submissionData.email,
+        [
+          {
+            attributeUuid: "attr-block",
+            value: [
+              "550e8400-e29b-41d4-a716-446655440000",
+              "550e8400-e29b-41d4-a716-446655440001",
+              "550e8400-e29b-41d4-a716-446655440002",
+            ],
+          },
+        ],
+      );
     });
 
     it("should register a new participant if it is a registration form", async () => {

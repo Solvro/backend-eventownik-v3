@@ -98,7 +98,8 @@ export class EmailsListeners {
         const config = getJsonObject(template.triggerConfig);
         if (
           config?.attributeUuid === event.attributeUuid &&
-          config.expectedValue === event.newValue
+          JSON.stringify(config.expectedValue) ===
+            JSON.stringify(event.newValue)
         ) {
           return this.emailDeliveryService.sendEmailToParticipants(
             template.uuid,

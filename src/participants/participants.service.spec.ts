@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
+import { AttributeChangedEvent } from "src/common/events/attribute-changed.event";
+import { ATTRIBUTE_CHANGED_EVENT } from "src/common/events/event-names.constants";
 import { Prisma } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -21,6 +23,8 @@ import { ParticipantsService } from "./participants.service";
 describe("ParticipantsService", () => {
   let service: ParticipantsService;
   let prisma: PrismaService;
+  let storageService: StorageService;
+  let eventEmitter: EventEmitter2;
 
   const mockPrismaService = {
     participant: {
@@ -77,6 +81,8 @@ describe("ParticipantsService", () => {
 
     service = module.get<ParticipantsService>(ParticipantsService);
     prisma = module.get<PrismaService>(PrismaService);
+    storageService = module.get<StorageService>(StorageService);
+    eventEmitter = module.get<EventEmitter2>(EventEmitter2);
     jest.clearAllMocks();
 
     // Default transaction mock to just execute the callback
@@ -389,6 +395,140 @@ describe("ParticipantsService", () => {
           eventUuid,
         },
       });
+    });
+  });
+
+  describe("bulkUpdateAttributes", () => {
+    const eventUuid = "event-123";
+    const attributeUuid = "attr-1";
+
+    it("should throw NotFoundException if the attribute does not belong to the event", async () => {
+      mockPrismaService.attribute.findUnique.mockResolvedValue({
+        uuid: attributeUuid,
+        eventUuid: "other-event",
+        type: "text",
+      });
+
+      await expect(
+        service.bulkUpdateAttributes(eventUuid, attributeUuid, "value", [
+          "p-1",
+        ]),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("should throw BadRequestException if a participant does not belong to the event", async () => {
+      mockPrismaService.attribute.findUnique.mockResolvedValue({
+        uuid: attributeUuid,
+        eventUuid,
+        type: "text",
+      });
+      mockPrismaService.participant.count.mockResolvedValue(1);
+
+      await expect(
+        service.bulkUpdateAttributes(eventUuid, attributeUuid, "value", [
+          "p-1",
+          "p-2",
+        ]),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("should update the value for every participant and emit ATTRIBUTE_CHANGED_EVENT per participant", async () => {
+      mockPrismaService.attribute.findUnique.mockResolvedValue({
+        uuid: attributeUuid,
+        eventUuid,
+        type: "text",
+      });
+      mockPrismaService.participant.count.mockResolvedValue(2);
+      mockPrismaService.attribute.findMany.mockResolvedValue([
+        { uuid: attributeUuid, type: "text", config: null },
+      ]);
+
+      await service.bulkUpdateAttributes(eventUuid, attributeUuid, "new-val", [
+        "p-1",
+        "p-2",
+      ]);
+
+      expect(
+        mockPrismaService.participantAttribute.deleteMany,
+      ).toHaveBeenCalledWith({
+        where: { attributeUuid, participantUuid: { in: ["p-1", "p-2"] } },
+      });
+      expect(
+        mockPrismaService.participantAttribute.createMany,
+      ).toHaveBeenCalledWith({
+        data: [
+          { participantUuid: "p-1", attributeUuid, value: "new-val" },
+          { participantUuid: "p-2", attributeUuid, value: "new-val" },
+        ],
+      });
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(eventEmitter.emit as jest.Mock).toHaveBeenCalledTimes(2);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(eventEmitter.emit as jest.Mock).toHaveBeenCalledWith(
+        ATTRIBUTE_CHANGED_EVENT,
+        new AttributeChangedEvent(attributeUuid, "p-1", eventUuid, "new-val"),
+      );
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(eventEmitter.emit as jest.Mock).toHaveBeenCalledWith(
+        ATTRIBUTE_CHANGED_EVENT,
+        new AttributeChangedEvent(attributeUuid, "p-2", eventUuid, "new-val"),
+      );
+    });
+
+    it("should allow bulk-clearing by omitting newValue", async () => {
+      mockPrismaService.attribute.findUnique.mockResolvedValue({
+        uuid: attributeUuid,
+        eventUuid,
+        type: "text",
+      });
+      mockPrismaService.participant.count.mockResolvedValue(1);
+      mockPrismaService.attribute.findMany.mockResolvedValue([
+        { uuid: attributeUuid, type: "text", config: null },
+      ]);
+
+      await service.bulkUpdateAttributes(eventUuid, attributeUuid, undefined, [
+        "p-1",
+      ]);
+
+      expect(
+        mockPrismaService.participantAttribute.createMany,
+      ).toHaveBeenCalledWith({
+        data: [
+          { participantUuid: "p-1", attributeUuid, value: Prisma.JsonNull },
+        ],
+      });
+    });
+
+    it("should clean up stale S3 file keys after commit, excluding a key equal to the new value and deduping", async () => {
+      mockPrismaService.attribute.findUnique.mockResolvedValue({
+        uuid: attributeUuid,
+        eventUuid,
+        type: "file",
+      });
+      mockPrismaService.participant.count.mockResolvedValue(3);
+      mockPrismaService.attribute.findMany.mockResolvedValue([
+        { uuid: attributeUuid, type: "file", config: null },
+      ]);
+      mockPrismaService.participantAttribute.findMany.mockResolvedValueOnce([
+        { value: "old-key-1" },
+        { value: "old-key-1" },
+        { value: "new-key" },
+        { value: null },
+      ]);
+
+      await service.bulkUpdateAttributes(eventUuid, attributeUuid, "new-key", [
+        "p-1",
+        "p-2",
+        "p-3",
+      ]);
+
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(storageService.delete as jest.Mock).toHaveBeenCalledTimes(1);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(storageService.delete as jest.Mock).toHaveBeenCalledWith(
+        "test-bucket",
+        "old-key-1",
+      );
     });
   });
 

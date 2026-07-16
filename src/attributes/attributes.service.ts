@@ -1,4 +1,8 @@
 import { isUUID } from "class-validator";
+import {
+  getConfigPositiveIntegerStrict,
+  getConfigStringArrayStrict,
+} from "src/attributes/attribute-config.utility";
 import { BlocksService } from "src/blocks/blocks.service";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
@@ -35,37 +39,6 @@ export class AttributesService {
     return config;
   }
 
-  private getStringArray(config: Record<string, unknown>, key: string) {
-    const value = config[key];
-    if (!Array.isArray(value)) {
-      return null;
-    }
-
-    const values = value.filter(
-      (item): item is string =>
-        typeof item === "string" && item.trim().length > 0,
-    );
-    return values;
-  }
-
-  private getPositiveIntegerValue(
-    config: Record<string, unknown>,
-    key: string,
-  ) {
-    const value = config[key];
-    if (value === undefined) {
-      return;
-    }
-
-    if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
-      throw new BadRequestException(
-        `Attribute config field ${key} must be a positive integer.`,
-      );
-    }
-
-    return value;
-  }
-
   private normalizeConfig(
     type: CreateAttributeDto["type"],
     config?: Record<string, unknown>,
@@ -79,7 +52,7 @@ export class AttributesService {
         );
       }
 
-      const options = this.getStringArray(configObject, "options");
+      const options = getConfigStringArrayStrict(configObject, "options");
       if (options == null || options.length === 0) {
         throw new BadRequestException(
           `Attribute config for ${type} attributes must contain a non-empty options array.`,
@@ -95,7 +68,7 @@ export class AttributesService {
       }
 
       if (type === "multiSelect") {
-        const maxSelections = this.getPositiveIntegerValue(
+        const maxSelections = getConfigPositiveIntegerStrict(
           configObject,
           "maxSelections",
         );
@@ -116,7 +89,7 @@ export class AttributesService {
         return normalizedConfig as Prisma.InputJsonValue;
       }
 
-      const maxSelections = this.getPositiveIntegerValue(
+      const maxSelections = getConfigPositiveIntegerStrict(
         configObject,
         "maxSelections",
       );
@@ -125,7 +98,7 @@ export class AttributesService {
       }
 
       if (configObject.participantFields !== undefined) {
-        const participantFields = this.getStringArray(
+        const participantFields = getConfigStringArrayStrict(
           configObject,
           "participantFields",
         );

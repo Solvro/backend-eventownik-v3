@@ -1,3 +1,4 @@
+import { normalizeParticipantAttributeValue } from "src/attributes/attribute-value-normalizer";
 import { AttributeChangedEvent } from "src/common/events/attribute-changed.event";
 import {
   ATTRIBUTE_CHANGED_EVENT,
@@ -54,286 +55,6 @@ export class ParticipantsService {
     private readonly configService: ConfigService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
-
-  private getStringConfigValues(
-    config: Prisma.JsonValue | null,
-    key: string,
-  ): string[] {
-    if (config == null || typeof config !== "object" || Array.isArray(config)) {
-      return [];
-    }
-
-    const values = (config as Record<string, unknown>)[key];
-    if (!Array.isArray(values)) {
-      return [];
-    }
-
-    return values.filter(
-      (value): value is string =>
-        typeof value === "string" && value.trim().length > 0,
-    );
-  }
-
-  private getBooleanConfigValue(
-    config: Prisma.JsonValue | null,
-    key: string,
-  ): boolean {
-    if (config == null || typeof config !== "object" || Array.isArray(config)) {
-      return false;
-    }
-
-    return (config as Record<string, unknown>)[key] === true;
-  }
-
-  private async normalizeParticipantAttributeValue(
-    eventUuid: string,
-    attribute: {
-      attributeUuid: string;
-      type: AttributeType;
-      config: Prisma.JsonValue | null;
-    },
-    value: unknown,
-  ): Promise<Prisma.InputJsonValue | typeof Prisma.JsonNull> {
-    if (attribute.type === AttributeType.select) {
-      if (value == null || value === "") {
-        return Prisma.JsonNull;
-      }
-      if (typeof value !== "string") {
-        throw new BadRequestException(
-          `Attribute ${attribute.attributeUuid} must be a string value.`,
-        );
-      }
-
-      const options = this.getStringConfigValues(attribute.config, "options");
-      const allowOther = this.getBooleanConfigValue(
-        attribute.config,
-        "allowOther",
-      );
-      if (!allowOther && options.length > 0 && !options.includes(value)) {
-        throw new BadRequestException(
-          `Invalid value for attribute ${attribute.attributeUuid}. Allowed values are: ${options.join(", ")}`,
-        );
-      }
-
-      return value;
-    }
-
-    if (attribute.type === AttributeType.multiSelect) {
-      if (value == null || value === "") {
-        return Prisma.JsonNull;
-      }
-
-      const rawValues = Array.isArray(value)
-        ? value
-        : typeof value === "string"
-          ? value.split(";")
-          : null;
-
-      if (rawValues == null) {
-        throw new BadRequestException(
-          `Attribute ${attribute.attributeUuid} must be a string array or a semicolon-separated string.`,
-        );
-      }
-
-      const normalizedValues = rawValues.map((item) => {
-        if (typeof item !== "string") {
-          throw new BadRequestException(
-            `Attribute ${attribute.attributeUuid} must contain only string values.`,
-          );
-        }
-        return item.trim();
-      });
-
-      if (normalizedValues.some((item) => item.length === 0)) {
-        throw new BadRequestException(
-          `Attribute ${attribute.attributeUuid} cannot contain empty values.`,
-        );
-      }
-
-      const options = this.getStringConfigValues(attribute.config, "options");
-      const allowOther = this.getBooleanConfigValue(
-        attribute.config,
-        "allowOther",
-      );
-      if (!allowOther && options.length > 0) {
-        const invalidValue = normalizedValues.find(
-          (item) => !options.includes(item),
-        );
-        if (invalidValue !== undefined) {
-          throw new BadRequestException(
-            `Invalid value for attribute ${attribute.attributeUuid}. Allowed values are: ${options.join(", ")}`,
-          );
-        }
-      }
-
-      return normalizedValues;
-    }
-
-    if (attribute.type === AttributeType.block) {
-      if (
-        value == null ||
-        value === "null" ||
-        value === "" ||
-        (Array.isArray(value) && value.length === 0)
-      ) {
-        return Prisma.JsonNull;
-      }
-
-      const rawValues = Array.isArray(value)
-        ? value
-        : typeof value === "string"
-          ? value.split(";")
-          : null;
-
-      if (rawValues == null) {
-        throw new BadRequestException(
-          `Attribute ${attribute.attributeUuid} must be an array of block UUIDs.`,
-        );
-      }
-
-      const normalizedValues = rawValues.map((item) => {
-        if (typeof item !== "string") {
-          throw new BadRequestException(
-            `Attribute ${attribute.attributeUuid} must contain only string values.`,
-          );
-        }
-        return item.trim();
-      });
-
-      if (normalizedValues.length === 0) {
-        return Prisma.JsonNull;
-      }
-
-      const blocksCount = await this.prisma.block.count({
-        where: {
-          uuid: { in: normalizedValues },
-          attribute: { eventUuid },
-        },
-      });
-
-      if (blocksCount !== normalizedValues.length) {
-        throw new BadRequestException(
-          `One or more block UUIDs are invalid or do not exist for attribute ${attribute.attributeUuid}.`,
-        );
-      }
-
-      const configObject =
-        attribute.config != null &&
-        typeof attribute.config === "object" &&
-        !Array.isArray(attribute.config)
-          ? (attribute.config as Record<string, unknown>)
-          : null;
-
-      const maxSelections =
-        configObject?.maxSelections !== undefined &&
-        typeof configObject.maxSelections === "number" &&
-        Number.isInteger(configObject.maxSelections) &&
-        configObject.maxSelections > 0
-          ? configObject.maxSelections
-          : 1;
-
-      if (normalizedValues.length > maxSelections) {
-        throw new BadRequestException(
-          `Attribute ${attribute.attributeUuid} cannot contain more than ${String(maxSelections)} selections.`,
-        );
-      }
-
-      return normalizedValues;
-    }
-
-    if (attribute.type === AttributeType.number) {
-      if (value == null || value === "") {
-        return Prisma.JsonNull;
-      }
-
-      const parsedValue =
-        typeof value === "number"
-          ? value
-          : typeof value === "string"
-            ? Number(value)
-            : Number.NaN;
-
-      if (Number.isNaN(parsedValue)) {
-        throw new BadRequestException(
-          `Attribute ${attribute.attributeUuid} must be a valid number.`,
-        );
-      }
-
-      return parsedValue;
-    }
-
-    if (
-      attribute.type === AttributeType.date ||
-      attribute.type === AttributeType.datetime
-    ) {
-      if (value == null || value === "") {
-        return Prisma.JsonNull;
-      }
-
-      const normalizedValue =
-        value instanceof Date
-          ? value.toISOString()
-          : typeof value === "string"
-            ? value
-            : null;
-
-      if (
-        normalizedValue == null ||
-        Number.isNaN(Date.parse(normalizedValue))
-      ) {
-        throw new BadRequestException(
-          `Attribute ${attribute.attributeUuid} must be a valid date/time format.`,
-        );
-      }
-
-      return normalizedValue;
-    }
-
-    if (attribute.type === AttributeType.checkbox) {
-      if (value == null || value === "") {
-        return Prisma.JsonNull;
-      }
-
-      if (typeof value === "boolean") {
-        return value;
-      }
-
-      if (typeof value === "number") {
-        if (value === 1) {
-          return true;
-        }
-        if (value === 0) {
-          return false;
-        }
-      }
-
-      if (typeof value === "string") {
-        const normalizedValue = value.toLowerCase();
-        if (["true", "1", "on"].includes(normalizedValue)) {
-          return true;
-        }
-        if (["false", "0", "off"].includes(normalizedValue)) {
-          return false;
-        }
-      }
-
-      throw new BadRequestException(
-        `Attribute ${attribute.attributeUuid} must be a boolean value.`,
-      );
-    }
-
-    if (value == null || value === "") {
-      return Prisma.JsonNull;
-    }
-
-    if (typeof value === "string") {
-      return value;
-    }
-
-    throw new BadRequestException(
-      `Attribute ${attribute.attributeUuid} must be a string value.`,
-    );
-  }
 
   private mapToEntity(participant: ParticipantWithRelations): Participant {
     return {
@@ -413,8 +134,8 @@ export class ParticipantsService {
         continue;
       }
 
-      const valueToSave = await this.normalizeParticipantAttributeValue(
-        eventUuid,
+      const valueToSave = await normalizeParticipantAttributeValue(
+        this.prisma,
         {
           attributeUuid: attribute.attributeUuid,
           type: matchingAttribute.type,
@@ -854,7 +575,7 @@ export class ParticipantsService {
   async bulkUpdateAttributes(
     eventUuid: string,
     attributeUuid: string,
-    newValue: string,
+    newValue: string | undefined,
     participantIds: string[],
   ) {
     // Verify event and attribute
@@ -892,7 +613,30 @@ export class ParticipantsService {
 
     const valueToSave = validatedAttributes[0].value;
 
+    const fileKeysToDelete: string[] = [];
+
     await this.prisma.$transaction(async (tx) => {
+      if (attribute.type === AttributeType.file) {
+        const existingFileAttributes = await tx.participantAttribute.findMany({
+          where: {
+            attributeUuid,
+            participantUuid: { in: uniqueParticipantIds },
+          },
+        });
+
+        const staleKeys = new Set(
+          existingFileAttributes
+            .map((existing) => existing.value)
+            .filter(
+              (value): value is string =>
+                typeof value === "string" &&
+                value.length > 0 &&
+                value !== valueToSave,
+            ),
+        );
+        fileKeysToDelete.push(...staleKeys);
+      }
+
       // Delete existing
       await tx.participantAttribute.deleteMany({
         where: {
@@ -910,6 +654,32 @@ export class ParticipantsService {
         })),
       });
     });
+
+    if (fileKeysToDelete.length > 0) {
+      const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
+      for (const key of fileKeysToDelete) {
+        await this.storageService.delete(bucket, key);
+      }
+    }
+
+    const emittedValue =
+      valueToSave == null ||
+      valueToSave === Prisma.JsonNull ||
+      valueToSave === Prisma.DbNull
+        ? null
+        : (valueToSave as Prisma.JsonValue);
+
+    for (const participantUuid of uniqueParticipantIds) {
+      this.eventEmitter.emit(
+        ATTRIBUTE_CHANGED_EVENT,
+        new AttributeChangedEvent(
+          attributeUuid,
+          participantUuid,
+          eventUuid,
+          emittedValue,
+        ),
+      );
+    }
   }
   async getPublicBlockAttributes(
     eventId: string,
