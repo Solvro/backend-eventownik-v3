@@ -23,7 +23,8 @@ export class ParticipantAttributeDto {
       "- number: number\n" +
       "- multiSelect/block: string[] (Array of UUIDs or options)\n" +
       "- checkbox: boolean\n" +
-      "- file: fileToken (UUID returned from upload endpoint)",
+      "- file: fileToken (UUID returned from upload endpoint)\n" +
+      "- drawing: fileToken (UUID returned from upload endpoint; image uploads only)",
   })
   @IsOptional()
   value?: unknown;

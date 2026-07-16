@@ -1,4 +1,4 @@
-import { isEmail, isHexColor, isString } from "class-validator";
+import { isEmail, isHexColor, isString, isUUID } from "class-validator";
 import {
   getConfigBoolean,
   getConfigObject,
@@ -10,8 +10,6 @@ import type { PrismaService } from "src/prisma/prisma.service";
 
 import { BadRequestException } from "@nestjs/common";
 
-const BLOCK_UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TEL_REGEX = /^\+?[0-9\s\-().]{6,20}$/;
 
 export interface NormalizableAttribute {
@@ -159,7 +157,7 @@ async function normalizeBlock(
     }
 
     const trimmedValue = item.trim();
-    if (!BLOCK_UUID_REGEX.test(trimmedValue)) {
+    if (!isUUID(trimmedValue)) {
       throw new BadRequestException(
         `Attribute ${attribute.attributeUuid} must contain valid block UUIDs.`,
       );

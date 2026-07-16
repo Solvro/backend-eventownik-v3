@@ -32,6 +32,15 @@ export class StorageService {
     return `${this.publicUrl}/${bucket}/${key}`;
   }
 
+  extractKey(bucket: string, value: string): string {
+    const prefix = `${this.publicUrl}/${bucket}/`;
+    let key = value;
+    while (key.startsWith(prefix)) {
+      key = key.slice(prefix.length);
+    }
+    return key;
+  }
+
   async upload(bucket: string, file: Express.Multer.File): Promise<string> {
     const extension = extname(file.originalname);
     const key = `${String(Date.now())}-${String(Math.round(Math.random() * 1e9))}${extension}`;

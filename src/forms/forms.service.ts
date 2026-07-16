@@ -1,4 +1,4 @@
-import { isString } from "class-validator";
+import { isString, isUUID } from "class-validator";
 import { BlocksService } from "src/blocks/blocks.service";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
@@ -30,8 +30,7 @@ import { FormListingDto } from "./dto/form-listing.dto";
 import { FormSubmitionDto } from "./dto/form-submition.dto";
 import { UpdateFormDto } from "./dto/update-form.dto";
 
-const BLOCK_UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const IMAGE_MIME_PREFIX = "image/";
 
 @Injectable()
 export class FormsService {
@@ -552,15 +551,21 @@ export class FormsService {
           );
         }
 
+        const isFileLikeAttribute =
+          foundAttribute.attribute.type === AttributeType.file ||
+          foundAttribute.attribute.type === AttributeType.drawing;
+
         if (
-          foundAttribute.attribute.type === AttributeType.file &&
+          isFileLikeAttribute &&
           isString(attributeValue) &&
           attributeValue.trim().length > 0
         ) {
           const fileToken = attributeValue.trim();
-          const uploadedFile = await prisma.uploadedFile.findUnique({
-            where: { uuid: fileToken },
-          });
+          const uploadedFile = isUUID(fileToken)
+            ? await prisma.uploadedFile.findUnique({
+                where: { uuid: fileToken },
+              })
+            : null;
 
           if (
             uploadedFile?.formUuid !== formUuid ||
@@ -568,6 +573,15 @@ export class FormsService {
           ) {
             throw new BadRequestException(
               `File token ${fileToken} for attribute ${attributeUuid} is invalid or already claimed`,
+            );
+          }
+
+          if (
+            foundAttribute.attribute.type === AttributeType.drawing &&
+            !uploadedFile.mimeType.startsWith(IMAGE_MIME_PREFIX)
+          ) {
+            throw new BadRequestException(
+              `Attribute ${attributeUuid} is a drawing attribute and only accepts image uploads`,
             );
           }
 
@@ -636,7 +650,7 @@ export class FormsService {
               continue;
             }
             const canSignIn =
-              BLOCK_UUID_REGEX.test(trimmedBlockId) &&
+              isUUID(trimmedBlockId) &&
               (await this.blocksService.canSignInToBlock(
                 event.uuid,
                 attributeUuid,
@@ -659,8 +673,26 @@ export class FormsService {
         )
         .map((formDefinition) => formDefinition.attribute) as Attribute[];
 
+      const existingAttributeValues =
+        submissionData.participantId === undefined ||
+        requiredAttributes.length === 0
+          ? null
+          : new Map(
+              (
+                await prisma.participantAttribute.findMany({
+                  where: { participantUuid: submissionData.participantId },
+                  select: { attributeUuid: true, value: true },
+                })
+              ).map((existing) => [existing.attributeUuid, existing.value]),
+            );
+
       for (const attribute of requiredAttributes) {
-        if (this.isMissingAttributeValue(submittedAttributes[attribute.uuid])) {
+        const wasSubmitted = Object.hasOwn(submittedAttributes, attribute.uuid);
+        const effectiveValue = wasSubmitted
+          ? submittedAttributes[attribute.uuid]
+          : existingAttributeValues?.get(attribute.uuid);
+
+        if (this.isMissingAttributeValue(effectiveValue)) {
           if (attribute.type === AttributeType.block) {
             const selectableBlocksCount = await prisma.block.count({
               where: { attributeUuid: attribute.uuid, isRootBlock: false },
@@ -696,6 +728,7 @@ export class FormsService {
           event.uuid,
           submissionData.participantId,
           participantDtoAttributes,
+          { trustedFileValues: true },
         );
       } else if (
         event.registerFormUuid === formUuid &&
@@ -716,6 +749,7 @@ export class FormsService {
             attributeUuid,
             value,
           })),
+          { trustedFileValues: true },
         );
       }
 

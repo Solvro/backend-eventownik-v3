@@ -47,6 +47,17 @@ type ParticipantWithRelations = PrismaParticipant & {
   })[];
 };
 
+const FILE_LIKE_ATTRIBUTE_TYPES: AttributeType[] = [
+  AttributeType.file,
+  AttributeType.drawing,
+];
+
+function isFileLikeAttributeType(
+  type: AttributeType | null | undefined,
+): boolean {
+  return type != null && FILE_LIKE_ATTRIBUTE_TYPES.includes(type);
+}
+
 @Injectable()
 export class ParticipantsService {
   constructor(
@@ -66,7 +77,7 @@ export class ParticipantsService {
           uuid: attribute.attributeUuid,
           name: attribute.attribute?.name ?? "",
           value:
-            attribute.attribute?.type === AttributeType.file &&
+            isFileLikeAttributeType(attribute.attribute?.type) &&
             typeof attribute.value === "string" &&
             attribute.value.length > 0
               ? this.storageService.getUrl(
@@ -90,15 +101,48 @@ export class ParticipantsService {
     };
   }
 
+  private resolveUntrustedFileValue(
+    attributeUuid: string,
+    rawValue: unknown,
+    currentValue: Prisma.JsonValue | null,
+  ): unknown {
+    if (rawValue == null || rawValue === "") {
+      return rawValue;
+    }
+
+    if (typeof rawValue !== "string") {
+      throw new BadRequestException(
+        `Attribute ${attributeUuid} must be a string value.`,
+      );
+    }
+
+    const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
+    const strippedValue = this.storageService.extractKey(bucket, rawValue);
+
+    if (currentValue == null || strippedValue !== currentValue) {
+      throw new BadRequestException(
+        `Attribute ${attributeUuid} cannot be set to a new value directly; upload a new file through a form instead.`,
+      );
+    }
+
+    return strippedValue;
+  }
+
   private async prepareAttributesForSave(
     eventUuid: string,
     participantAttributes?: ParticipantAttributeDto[],
+    options: {
+      trustedFileValues?: boolean;
+      currentParticipantUuid?: string;
+    } = {},
   ): Promise<
     Prisma.ParticipantAttributeUncheckedCreateWithoutParticipantInput[]
   > {
     if (participantAttributes == null || participantAttributes.length === 0) {
       return [];
     }
+
+    const { trustedFileValues = false, currentParticipantUuid } = options;
 
     const attributeUuids = participantAttributes.map(
       (attribute) => attribute.attributeUuid,
@@ -125,6 +169,33 @@ export class ParticipantsService {
       });
     }
 
+    let currentFileValues: Map<string, Prisma.JsonValue> | null = null;
+    if (!trustedFileValues && currentParticipantUuid !== undefined) {
+      const fileAttributeUuids = participantAttributes
+        .filter((attribute) =>
+          isFileLikeAttributeType(
+            validAttributeMap.get(attribute.attributeUuid)?.type,
+          ),
+        )
+        .map((attribute) => attribute.attributeUuid);
+
+      if (fileAttributeUuids.length > 0) {
+        const existingValues = await this.prisma.participantAttribute.findMany({
+          where: {
+            participantUuid: currentParticipantUuid,
+            attributeUuid: { in: fileAttributeUuids },
+          },
+          select: { attributeUuid: true, value: true },
+        });
+        currentFileValues = new Map(
+          existingValues.map((existing) => [
+            existing.attributeUuid,
+            existing.value,
+          ]),
+        );
+      }
+    }
+
     const transformedAttributes: Prisma.ParticipantAttributeUncheckedCreateWithoutParticipantInput[] =
       [];
 
@@ -134,6 +205,15 @@ export class ParticipantsService {
         continue;
       }
 
+      const valueToNormalize =
+        isFileLikeAttributeType(matchingAttribute.type) && !trustedFileValues
+          ? this.resolveUntrustedFileValue(
+              attribute.attributeUuid,
+              attribute.value,
+              currentFileValues?.get(attribute.attributeUuid) ?? null,
+            )
+          : attribute.value;
+
       const valueToSave = await normalizeParticipantAttributeValue(
         this.prisma,
         {
@@ -141,7 +221,7 @@ export class ParticipantsService {
           type: matchingAttribute.type,
           config: matchingAttribute.config,
         },
-        attribute.value,
+        valueToNormalize,
       );
 
       transformedAttributes.push({
@@ -168,6 +248,7 @@ export class ParticipantsService {
     eventUuid: string,
     email: string,
     participantAttributes?: ParticipantAttributeDto[],
+    options: { trustedFileValues?: boolean } = {},
   ): Promise<Participant> {
     try {
       const participant = await this.prisma.$transaction(async (tx) => {
@@ -179,6 +260,7 @@ export class ParticipantsService {
         const attributesToCreate = await this.prepareAttributesForSave(
           eventUuid,
           participantAttributes,
+          { trustedFileValues: options.trustedFileValues },
         );
 
         const createdParticipant = await tx.participant.create({
@@ -222,6 +304,7 @@ export class ParticipantsService {
     eventUuid: string,
     participantUuid: string,
     updateDto: ParticipantUpdateDto,
+    options: { trustedFileValues?: boolean } = {},
   ): Promise<Participant> {
     const { participantAttributes, ...updates } = updateDto;
 
@@ -244,6 +327,10 @@ export class ParticipantsService {
           const attributesToSave = await this.prepareAttributesForSave(
             eventUuid,
             participantAttributes,
+            {
+              trustedFileValues: options.trustedFileValues,
+              currentParticipantUuid: participantUuid,
+            },
           );
           savedAttributes = attributesToSave;
 
@@ -257,9 +344,16 @@ export class ParticipantsService {
                 where: {
                   participantUuid,
                   attributeUuid: { in: attributeUuidsToUpdate },
-                  attribute: { type: AttributeType.file },
+                  attribute: { type: { in: FILE_LIKE_ATTRIBUTE_TYPES } },
                 },
               });
+
+            const newValueByAttributeUuid = new Map(
+              attributesToSave.map((attribute) => [
+                attribute.attributeUuid,
+                attribute.value,
+              ]),
+            );
 
             await tx.participantAttribute.deleteMany({
               where: {
@@ -271,7 +365,9 @@ export class ParticipantsService {
             for (const attribute of existingFileAttributes) {
               if (
                 typeof attribute.value === "string" &&
-                attribute.value.length > 0
+                attribute.value.length > 0 &&
+                attribute.value !==
+                  newValueByAttributeUuid.get(attribute.attributeUuid)
               ) {
                 fileKeysToDelete.push(attribute.value);
               }
@@ -376,7 +472,7 @@ export class ParticipantsService {
       if (
         typeof attribute.value === "string" &&
         attribute.value.length > 0 &&
-        attribute.attribute.type === AttributeType.file
+        isFileLikeAttributeType(attribute.attribute.type)
       ) {
         await this.storageService.delete(bucket, attribute.value);
       }
@@ -425,7 +521,7 @@ export class ParticipantsService {
         if (
           typeof attribute.value === "string" &&
           attribute.value.length > 0 &&
-          attribute.attribute.type === AttributeType.file
+          isFileLikeAttributeType(attribute.attribute.type)
         ) {
           await this.storageService.delete(bucket, attribute.value);
         }
@@ -569,7 +665,19 @@ export class ParticipantsService {
       throw new NotFoundException("Participant not found");
     }
 
-    return participant;
+    const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
+    return {
+      ...participant,
+      attributes: participant.attributes.map((attribute) => ({
+        ...attribute,
+        value:
+          isFileLikeAttributeType(attribute.attribute.type) &&
+          typeof attribute.value === "string" &&
+          attribute.value.length > 0
+            ? this.storageService.getUrl(bucket, attribute.value)
+            : attribute.value,
+      })),
+    };
   }
 
   async bulkUpdateAttributes(
@@ -616,7 +724,7 @@ export class ParticipantsService {
     const fileKeysToDelete: string[] = [];
 
     await this.prisma.$transaction(async (tx) => {
-      if (attribute.type === AttributeType.file) {
+      if (isFileLikeAttributeType(attribute.type)) {
         const existingFileAttributes = await tx.participantAttribute.findMany({
           where: {
             attributeUuid,

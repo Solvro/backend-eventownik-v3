@@ -266,4 +266,140 @@ describe("Forms -> Participants Integration", () => {
       expect(storedFileAttribute?.value).toBe("old-file-key");
     });
   });
+
+  describe("drawing attribute behaves like file, but images only", () => {
+    it("accepts an image upload for a drawing attribute", async () => {
+      const event = await createEvent();
+      const drawingAttribute = await createAttribute(event.uuid, {
+        type: AttributeType.drawing,
+        name: "Signature",
+      });
+      const form = await createForm(event.uuid);
+      await prisma.event.update({
+        where: { uuid: event.uuid },
+        data: { registerFormUuid: form.uuid },
+      });
+      await createFormDefinition(form.uuid, drawingAttribute.uuid, false);
+
+      const uploadedFile = await prisma.uploadedFile.create({
+        data: {
+          fileKey: "signature-key.png",
+          originalName: "signature.png",
+          mimeType: "image/png",
+          size: 512,
+          formUuid: form.uuid,
+          sourceIp: "127.0.0.1",
+        },
+      });
+
+      const submissionData = {
+        email: `participant-${String(Date.now())}@example.com`,
+        attributes: [
+          [{ attributeUuid: drawingAttribute.uuid, value: uploadedFile.uuid }],
+        ],
+      } as unknown as FormSubmitionDto;
+
+      const participant = await formsService.formSubmit(
+        event.slug,
+        form.uuid,
+        submissionData,
+      );
+
+      const storedAttribute = await prisma.participantAttribute.findUnique({
+        where: {
+          participantUuid_attributeUuid: {
+            participantUuid: participant.uuid,
+            attributeUuid: drawingAttribute.uuid,
+          },
+        },
+      });
+      expect(storedAttribute?.value).toBe("signature-key.png");
+    });
+
+    it("rejects a non-image upload for a drawing attribute", async () => {
+      const event = await createEvent();
+      const drawingAttribute = await createAttribute(event.uuid, {
+        type: AttributeType.drawing,
+        name: "Signature",
+      });
+      const form = await createForm(event.uuid);
+      await prisma.event.update({
+        where: { uuid: event.uuid },
+        data: { registerFormUuid: form.uuid },
+      });
+      await createFormDefinition(form.uuid, drawingAttribute.uuid, false);
+
+      const uploadedFile = await prisma.uploadedFile.create({
+        data: {
+          fileKey: "not-an-image-key.pdf",
+          originalName: "document.pdf",
+          mimeType: "application/pdf",
+          size: 512,
+          formUuid: form.uuid,
+          sourceIp: "127.0.0.1",
+        },
+      });
+
+      const submissionData = {
+        email: `participant-${String(Date.now())}@example.com`,
+        attributes: [
+          [{ attributeUuid: drawingAttribute.uuid, value: uploadedFile.uuid }],
+        ],
+      } as unknown as FormSubmitionDto;
+
+      await expect(
+        formsService.formSubmit(event.slug, form.uuid, submissionData),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe("required field omitted on update falls back to the existing value", () => {
+    it("does not fail when a required file attribute is omitted because it's unchanged", async () => {
+      const event = await createEvent();
+      const fileAttribute = await createAttribute(event.uuid, {
+        type: AttributeType.file,
+        name: "Resume",
+      });
+      const updateForm = await createForm(event.uuid, {
+        name: "Profile update form",
+      });
+      await createFormDefinition(updateForm.uuid, fileAttribute.uuid, true);
+
+      const participant = await prisma.participant.create({
+        data: {
+          email: `participant-${String(Date.now())}@example.com`,
+          eventUuid: event.uuid,
+          attributes: {
+            create: [
+              { attributeUuid: fileAttribute.uuid, value: "existing-key.png" },
+            ],
+          },
+        },
+      });
+
+      const submissionData = {
+        participantId: participant.uuid,
+        attributes: [],
+      } as unknown as FormSubmitionDto;
+
+      const result = await formsService.formSubmit(
+        event.slug,
+        updateForm.uuid,
+        submissionData,
+      );
+
+      expect(result).toBeDefined();
+
+      const storedAttribute = await prisma.participantAttribute.findUnique({
+        where: {
+          participantUuid_attributeUuid: {
+            participantUuid: participant.uuid,
+            attributeUuid: fileAttribute.uuid,
+          },
+        },
+      });
+      expect(storedAttribute?.value).toBe("existing-key.png");
+      expect(mockStorageService.delete).not.toHaveBeenCalled();
+    });
+  });
 });

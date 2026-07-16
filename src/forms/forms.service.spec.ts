@@ -43,6 +43,14 @@ describe("FormsService", () => {
     formDefinition: {
       createMany: jest.fn(),
     },
+    uploadedFile: {
+      findUnique: jest.fn(),
+      update: jest.fn(),
+    },
+    participantAttribute: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn(),
+    },
     $transaction: jest.fn(),
   };
 
@@ -465,6 +473,7 @@ describe("FormsService", () => {
         eventUuid,
         submissionData.email,
         [{ attributeUuid: "attr-select", value: "choice-1" }],
+        { trustedFileValues: true },
       );
     });
 
@@ -509,6 +518,7 @@ describe("FormsService", () => {
         eventUuid,
         submissionData.email,
         [{ attributeUuid: "attr-multi", value: ["invalid"] }],
+        { trustedFileValues: true },
       );
     });
 
@@ -565,6 +575,7 @@ describe("FormsService", () => {
             value: ["allowed-1", "allowed-2", "allowed-3"],
           },
         ],
+        { trustedFileValues: true },
       );
     });
 
@@ -631,6 +642,7 @@ describe("FormsService", () => {
             ],
           },
         ],
+        { trustedFileValues: true },
       );
       expect(result).toBeDefined();
     });
@@ -696,6 +708,7 @@ describe("FormsService", () => {
             ],
           },
         ],
+        { trustedFileValues: true },
       );
     });
 
@@ -739,6 +752,7 @@ describe("FormsService", () => {
         eventUuid,
         submissionData.email,
         [{ attributeUuid: "attr-1", value: "value-1" }],
+        { trustedFileValues: true },
       );
       expect(result).toBeDefined();
     });
@@ -781,6 +795,7 @@ describe("FormsService", () => {
             { attributeUuid: "attr-1", value: "updated-value" },
           ],
         }),
+        { trustedFileValues: true },
       );
     });
 
@@ -808,6 +823,192 @@ describe("FormsService", () => {
       ).rejects.toThrow(
         `Event with a slug: ${eventSlug} has reached the participants limit`,
       );
+    });
+
+    it("should resolve a drawing attribute's upload token to its file key, like a file attribute", async () => {
+      const token = "550e8400-e29b-41d4-a716-446655440099";
+      const submissionData = {
+        email: "test@example.com",
+        attributes: [[{ attributeUuid: "attr-drawing", value: token }]],
+      } as unknown as FormSubmitionDto;
+
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
+        registerFormUuid: formUuid,
+        participants: [],
+        participantsLimit: 10,
+      });
+      mockPrismaService.form.findUnique.mockResolvedValue({
+        uuid: formUuid,
+        formDefinitions: [
+          {
+            attributeUuid: "attr-drawing",
+            isRequired: false,
+            attribute: { uuid: "attr-drawing", type: AttributeType.drawing },
+          },
+        ],
+      });
+      mockPrismaService.uploadedFile.findUnique.mockResolvedValue({
+        uuid: token,
+        formUuid,
+        claimedAt: null,
+        fileKey: "drawing-key.png",
+        mimeType: "image/png",
+      });
+      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockParticipantsService.register.mockResolvedValue({
+        id: 1,
+        email: submissionData.email,
+      });
+
+      await service.formSubmit(eventSlug, formUuid, submissionData);
+
+      expect(mockParticipantsService.register).toHaveBeenCalledWith(
+        eventUuid,
+        submissionData.email,
+        [{ attributeUuid: "attr-drawing", value: "drawing-key.png" }],
+        { trustedFileValues: true },
+      );
+    });
+
+    it("should reject a drawing attribute upload whose file is not an image", async () => {
+      const token = "550e8400-e29b-41d4-a716-446655440099";
+      const submissionData = {
+        email: "test@example.com",
+        attributes: [[{ attributeUuid: "attr-drawing", value: token }]],
+      } as unknown as FormSubmitionDto;
+
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
+        registerFormUuid: formUuid,
+        participants: [],
+        participantsLimit: 10,
+      });
+      mockPrismaService.form.findUnique.mockResolvedValue({
+        uuid: formUuid,
+        formDefinitions: [
+          {
+            attributeUuid: "attr-drawing",
+            isRequired: false,
+            attribute: { uuid: "attr-drawing", type: AttributeType.drawing },
+          },
+        ],
+      });
+      mockPrismaService.uploadedFile.findUnique.mockResolvedValue({
+        uuid: token,
+        formUuid,
+        claimedAt: null,
+        fileKey: "not-an-image.pdf",
+        mimeType: "application/pdf",
+      });
+      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+
+      await expect(
+        service.formSubmit(eventSlug, formUuid, submissionData),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("should reject a malformed (non-UUID) file token with 400 without querying the database", async () => {
+      const submissionData = {
+        email: "test@example.com",
+        attributes: [
+          [{ attributeUuid: "attr-file", value: "not-a-valid-token" }],
+        ],
+      } as unknown as FormSubmitionDto;
+
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
+        registerFormUuid: formUuid,
+        participants: [],
+        participantsLimit: 10,
+      });
+      mockPrismaService.form.findUnique.mockResolvedValue({
+        uuid: formUuid,
+        formDefinitions: [
+          {
+            attributeUuid: "attr-file",
+            isRequired: false,
+            attribute: { uuid: "attr-file", type: AttributeType.file },
+          },
+        ],
+      });
+      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+
+      await expect(
+        service.formSubmit(eventSlug, formUuid, submissionData),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrismaService.uploadedFile.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("should not fail an update submission that omits a required file attribute the participant already has", async () => {
+      const submissionData = {
+        participantId,
+        attributes: [],
+      } as unknown as FormSubmitionDto;
+
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
+        registerFormUuid: "other-form-uuid",
+      });
+      mockPrismaService.form.findUnique.mockResolvedValue({
+        uuid: formUuid,
+        formDefinitions: [
+          {
+            attributeUuid: "attr-file",
+            isRequired: true,
+            attribute: { uuid: "attr-file", type: AttributeType.file },
+          },
+        ],
+      });
+      mockPrismaService.participantAttribute.findMany.mockResolvedValueOnce([
+        { attributeUuid: "attr-file", value: "existing-key.png" },
+      ]);
+      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockParticipantsService.update.mockResolvedValue({
+        id: participantId,
+        status: "updated",
+      });
+
+      await service.formSubmit(eventSlug, formUuid, submissionData);
+
+      expect(mockParticipantsService.update).toHaveBeenCalledWith(
+        eventUuid,
+        participantId,
+        expect.objectContaining({ participantAttributes: [] }),
+        { trustedFileValues: true },
+      );
+    });
+
+    it("should fail a registration submission that omits a required attribute", async () => {
+      const submissionData = {
+        email: "test@example.com",
+        attributes: [],
+      } as unknown as FormSubmitionDto;
+
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
+        registerFormUuid: formUuid,
+        participants: [],
+        participantsLimit: 10,
+      });
+      mockPrismaService.form.findUnique.mockResolvedValue({
+        uuid: formUuid,
+        formDefinitions: [
+          {
+            attributeUuid: "attr-required",
+            isRequired: true,
+            attribute: { uuid: "attr-required", type: AttributeType.text },
+          },
+        ],
+      });
+      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+
+      await expect(
+        service.formSubmit(eventSlug, formUuid, submissionData),
+      ).rejects.toThrow(BadRequestException);
+      expect(
+        mockPrismaService.participantAttribute.findMany,
+      ).not.toHaveBeenCalled();
     });
   });
 });

@@ -56,6 +56,16 @@ describe("ParticipantsService", () => {
     $transaction: jest.fn(),
   };
 
+  const mockStorageService = {
+    upload: jest.fn(),
+    delete: jest.fn(),
+    getUrl: jest.fn(
+      (bucket: string, key: string) =>
+        `https://cdn.example.com/${bucket}/${key}`,
+    ),
+    extractKey: jest.fn((_bucket: string, value: string) => value),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -66,7 +76,7 @@ describe("ParticipantsService", () => {
         },
         {
           provide: StorageService,
-          useValue: { upload: jest.fn(), delete: jest.fn() },
+          useValue: mockStorageService,
         },
         {
           provide: ConfigService,
@@ -267,6 +277,185 @@ describe("ParticipantsService", () => {
     });
   });
 
+  describe("file/drawing attribute lockdown", () => {
+    const eventUuid = "event-123";
+    const participantUuid = "part-123";
+    const fileAttribute = { uuid: "attr-file", type: "file", config: null };
+
+    it("create: rejects a non-empty file attribute value (no upload mechanism on this path)", async () => {
+      mockPrismaService.event.findUnique.mockResolvedValue({ uuid: eventUuid });
+      mockPrismaService.attribute.findMany.mockResolvedValue([fileAttribute]);
+
+      await expect(
+        service.create(eventUuid, {
+          email: "test@example.com",
+          participantAttributes: [
+            { attributeUuid: "attr-file", value: "some-key.png" },
+          ],
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("update: accepts a resubmitted value matching the current one, and does not delete the underlying file", async () => {
+      mockPrismaService.participant.findUnique.mockResolvedValue({
+        uuid: participantUuid,
+        eventUuid,
+      });
+      mockPrismaService.attribute.findMany.mockResolvedValue([fileAttribute]);
+      mockPrismaService.participantAttribute.findMany.mockResolvedValue([
+        { attributeUuid: "attr-file", value: "old-key.png" },
+      ]);
+      mockPrismaService.participant.update.mockResolvedValue({
+        uuid: participantUuid,
+        email: "test@example.com",
+        createdAt: new Date(),
+        attributes: [],
+      });
+
+      await service.update(eventUuid, participantUuid, {
+        participantAttributes: [
+          { attributeUuid: "attr-file", value: "old-key.png" },
+        ],
+      });
+
+      expect(mockPrismaService.participant.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            attributes: {
+              create: [{ attributeUuid: "attr-file", value: "old-key.png" }],
+            },
+          }),
+        }),
+      );
+      expect(mockStorageService.delete).not.toHaveBeenCalled();
+    });
+
+    it("update: rejects a value that does not match the current stored value", async () => {
+      mockPrismaService.participant.findUnique.mockResolvedValue({
+        uuid: participantUuid,
+        eventUuid,
+      });
+      mockPrismaService.attribute.findMany.mockResolvedValue([fileAttribute]);
+      mockPrismaService.participantAttribute.findMany.mockResolvedValue([
+        { attributeUuid: "attr-file", value: "old-key.png" },
+      ]);
+
+      await expect(
+        service.update(eventUuid, participantUuid, {
+          participantAttributes: [
+            { attributeUuid: "attr-file", value: "different-key.png" },
+          ],
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("update: allows clearing a file attribute to empty", async () => {
+      mockPrismaService.participant.findUnique.mockResolvedValue({
+        uuid: participantUuid,
+        eventUuid,
+      });
+      mockPrismaService.attribute.findMany.mockResolvedValue([fileAttribute]);
+      mockPrismaService.participant.update.mockResolvedValue({
+        uuid: participantUuid,
+        email: "test@example.com",
+        createdAt: new Date(),
+        attributes: [],
+      });
+
+      await service.update(eventUuid, participantUuid, {
+        participantAttributes: [{ attributeUuid: "attr-file", value: "" }],
+      });
+
+      expect(mockPrismaService.participant.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            attributes: {
+              create: [{ attributeUuid: "attr-file", value: Prisma.JsonNull }],
+            },
+          }),
+        }),
+      );
+    });
+
+    it("update: trustedFileValues bypasses the match-check (forms.service path)", async () => {
+      mockPrismaService.participant.findUnique.mockResolvedValue({
+        uuid: participantUuid,
+        eventUuid,
+      });
+      mockPrismaService.attribute.findMany.mockResolvedValue([fileAttribute]);
+      mockPrismaService.participant.update.mockResolvedValue({
+        uuid: participantUuid,
+        email: "test@example.com",
+        createdAt: new Date(),
+        attributes: [],
+      });
+
+      await service.update(
+        eventUuid,
+        participantUuid,
+        {
+          participantAttributes: [
+            { attributeUuid: "attr-file", value: "brand-new-key.png" },
+          ],
+        },
+        { trustedFileValues: true },
+      );
+
+      expect(mockPrismaService.participant.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            attributes: {
+              create: [
+                { attributeUuid: "attr-file", value: "brand-new-key.png" },
+              ],
+            },
+          }),
+        }),
+      );
+    });
+
+    it("bulkUpdateAttributes: rejects a non-empty new value for a file-type attribute", async () => {
+      mockPrismaService.attribute.findUnique.mockResolvedValue({
+        uuid: "attr-file",
+        eventUuid,
+        type: "file",
+      });
+      mockPrismaService.participant.count.mockResolvedValue(1);
+
+      await expect(
+        service.bulkUpdateAttributes(eventUuid, "attr-file", "new-key.png", [
+          "p-1",
+        ]),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("bulkUpdateAttributes: allows clearing a file-type attribute", async () => {
+      mockPrismaService.attribute.findUnique.mockResolvedValue({
+        uuid: "attr-file",
+        eventUuid,
+        type: "file",
+      });
+      mockPrismaService.participant.count.mockResolvedValue(1);
+      mockPrismaService.attribute.findMany.mockResolvedValue([fileAttribute]);
+
+      await service.bulkUpdateAttributes(eventUuid, "attr-file", undefined, [
+        "p-1",
+      ]);
+
+      expect(
+        mockPrismaService.participantAttribute.createMany,
+      ).toHaveBeenCalledWith({
+        data: [
+          {
+            participantUuid: "p-1",
+            attributeUuid: "attr-file",
+            value: Prisma.JsonNull,
+          },
+        ],
+      });
+    });
+  });
+
   describe("findAll", () => {
     it("should return paginated participants", async () => {
       const eventUuid = "event-123";
@@ -350,6 +539,64 @@ describe("ParticipantsService", () => {
       await expect(service.findOne("e-1", "p-1")).rejects.toThrow(
         NotFoundException,
       );
+    });
+
+    it("should resolve drawing attribute values to a storage URL, same as file", async () => {
+      mockPrismaService.participant.findFirst.mockResolvedValue({
+        uuid: "part-123",
+        email: "test@example.com",
+        createdAt: new Date(),
+        attributes: [
+          {
+            attributeUuid: "attr-drawing",
+            value: "drawing-key.png",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            attribute: { name: "Signature", type: "drawing" },
+          },
+        ],
+      });
+
+      const result = await service.findOne("event-123", "part-123");
+
+      expect(result.attributes[0].value).toBe(
+        "https://cdn.example.com/test-bucket/drawing-key.png",
+      );
+    });
+  });
+
+  describe("findOnePublic", () => {
+    it("should resolve file/drawing attribute values to a storage URL", async () => {
+      mockPrismaService.participant.findFirst.mockResolvedValue({
+        uuid: "part-123",
+        email: "test@example.com",
+        attributes: [
+          {
+            attributeUuid: "attr-file",
+            value: "resume.pdf",
+            attribute: { name: "Resume", type: "file" },
+          },
+          {
+            attributeUuid: "attr-text",
+            value: "hello",
+            attribute: { name: "Name", type: "text" },
+          },
+        ],
+      });
+
+      const result = await service.findOnePublic("event-123", "part-123", []);
+
+      expect(result.attributes[0].value).toBe(
+        "https://cdn.example.com/test-bucket/resume.pdf",
+      );
+      expect(result.attributes[1].value).toBe("hello");
+    });
+
+    it("should throw NotFoundException if participant not found", async () => {
+      mockPrismaService.participant.findFirst.mockResolvedValue(null);
+      await expect(
+        service.findOnePublic("event-123", "part-123", []),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
