@@ -673,18 +673,23 @@ export class FormsService {
         )
         .map((formDefinition) => formDefinition.attribute) as Attribute[];
 
-      const existingAttributeValues =
-        submissionData.participantId === undefined ||
-        requiredAttributes.length === 0
-          ? null
-          : new Map(
-              (
-                await prisma.participantAttribute.findMany({
-                  where: { participantUuid: submissionData.participantId },
-                  select: { attributeUuid: true, value: true },
-                })
-              ).map((existing) => [existing.attributeUuid, existing.value]),
-            );
+      let existingAttributeValues: Map<string, Prisma.JsonValue> | null = null;
+      if (
+        submissionData.participantId !== undefined &&
+        requiredAttributes.length > 0
+      ) {
+        const existingAttributeRows =
+          await prisma.participantAttribute.findMany({
+            where: { participantUuid: submissionData.participantId },
+            select: { attributeUuid: true, value: true },
+          });
+        existingAttributeValues = new Map(
+          existingAttributeRows.map((existing) => [
+            existing.attributeUuid,
+            existing.value,
+          ]),
+        );
+      }
 
       for (const attribute of requiredAttributes) {
         const wasSubmitted = Object.hasOwn(submittedAttributes, attribute.uuid);

@@ -746,7 +746,7 @@ describe("ParticipantsService", () => {
       });
     });
 
-    it("should clean up stale S3 file keys after commit, excluding a key equal to the new value and deduping", async () => {
+    it("should clean up all existing S3 file keys when bulk-clearing a file attribute, deduping", async () => {
       mockPrismaService.attribute.findUnique.mockResolvedValue({
         uuid: attributeUuid,
         eventUuid,
@@ -759,22 +759,27 @@ describe("ParticipantsService", () => {
       mockPrismaService.participantAttribute.findMany.mockResolvedValueOnce([
         { value: "old-key-1" },
         { value: "old-key-1" },
-        { value: "new-key" },
+        { value: "old-key-2" },
         { value: null },
       ]);
 
-      await service.bulkUpdateAttributes(eventUuid, attributeUuid, "new-key", [
+      await service.bulkUpdateAttributes(eventUuid, attributeUuid, undefined, [
         "p-1",
         "p-2",
         "p-3",
       ]);
 
       // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(storageService.delete as jest.Mock).toHaveBeenCalledTimes(1);
+      expect(storageService.delete as jest.Mock).toHaveBeenCalledTimes(2);
       // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(storageService.delete as jest.Mock).toHaveBeenCalledWith(
         "test-bucket",
         "old-key-1",
+      );
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(storageService.delete as jest.Mock).toHaveBeenCalledWith(
+        "test-bucket",
+        "old-key-2",
       );
     });
   });

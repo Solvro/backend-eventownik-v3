@@ -17,7 +17,12 @@ import { FormsService } from "./forms.service";
 describe("Forms -> Participants Integration", () => {
   let formsService: FormsService;
   let prisma: PrismaService;
-  let mockStorageService: { upload: jest.Mock; delete: jest.Mock };
+  let mockStorageService: {
+    upload: jest.Mock;
+    delete: jest.Mock;
+    getUrl: jest.Mock;
+    extractKey: jest.Mock;
+  };
 
   const createdEventUuids: string[] = [];
 
@@ -25,6 +30,11 @@ describe("Forms -> Participants Integration", () => {
     mockStorageService = {
       upload: jest.fn(),
       delete: jest.fn(),
+      getUrl: jest.fn(
+        (bucket: string, key: string) =>
+          `https://cdn.example.com/${bucket}/${key}`,
+      ),
+      extractKey: jest.fn((_bucket: string, value: string) => value),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -239,13 +249,13 @@ describe("Forms -> Participants Integration", () => {
         },
       });
 
-      // Submit a new file for the (optional) file attribute, but omit the
-      // required text attribute entirely so the submission gets rejected
-      // after the file token has already been resolved.
       const submissionData = {
         participantId: participant.uuid,
         attributes: [
-          [{ attributeUuid: fileAttribute.uuid, value: uploadedFile.uuid }],
+          [
+            { attributeUuid: fileAttribute.uuid, value: uploadedFile.uuid },
+            { attributeUuid: requiredTextAttribute.uuid, value: "" },
+          ],
         ],
       } as unknown as FormSubmitionDto;
 
