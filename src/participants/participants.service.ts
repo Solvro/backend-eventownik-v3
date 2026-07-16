@@ -118,8 +118,15 @@ export class ParticipantsService {
 
     const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
     const strippedValue = this.storageService.extractKey(bucket, rawValue);
+    const strippedCurrentValue =
+      typeof currentValue === "string"
+        ? this.storageService.extractKey(bucket, currentValue)
+        : null;
 
-    if (currentValue == null || strippedValue !== currentValue) {
+    if (
+      strippedCurrentValue == null ||
+      strippedValue !== strippedCurrentValue
+    ) {
       throw new BadRequestException(
         `Attribute ${attributeUuid} cannot be set to a new value directly; upload a new file through a form instead.`,
       );
@@ -395,7 +402,10 @@ export class ParticipantsService {
       if (fileKeysToDelete.length > 0) {
         const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
         for (const key of fileKeysToDelete) {
-          await this.storageService.delete(bucket, key);
+          await this.storageService.delete(
+            bucket,
+            this.storageService.extractKey(bucket, key),
+          );
         }
       }
 
@@ -474,7 +484,10 @@ export class ParticipantsService {
         attribute.value.length > 0 &&
         isFileLikeAttributeType(attribute.attribute.type)
       ) {
-        await this.storageService.delete(bucket, attribute.value);
+        await this.storageService.delete(
+          bucket,
+          this.storageService.extractKey(bucket, attribute.value),
+        );
       }
     }
   }
@@ -523,7 +536,10 @@ export class ParticipantsService {
           attribute.value.length > 0 &&
           isFileLikeAttributeType(attribute.attribute.type)
         ) {
-          await this.storageService.delete(bucket, attribute.value);
+          await this.storageService.delete(
+            bucket,
+            this.storageService.extractKey(bucket, attribute.value),
+          );
         }
       }
     }
@@ -766,7 +782,10 @@ export class ParticipantsService {
     if (fileKeysToDelete.length > 0) {
       const bucket = this.configService.getOrThrow<string>("S3_BUCKET_FORMS");
       for (const key of fileKeysToDelete) {
-        await this.storageService.delete(bucket, key);
+        await this.storageService.delete(
+          bucket,
+          this.storageService.extractKey(bucket, key),
+        );
       }
     }
 

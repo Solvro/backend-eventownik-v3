@@ -349,6 +349,60 @@ describe("ParticipantsService", () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it("update: self-heals when the currently stored value is already URL-corrupted", async () => {
+      const prefix = "https://cdn.example.com/test-bucket/";
+      mockPrismaService.participant.findUnique.mockResolvedValue({
+        uuid: participantUuid,
+        eventUuid,
+      });
+      mockPrismaService.attribute.findMany.mockResolvedValue([fileAttribute]);
+      mockPrismaService.participantAttribute.findMany.mockResolvedValue([
+        { attributeUuid: "attr-file", value: `${prefix}old-key.png` },
+      ]);
+      mockPrismaService.participant.update.mockResolvedValue({
+        uuid: participantUuid,
+        email: "test@example.com",
+        createdAt: new Date(),
+        attributes: [],
+      });
+      mockStorageService.extractKey.mockImplementation(
+        (_bucket: string, value: string) => {
+          let key = value;
+          while (key.startsWith(prefix)) {
+            key = key.slice(prefix.length);
+          }
+          return key;
+        },
+      );
+
+      // The frontend resubmits exactly what a GET returned: the already
+      // (singly) corrupted stored value with the resolved URL applied on
+      // top of it once more.
+      await service.update(eventUuid, participantUuid, {
+        participantAttributes: [
+          {
+            attributeUuid: "attr-file",
+            value: `${prefix}${prefix}old-key.png`,
+          },
+        ],
+      });
+
+      expect(mockPrismaService.participant.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            attributes: {
+              create: [{ attributeUuid: "attr-file", value: "old-key.png" }],
+            },
+          }),
+        }),
+      );
+
+      // Restore the default identity implementation for later tests.
+      mockStorageService.extractKey.mockImplementation(
+        (_bucket: string, value: string) => value,
+      );
+    });
+
     it("update: allows clearing a file attribute to empty", async () => {
       mockPrismaService.participant.findUnique.mockResolvedValue({
         uuid: participantUuid,

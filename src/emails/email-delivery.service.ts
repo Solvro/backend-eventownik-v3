@@ -183,16 +183,17 @@ export class EmailDeliveryService {
       throw new NotFoundException("Email template not found");
     }
 
+    const uniqueParticipantUuids = [...new Set(participantUuids)];
     const matchingParticipantsCount = await this.prisma.participant.count({
-      where: { uuid: { in: participantUuids }, eventUuid },
+      where: { uuid: { in: uniqueParticipantUuids }, eventUuid },
     });
-    if (matchingParticipantsCount !== participantUuids.length) {
+    if (matchingParticipantsCount !== uniqueParticipantUuids.length) {
       throw new BadRequestException(
         "One or more participants were not found in this event",
       );
     }
 
-    await this.sendEmailToParticipants(emailUuid, participantUuids);
+    await this.sendEmailToParticipants(emailUuid, uniqueParticipantUuids);
   }
 
   async sendTestEmail(

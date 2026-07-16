@@ -286,6 +286,34 @@ describe("EmailDeliveryService", () => {
         service.sendManualEmail("event-uuid", "email-uuid", ["participant-1"]),
       ).rejects.toThrow(NotFoundException);
     });
+
+    it("dedupes duplicate participant UUIDs before validating and sending", async () => {
+      mockPrismaService.emailTemplate.findFirst.mockResolvedValue({
+        uuid: "email-uuid",
+      });
+      mockPrismaService.participant.count.mockResolvedValue(2);
+
+      await service.sendManualEmail("event-uuid", "email-uuid", [
+        "participant-1",
+        "participant-1",
+        "participant-2",
+      ]);
+
+      expect(mockPrismaService.participant.count).toHaveBeenCalledWith({
+        where: {
+          uuid: { in: ["participant-1", "participant-2"] },
+          eventUuid: "event-uuid",
+        },
+      });
+      expect(
+        mockPrismaService.participantEmailStatus.createMany,
+      ).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({ participantUuid: "participant-1" }),
+          expect.objectContaining({ participantUuid: "participant-2" }),
+        ],
+      });
+    });
   });
 
   describe("sendTestEmail", () => {

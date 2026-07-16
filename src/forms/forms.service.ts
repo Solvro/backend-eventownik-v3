@@ -489,7 +489,6 @@ export class FormsService {
     submissionData: FormSubmitionDto,
   ) {
     let eventUuid = "";
-    const fileKeysToDelete: string[] = [];
     const participant = await this.prisma.$transaction(async (prisma) => {
       const event = await prisma.event.findUnique({
         where: { slug: eventSlug },
@@ -591,25 +590,6 @@ export class FormsService {
             where: { uuid: fileToken },
             data: { claimedAt: new Date() },
           });
-
-          if (submissionData.participantId !== undefined) {
-            const existingAttribute =
-              await prisma.participantAttribute.findUnique({
-                where: {
-                  participantUuid_attributeUuid: {
-                    participantUuid: submissionData.participantId,
-                    attributeUuid,
-                  },
-                },
-              });
-            if (
-              existingAttribute?.value != null &&
-              isString(existingAttribute.value) &&
-              existingAttribute.value.length > 0
-            ) {
-              fileKeysToDelete.push(existingAttribute.value);
-            }
-          }
         }
 
         if (
@@ -762,10 +742,6 @@ export class FormsService {
         `Unexpected error in form submission.`,
       );
     });
-
-    for (const key of fileKeysToDelete) {
-      await this.storageService.delete(this.bucket, key);
-    }
 
     this.eventEmitter.emit(
       FORM_FILLED_EVENT,
