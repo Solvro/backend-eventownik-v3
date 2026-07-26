@@ -13,6 +13,7 @@ import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
 import { PrismaService } from "../prisma/prisma.service";
+import { AuthEmailService } from "./auth-email.service";
 import { AuthService } from "./auth.service";
 
 describe("AuthService", () => {
@@ -63,6 +64,10 @@ describe("AuthService", () => {
         {
           provide: ConfigService,
           useValue: { getOrThrow: jest.fn().mockReturnValue(7) },
+        },
+        {
+          provide: AuthEmailService,
+          useValue: { enqueuePasswordResetEmail: jest.fn() },
         },
       ],
     }).compile();

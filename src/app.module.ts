@@ -94,8 +94,7 @@ import { StorageModule } from "./storage/storage.module";
           from: configService.getOrThrow<string>("SMTP_FROM"),
         },
         template: {
-          // eslint-disable-next-line unicorn/prefer-module
-          dir: path.join(__dirname, "common", "templates"),
+          dir: path.join(process.cwd(), "dist", "common", "templates"),
           adapter: new HandlebarsAdapter(),
           options: {
             strict: true,
