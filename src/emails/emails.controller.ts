@@ -146,28 +146,7 @@ export class EmailsController {
     @Param("emailId", ParseUUIDPipe) emailId: string,
     @Body() query: DuplicateEmailDto,
   ) {
-    return this.emailsService.duplicate(eventId, emailId, query);
-  }
-
-  @Post(":emailId/duplicate")
-  @RequirePermission(PermissionType.MANAGE_EMAIL)
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: "Duplicate an email template" })
-  @ApiParam({ name: "eventId", description: "UUID of the event" })
-  @ApiParam({ name: "emailId", description: "UUID of the email to duplicate" })
-  @ApiCreatedResponse({
-    description: "Email template duplicated successfully",
-    type: EmailResponseDto,
-  })
-  @ApiNotFoundResponse({
-    description: "Email template or event does not exist",
-  })
-  async duplicate(
-    @Param("eventId", ParseUUIDPipe) eventId: string,
-    @Param("emailId", ParseUUIDPipe) emailId: string,
-    @Body() query: DuplicateEmailDto,
-  ) {
-    return this.emailsService.duplicate(eventId, emailId, query);
+    return this.emailTemplatesService.duplicate(eventId, emailId, query);
   }
 
   @Patch(":emailId")

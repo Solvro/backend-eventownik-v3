@@ -1,7 +1,7 @@
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { parseSortInput } from "src/common/utils/prisma.utility";
-import type { Prisma } from "src/generated/prisma/client";
+import { Prisma } from "src/generated/prisma/client";
 import { EmailStatus, EmailTrigger } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -12,6 +12,7 @@ import {
 } from "@nestjs/common";
 
 import { CreateEmailDto } from "./dto/create-email.dto";
+import { DuplicateEmailDto } from "./dto/duplicate-email.dto";
 import { EmailCompleteElementDto } from "./dto/email-complete-element.dto";
 import { EmailListElementDto } from "./dto/email-list-element.dto";
 import { EmailListingDto } from "./dto/email-listing.dto";
@@ -346,6 +347,50 @@ export class EmailTemplatesService {
           uuid: emailUuid,
         },
       });
+    });
+  }
+
+  async duplicate(
+    eventUuid: string,
+    emailUuid: string,
+    query: DuplicateEmailDto,
+  ): Promise<EmailResponseDto> {
+    return this.prisma.$transaction(async (tx) => {
+      const sourceEmail = await tx.emailTemplate.findFirst({
+        where: { uuid: emailUuid, eventUuid },
+      });
+      if (sourceEmail == null) {
+        throw new NotFoundException("Email template or event does not exist");
+      }
+
+      const emailTemplate = await tx.emailTemplate.create({
+        data: {
+          name: query.name ?? `${sourceEmail.name} - copy`,
+          content: sourceEmail.content,
+          trigger: sourceEmail.trigger,
+          triggerConfig:
+            sourceEmail.triggerConfig == null
+              ? {}
+              : (sourceEmail.triggerConfig as Prisma.InputJsonValue),
+          schema:
+            sourceEmail.schema == null
+              ? Prisma.JsonNull
+              : (sourceEmail.schema as Prisma.InputJsonValue),
+          order: sourceEmail.order,
+          eventUuid,
+        },
+      });
+
+      return {
+        id: emailTemplate.uuid,
+        name: emailTemplate.name,
+        content: emailTemplate.content,
+        trigger: emailTemplate.trigger,
+        eventId: emailTemplate.eventUuid,
+        schema: emailTemplate.schema,
+        createdAt: emailTemplate.createdAt.toISOString(),
+        updatedAt: emailTemplate.updatedAt.toISOString(),
+      };
     });
   }
 }
