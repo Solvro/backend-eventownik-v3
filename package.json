@@ -125,5 +125,14 @@
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.20.0"
+  },
+  "allowScripts": {
+    "prisma@7.8.0": true,
+    "msgpackr-extract@3.0.3": true,
+    "esbuild@0.27.2": true,
+    "@swc/core@1.13.3": true,
+    "@prisma/engines@7.8.0": true,
+    "@scarf/scarf@1.4.0": true,
+    "bcrypt@6.0.0": true
   }
 }
