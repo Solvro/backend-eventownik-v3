@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 
 import { CreateBlockDto } from "./dto/create-block.dto";
+import { DuplicateBlockDto } from "./dto/duplicate-block.dto";
 import { UpdateBlockDto } from "./dto/update-block.dto";
 import { Block } from "./entities/block.entity";
 
@@ -213,6 +214,30 @@ export class BlocksService {
     return this.prisma.block.update({
       where: { uuid: id },
       data: updateBlockDto,
+    });
+  }
+
+  async duplicate(
+    eventId: string,
+    attributeId: string,
+    id: string,
+    duplicateBlockDto: DuplicateBlockDto,
+  ) {
+    const block = await this.findOne(eventId, attributeId, id);
+
+    if (block.isRootBlock) {
+      throw new BadRequestException("Root block cannot be duplicated");
+    }
+
+    return this.prisma.block.create({
+      data: {
+        capacity: block.capacity,
+        order: block.order,
+        name: duplicateBlockDto.name ?? `${block.name} - copy`,
+        description: block.description,
+        parentUuid: block.parentUuid,
+        attributeUuid: block.attributeUuid,
+      },
     });
   }
 
