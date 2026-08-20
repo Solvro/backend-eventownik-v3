@@ -653,14 +653,16 @@ export class ParticipantsService {
   }
 
   async findOnePublic(
-    eventUuid: string,
+    eventSlug: string,
     participantUuid: string,
     attributes: string[],
   ) {
     const participant = await this.prisma.participant.findFirst({
       where: {
         uuid: participantUuid,
-        eventUuid,
+        event: {
+          slug: eventSlug,
+        },
       },
       include: {
         attributes: {

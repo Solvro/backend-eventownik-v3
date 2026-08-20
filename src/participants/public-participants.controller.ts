@@ -12,13 +12,13 @@ import { Participant } from "./entities/participant.entity";
 import { ParticipantsService } from "./participants.service";
 
 @ApiTags("Public")
-@Controller("public/events/:eventId/participants")
+@Controller("public/events/:eventSlug/participants")
 export class PublicParticipantsController {
   constructor(private readonly participantsService: ParticipantsService) {}
 
   @Get(":participantId")
   @ApiOperation({ summary: "Get public participant" })
-  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "eventSlug", description: "Slug of the event" })
   @ApiParam({ name: "participantId", description: "UUID of the participant" })
   @ApiQuery({
     name: "attributes",
@@ -29,7 +29,7 @@ export class PublicParticipantsController {
   @ApiOkResponse({ type: Participant })
   @ApiNotFoundResponse({ description: "Participant not found" })
   async findOne(
-    @Param("eventId", ParseUUIDPipe) eventUuid: string,
+    @Param("eventSlug") eventSlug: string,
     @Param("participantId", ParseUUIDPipe) participantUuid: string,
     @Query("attributes") attributes?: string | string[],
   ) {
@@ -39,7 +39,7 @@ export class PublicParticipantsController {
         ? []
         : [attributes];
     return this.participantsService.findOnePublic(
-      eventUuid,
+      eventSlug,
       participantUuid,
       normalizedAttributes,
     );

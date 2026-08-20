@@ -16,6 +16,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCreatedResponse,
   ApiForbiddenResponse,
@@ -30,6 +31,7 @@ import {
 
 import { BlocksService } from "./blocks.service";
 import { CreateBlockDto } from "./dto/create-block.dto";
+import { DuplicateBlockDto } from "./dto/duplicate-block.dto";
 import { UpdateBlockDto } from "./dto/update-block.dto";
 import { Block } from "./entities/block.entity";
 
@@ -84,6 +86,30 @@ export class BlocksController {
     @Param("id", ParseUUIDPipe) blockId: string,
   ) {
     return this.blocksService.findOne(eventId, attributeId, blockId);
+  }
+
+  @Post(":id/duplicate")
+  @ApiOperation({
+    summary: "Duplicate a block (basic attributes only, without children)",
+  })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "attributeId", description: "UUID of the attribute" })
+  @ApiParam({ name: "id", description: "UUID of the block to duplicate" })
+  @ApiCreatedResponse({ description: "The duplicated block", type: Block })
+  @ApiBadRequestResponse({ description: "Root block cannot be duplicated" })
+  @ApiNotFoundResponse({ description: "Block not found" })
+  async duplicate(
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @Param("attributeId", ParseUUIDPipe) attributeId: string,
+    @Param("id", ParseUUIDPipe) blockId: string,
+    @Body() duplicateBlockDto: DuplicateBlockDto,
+  ) {
+    return this.blocksService.duplicate(
+      eventId,
+      attributeId,
+      blockId,
+      duplicateBlockDto,
+    );
   }
 
   @Patch(":id")
