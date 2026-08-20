@@ -58,7 +58,7 @@ export class EventsService {
     query: EventListingDto,
     baseWhere: Prisma.EventWhereInput,
   ): Promise<PageDto<Event>> {
-    const { skip, take, name, location, sort } = query;
+    const { skip, take, name, location, before, after, sort } = query;
     const where: Prisma.EventWhereInput = {
       ...baseWhere,
       ...(name === undefined
@@ -67,7 +67,8 @@ export class EventsService {
       ...(location === undefined
         ? {}
         : { location: { contains: location, mode: "insensitive" } }),
-      // TODO: add more for every filtering options
+      ...(before === undefined ? {} : { startDate: { lte: before } }),
+      ...(after === undefined ? {} : { endDate: { gte: after } }),
     };
 
     const orderBy = parseSortInput(sort, ["name", "location", "createdAt"]);
