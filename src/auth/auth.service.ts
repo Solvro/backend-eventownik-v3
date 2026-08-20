@@ -12,6 +12,7 @@ import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 
 import { PrismaService } from "../prisma/prisma.service";
+import { AuthEmailService } from "./auth-email.service";
 
 @Injectable()
 export class AuthService {
@@ -19,6 +20,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private authEmailService: AuthEmailService,
   ) {}
 
   async register(data: {
@@ -134,7 +136,15 @@ export class AuthService {
           token: hashedToken,
         },
       });
-      // !!! TODO: ADD EMAIL SENDING !!!
+
+      const frontendUrl = this.configService.getOrThrow<string>("FRONTEND_URL");
+      const resetUrl = `${frontendUrl}/password-reset/?token=${resetToken}`;
+      const name = `${admin.firstName} ${admin.lastName}`;
+      await this.authEmailService.enqueuePasswordResetEmail(
+        admin.email,
+        name,
+        resetUrl,
+      );
     }
   }
 

@@ -1,6 +1,8 @@
 import { HcaptchaModule } from "@gvrs/nestjs-hcaptcha";
 import { MailerModule } from "@nestjs-modules/mailer";
+import { HandlebarsAdapter } from "@nestjs-modules/mailer/dist/adapters/handlebars.adapter";
 import * as Joi from "joi";
+import path from "node:path";
 
 import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
@@ -90,6 +92,13 @@ import { StorageModule } from "./storage/storage.module";
         },
         defaults: {
           from: configService.getOrThrow<string>("SMTP_FROM"),
+        },
+        template: {
+          dir: path.join(process.cwd(), "dist", "common", "templates"),
+          adapter: new HandlebarsAdapter(),
+          options: {
+            strict: true,
+          },
         },
       }),
     }),

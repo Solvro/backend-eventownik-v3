@@ -8,7 +8,7 @@
   "scripts": {
     "build": "prisma generate && nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "format:check": "prettier --check .",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "migrate:test": "dotenv -e .env.test -- prisma migrate deploy",
     "prepare": "husky || true",
@@ -78,6 +78,7 @@
     "cookie-parser": "^1.4.7",
     "exceljs": "^4.4.0",
     "file-type": "^22.0.1",
+    "handlebars": "^4.7.9",
     "joi": "^18.0.2",
     "joy": "^0.1.1",
     "nodemailer": "^8.0.7",
@@ -124,5 +125,14 @@
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.20.0"
+  },
+  "allowScripts": {
+    "@scarf/scarf@1.4.0": true,
+    "bcrypt@6.0.0": true,
+    "@swc/core@1.15.47": true,
+    "prisma@7.9.1": true,
+    "msgpackr-extract@3.0.4": true,
+    "@prisma/engines@7.9.1": true,
+    "esbuild@0.28.1": true
   }
 }
