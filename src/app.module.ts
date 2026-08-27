@@ -2,7 +2,7 @@ import { HcaptchaModule } from "@gvrs/nestjs-hcaptcha";
 import { MailerModule } from "@nestjs-modules/mailer";
 import { HandlebarsAdapter } from "@nestjs-modules/mailer/adapters/handlebars.adapter";
 import * as Joi from "joi";
-import path from "node:path";
+import * as path from "node:path";
 
 import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
