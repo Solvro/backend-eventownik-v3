@@ -1,4 +1,4 @@
-import * as bcrypt from "bcrypt";
+import bcrypt from "bcrypt";
 import { createHash } from "node:crypto";
 import type { Admin } from "src/generated/prisma/client";
 
