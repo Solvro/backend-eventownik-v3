@@ -44,14 +44,29 @@ export class EventsService {
     };
   }
 
-  private verificationData(
+  private superadminData(
     isVerified: boolean | undefined,
+    isFeatured: boolean | undefined,
     userType: OrganizerType,
-  ): Pick<Prisma.EventUncheckedCreateInput, "isVerified" | "verifiedAt"> {
-    if (userType !== OrganizerType.superadmin || isVerified === undefined) {
+  ): Pick<
+    Prisma.EventUncheckedCreateInput,
+    "isVerified" | "verifiedAt" | "isFeatured"
+  > {
+    if (userType !== OrganizerType.superadmin) {
       return {};
     }
-    return { isVerified, verifiedAt: isVerified ? new Date() : null };
+    const data: Pick<
+      Prisma.EventUncheckedCreateInput,
+      "isVerified" | "verifiedAt" | "isFeatured"
+    > = {};
+    if (isVerified !== undefined) {
+      data.isVerified = isVerified;
+      data.verifiedAt = isVerified ? new Date() : null;
+    }
+    if (isFeatured !== undefined) {
+      data.isFeatured = isFeatured;
+    }
+    return data;
   }
 
   private async findPage(
@@ -117,7 +132,7 @@ export class EventsService {
     adminUuid: string,
     userType: OrganizerType,
   ): Promise<Event> {
-    const { links, isVerified, ...data } = eventDto;
+    const { links, isVerified, isFeatured, ...data } = eventDto;
 
     const photoKey =
       photo === undefined
@@ -129,7 +144,7 @@ export class EventsService {
         const createdEvent = await tx.event.create({
           data: {
             ...data,
-            ...this.verificationData(isVerified, userType),
+            ...this.superadminData(isVerified, isFeatured, userType),
             photoKey,
             organizerAdmin: {
               connect: { uuid: adminUuid },
@@ -217,7 +232,7 @@ export class EventsService {
     userType: OrganizerType,
   ): Promise<Event> {
     // TODO: superadmin dowolny, organizator swoje
-    const { links, isVerified, photoUrl, ...data } = eventDto;
+    const { links, isVerified, isFeatured, photoUrl, ...data } = eventDto;
     const removePhoto = photoUrl === null;
 
     let previousPhotoKey: string | null = null;
@@ -241,7 +256,7 @@ export class EventsService {
         : { photoKey: newPhotoKey };
     const updateData = {
       ...data,
-      ...this.verificationData(isVerified, userType),
+      ...this.superadminData(isVerified, isFeatured, userType),
       ...photoData,
     };
 

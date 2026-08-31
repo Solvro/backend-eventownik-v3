@@ -70,6 +70,7 @@ model Event {
   slug              String    @unique
   isPublic          Boolean   @default(false)
   isVerified        Boolean   @default(false)
+  isFeatured        Boolean   @default(false)
   participantsLimit Int?
   verifiedAt        DateTime?
   description       String?

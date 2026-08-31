@@ -110,6 +110,7 @@ describe("EventsService (integration)", () => {
       endDate: Date;
       isPublic: boolean;
       isVerified: boolean;
+      isFeatured: boolean;
       photoKey: string | null;
     }> = {},
   ): Promise<Event> {
@@ -122,6 +123,7 @@ describe("EventsService (integration)", () => {
         organizerUuid,
         isPublic: false,
         isVerified: false,
+        isFeatured: false,
         ...overrides,
       },
     });
@@ -140,7 +142,7 @@ describe("EventsService (integration)", () => {
   }
 
   describe("create", () => {
-    it("creates event with superadmin verification", async () => {
+    it("creates event with superadmin verification and featured flag", async () => {
       const admin = await createAdmin({ type: OrganizerType.superadmin });
       const dto = Object.assign(new EventCreateDto(), {
         name: "Verified Event",
@@ -149,6 +151,7 @@ describe("EventsService (integration)", () => {
         endDate: new Date("2025-07-02"),
         isPublic: true,
         isVerified: true,
+        isFeatured: true,
       });
 
       const event = await service.create(
@@ -160,16 +163,18 @@ describe("EventsService (integration)", () => {
 
       expect(event.name).toBe("Verified Event");
       expect(event.isVerified).toBe(true);
+      expect(event.isFeatured).toBe(true);
       expect(event.verifiedAt).toBeInstanceOf(Date);
 
       const databaseEvent = await prisma.event.findUnique({
         where: { uuid: event.uuid },
       });
       expect(databaseEvent?.isVerified).toBe(true);
+      expect(databaseEvent?.isFeatured).toBe(true);
       createdEventUuids.push(event.uuid);
     });
 
-    it("ignores isVerified for organizer", async () => {
+    it("ignores isVerified and isFeatured for organizer", async () => {
       const admin = await createAdmin({ type: OrganizerType.organizer });
       const dto = Object.assign(new EventCreateDto(), {
         name: "Organizer Event",
@@ -177,6 +182,7 @@ describe("EventsService (integration)", () => {
         startDate: new Date("2025-07-01"),
         endDate: new Date("2025-07-02"),
         isVerified: true,
+        isFeatured: true,
       });
 
       const event = await service.create(
@@ -187,6 +193,7 @@ describe("EventsService (integration)", () => {
       );
 
       expect(event.isVerified).toBe(false);
+      expect(event.isFeatured).toBe(false);
       expect(event.verifiedAt).toBeNull();
       createdEventUuids.push(event.uuid);
     });
@@ -384,11 +391,17 @@ describe("EventsService (integration)", () => {
       expect(databaseEvent?.photoKey).toBeNull();
     });
 
-    it("ignores isVerified for organizer", async () => {
+    it("ignores isVerified and isFeatured for organizer", async () => {
       const admin = await createAdmin({ type: OrganizerType.organizer });
-      const event = await createEvent(admin.uuid, { isVerified: false });
+      const event = await createEvent(admin.uuid, {
+        isVerified: false,
+        isFeatured: false,
+      });
 
-      const dto = Object.assign(new EventUpdateDto(), { isVerified: true });
+      const dto = Object.assign(new EventUpdateDto(), {
+        isVerified: true,
+        isFeatured: true,
+      });
       const result = await service.update(
         event.uuid,
         dto,
@@ -397,18 +410,26 @@ describe("EventsService (integration)", () => {
       );
 
       expect(result.isVerified).toBe(false);
+      expect(result.isFeatured).toBe(false);
 
       const databaseEvent = await prisma.event.findUnique({
         where: { uuid: event.uuid },
       });
       expect(databaseEvent?.isVerified).toBe(false);
+      expect(databaseEvent?.isFeatured).toBe(false);
     });
 
-    it("allows superadmin to set verification", async () => {
+    it("allows superadmin to set verification and featured flag", async () => {
       const admin = await createAdmin({ type: OrganizerType.superadmin });
-      const event = await createEvent(admin.uuid, { isVerified: false });
+      const event = await createEvent(admin.uuid, {
+        isVerified: false,
+        isFeatured: false,
+      });
 
-      const dto = Object.assign(new EventUpdateDto(), { isVerified: true });
+      const dto = Object.assign(new EventUpdateDto(), {
+        isVerified: true,
+        isFeatured: true,
+      });
       const result = await service.update(
         event.uuid,
         dto,
@@ -417,6 +438,7 @@ describe("EventsService (integration)", () => {
       );
 
       expect(result.isVerified).toBe(true);
+      expect(result.isFeatured).toBe(true);
       expect(result.verifiedAt).toBeInstanceOf(Date);
     });
 
