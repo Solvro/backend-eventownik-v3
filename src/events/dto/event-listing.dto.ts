@@ -1,8 +1,8 @@
+import { Type } from "class-transformer";
 import { IsDate, IsOptional, IsString } from "class-validator";
 import { PageOptionsDto } from "src/common/dto/page-options.dto";
 
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { Type } from "class-transformer";
 
 export class EventListingDto extends PageOptionsDto {
   @ApiPropertyOptional({ description: "Filter by event name" })
