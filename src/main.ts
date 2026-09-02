@@ -1,4 +1,4 @@
-import * as cookieParser from "cookie-parser";
+import cookieParser from "cookie-parser";
 import * as express from "express";
 import * as qs from "qs";
 import { swaggerConfig } from "src/config/swagger.config";

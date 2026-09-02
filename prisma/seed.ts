@@ -101,6 +101,7 @@ async function main() {
       slug: "sample-event",
       isPublic: true,
       isVerified: true,
+      isFeatured: true,
     },
   });
 
