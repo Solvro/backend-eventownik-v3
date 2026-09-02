@@ -28,6 +28,7 @@ function createBaseDto(): EventCreateDto {
     startDate: new Date(),
     endDate: new Date(),
     isVerified: true,
+    isFeatured: true,
     slug: "xcscxzcxz123",
     isPublic: true,
     links: [],
@@ -40,6 +41,7 @@ function updateBaseDto(): EventUpdateDto {
     startDate: new Date(),
     endDate: new Date(),
     isVerified: true,
+    isFeatured: true,
     slug: "updated-xcscxzcxz123",
     isPublic: true,
   });
@@ -443,6 +445,7 @@ describe("EventsService", () => {
 
       const createData = dataArgument(mockPrismaService.event.create);
       expect(createData.isVerified).toBe(true);
+      expect(createData.isFeatured).toBe(true);
       expect(createData.verifiedAt).toBeInstanceOf(Date);
       expect(createData.photoKey).toBeNull();
       expect(mockPrismaService.eventPermission.create).toHaveBeenCalled();
@@ -451,11 +454,12 @@ describe("EventsService", () => {
       expect(result).toEqual({ ...createdWithoutKey, photoUrl: null });
     });
 
-    it("should ignore isVerified if admin type is organizer", async () => {
+    it("should ignore isVerified and isFeatured if admin type is organizer", async () => {
       const eventDto = createBaseDto();
       const createdEvent = Object.assign(new Event(), eventDto, {
         uuid: "123e4567-e89b-12d3-a456-426614174000",
         isVerified: false,
+        isFeatured: false,
         verifiedAt: null,
         photoKey: null,
       });
@@ -471,6 +475,7 @@ describe("EventsService", () => {
 
       const createData = dataArgument(mockPrismaService.event.create);
       expect(createData.isVerified).toBeUndefined();
+      expect(createData.isFeatured).toBeUndefined();
       expect(createData.verifiedAt).toBeUndefined();
     });
 
@@ -621,7 +626,7 @@ describe("EventsService", () => {
       expect(result.photoUrl).toBeNull();
     });
 
-    it("should ignore isVerified if admin type is organizer", async () => {
+    it("should ignore isVerified and isFeatured if admin type is organizer", async () => {
       const eventDto = updateBaseDto();
       const updatedEvent = { uuid: eventUuid, name: "test", photoKey: null };
 
@@ -636,6 +641,7 @@ describe("EventsService", () => {
 
       const updateData = dataArgument(mockPrismaService.event.update);
       expect(updateData.isVerified).toBeUndefined();
+      expect(updateData.isFeatured).toBeUndefined();
       expect(updateData.verifiedAt).toBeUndefined();
     });
 

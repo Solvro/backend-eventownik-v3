@@ -30,6 +30,9 @@ export class Event implements Omit<PrismaEvent, "photoKey"> {
   @ApiProperty()
   isVerified: boolean;
 
+  @ApiProperty()
+  isFeatured: boolean;
+
   @ApiProperty({ nullable: true, required: false })
   participantsLimit: number | null;
 

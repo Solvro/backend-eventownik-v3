@@ -62,6 +62,17 @@ export class EventCreateDto {
   isVerified?: boolean;
 
   @ApiPropertyOptional({
+    description:
+      "Featured status of the event, defaults to false. Only superadmins can set it; ignored for organizers.",
+    type: Boolean,
+    example: true,
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === "true" || value === true)
+  @IsBoolean()
+  isFeatured?: boolean;
+
+  @ApiPropertyOptional({
     description: "Participants limit for the event",
     type: Number,
     example: 100,
