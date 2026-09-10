@@ -582,6 +582,14 @@ export class FormsService {
         );
       }
 
+      if (
+        event.registerFormUuid === formUuid &&
+        submissionData.participantId === undefined &&
+        submissionData.gdprConsent !== true
+      ) {
+        throw new BadRequestException(`GDPR consent is required to register`);
+      }
+
       const submittedAttributes: Record<string, unknown> =
         submissionData.attributes
           .flat()

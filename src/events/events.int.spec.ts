@@ -117,6 +117,7 @@ describe("EventsService (integration)", () => {
     const event = await prisma.event.create({
       data: {
         name: "Test Event",
+        dataRecipients: "Test data recipients",
         slug: `events-int-${String(Date.now())}-${Math.random().toString(36).slice(2)}`,
         startDate: new Date("2025-06-01"),
         endDate: new Date("2025-06-02"),
@@ -152,6 +153,7 @@ describe("EventsService (integration)", () => {
         isPublic: true,
         isVerified: true,
         isFeatured: true,
+        dataRecipients: "Test data recipients",
       });
 
       const event = await service.create(
@@ -183,6 +185,7 @@ describe("EventsService (integration)", () => {
         endDate: new Date("2025-07-02"),
         isVerified: true,
         isFeatured: true,
+        dataRecipients: "Test data recipients",
       });
 
       const event = await service.create(
@@ -213,6 +216,7 @@ describe("EventsService (integration)", () => {
         slug: `photo-${String(Date.now())}`,
         startDate: new Date("2025-07-01"),
         endDate: new Date("2025-07-02"),
+        dataRecipients: "Test data recipients",
       });
 
       const event = await service.create(
@@ -251,6 +255,7 @@ describe("EventsService (integration)", () => {
         slug: "duplicate-slug-for-conflict",
         startDate: new Date("2025-07-01"),
         endDate: new Date("2025-07-02"),
+        dataRecipients: "Test data recipients",
       });
 
       await service.create(dto, undefined, admin.uuid, OrganizerType.organizer);
@@ -280,6 +285,7 @@ describe("EventsService (integration)", () => {
         slug: `perm-${String(Date.now())}`,
         startDate: new Date("2025-07-01"),
         endDate: new Date("2025-07-02"),
+        dataRecipients: "Test data recipients",
       });
 
       const event = await service.create(

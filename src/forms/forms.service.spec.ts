@@ -435,6 +435,7 @@ describe("FormsService", () => {
     it("should pass an out-of-options select value through unchanged", async () => {
       const submissionData = {
         email: "test@example.com",
+        gdprConsent: true,
         attributes: [[{ attributeUuid: "attr-select", value: "choice-1" }]],
       } as unknown as FormSubmitionDto;
 
@@ -480,6 +481,7 @@ describe("FormsService", () => {
     it("should pass an out-of-options multiSelect value through unchanged", async () => {
       const submissionData = {
         email: "test@example.com",
+        gdprConsent: true,
         attributes: [[{ attributeUuid: "attr-multi", value: ["invalid"] }]],
       } as unknown as FormSubmitionDto;
 
@@ -525,6 +527,7 @@ describe("FormsService", () => {
     it("should pass a multiSelect value exceeding maxSelections through unchanged", async () => {
       const submissionData = {
         email: "test@example.com",
+        gdprConsent: true,
         attributes: [
           [
             {
@@ -582,6 +585,7 @@ describe("FormsService", () => {
     it("should validate block submissions and save successfully", async () => {
       const submissionData = {
         email: "test@example.com",
+        gdprConsent: true,
         attributes: [
           [
             {
@@ -650,6 +654,7 @@ describe("FormsService", () => {
     it("should pass a block value exceeding maxSelections through unchanged (capacity pre-check still applies)", async () => {
       const submissionData = {
         email: "test@example.com",
+        gdprConsent: true,
         attributes: [
           [
             {
@@ -715,6 +720,7 @@ describe("FormsService", () => {
     it("should register a new participant if it is a registration form", async () => {
       const submissionData = {
         email: "test@example.com",
+        gdprConsent: true,
         attributes: [[{ attributeUuid: "attr-1", value: "value-1" }]],
       } as unknown as FormSubmitionDto;
 
@@ -815,6 +821,7 @@ describe("FormsService", () => {
 
       const submissionData = {
         email: "full@test.com",
+        gdprConsent: true,
         attributes: [],
       } as unknown as FormSubmitionDto;
 
@@ -829,6 +836,7 @@ describe("FormsService", () => {
       const token = "550e8400-e29b-41d4-a716-446655440099";
       const submissionData = {
         email: "test@example.com",
+        gdprConsent: true,
         attributes: [[{ attributeUuid: "attr-drawing", value: token }]],
       } as unknown as FormSubmitionDto;
 
@@ -875,6 +883,7 @@ describe("FormsService", () => {
       const token = "550e8400-e29b-41d4-a716-446655440099";
       const submissionData = {
         email: "test@example.com",
+        gdprConsent: true,
         attributes: [[{ attributeUuid: "attr-drawing", value: token }]],
       } as unknown as FormSubmitionDto;
 
@@ -911,6 +920,7 @@ describe("FormsService", () => {
     it("should reject a malformed (non-UUID) file token with 400 without querying the database", async () => {
       const submissionData = {
         email: "test@example.com",
+        gdprConsent: true,
         attributes: [
           [{ attributeUuid: "attr-file", value: "not-a-valid-token" }],
         ],
@@ -982,6 +992,7 @@ describe("FormsService", () => {
     it("should fail a registration submission that omits a required attribute", async () => {
       const submissionData = {
         email: "test@example.com",
+        gdprConsent: true,
         attributes: [],
       } as unknown as FormSubmitionDto;
 

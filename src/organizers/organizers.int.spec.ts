@@ -90,6 +90,7 @@ describe("OrganizersService (integration)", () => {
     const event = await prisma.event.create({
       data: {
         name: "Test Event",
+        dataRecipients: "Test data recipients",
         slug: `organizers-int-${String(Date.now())}-${Math.random().toString(36).slice(2)}`,
         startDate: new Date("2025-06-01"),
         endDate: new Date("2025-06-02"),

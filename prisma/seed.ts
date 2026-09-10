@@ -98,6 +98,7 @@ async function main() {
       photoKey: "https://placehold.co/200x200",
       location: "Test City",
       contactEmail: "contact@example.com",
+      dataRecipients: "Cloud hosting provider, payment processor",
       slug: "sample-event",
       isPublic: true,
       isVerified: true,

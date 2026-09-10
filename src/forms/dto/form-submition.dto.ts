@@ -1,6 +1,7 @@
 import { Transform, Type, plainToInstance } from "class-transformer";
 import {
   IsArray,
+  IsBoolean,
   IsEmail,
   IsOptional,
   IsString,
@@ -44,6 +45,16 @@ export class FormSubmitionDto {
   @IsUUID()
   @Transform(({ value }) => (value === "" ? undefined : (value as string)))
   participantId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Guard confirming the frontend's GDPR consent checkbox was checked. " +
+      "Registration itself constitutes consent; this only prevents bypassing the frontend checkbox by calling the API directly. " +
+      "Required (must be true) when submitting the registration form; ignored otherwise.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  gdprConsent?: boolean;
 
   @ApiProperty({
     isArray: true,

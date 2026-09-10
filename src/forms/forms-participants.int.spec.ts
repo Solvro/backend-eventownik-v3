@@ -79,6 +79,7 @@ describe("Forms -> Participants Integration", () => {
     const event = await prisma.event.create({
       data: {
         name: "Test Event",
+        dataRecipients: "Test data recipients",
         slug: `forms-participants-int-${String(Date.now())}-${Math.random().toString(36).slice(2)}`,
         startDate: new Date("2025-06-01"),
         endDate: new Date("2025-06-02"),
@@ -150,6 +151,7 @@ describe("Forms -> Participants Integration", () => {
 
       const submissionData = {
         email: `participant-${String(Date.now())}@example.com`,
+        gdprConsent: true,
         attributes: [[{ attributeUuid: selectAttribute.uuid, value: "" }]],
       } as unknown as FormSubmitionDto;
 
@@ -187,6 +189,7 @@ describe("Forms -> Participants Integration", () => {
 
       const submissionData = {
         email: `participant-${String(Date.now())}@example.com`,
+        gdprConsent: true,
         attributes: [[{ attributeUuid: dateAttribute.uuid, value: "" }]],
       } as unknown as FormSubmitionDto;
 
@@ -304,6 +307,7 @@ describe("Forms -> Participants Integration", () => {
 
       const submissionData = {
         email: `participant-${String(Date.now())}@example.com`,
+        gdprConsent: true,
         attributes: [
           [{ attributeUuid: drawingAttribute.uuid, value: uploadedFile.uuid }],
         ],
@@ -352,6 +356,7 @@ describe("Forms -> Participants Integration", () => {
 
       const submissionData = {
         email: `participant-${String(Date.now())}@example.com`,
+        gdprConsent: true,
         attributes: [
           [{ attributeUuid: drawingAttribute.uuid, value: uploadedFile.uuid }],
         ],

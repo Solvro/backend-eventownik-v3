@@ -31,6 +31,7 @@ function createBaseDto(): EventCreateDto {
     isFeatured: true,
     slug: "xcscxzcxz123",
     isPublic: true,
+    dataRecipients: "Test data recipients",
     links: [],
   });
 }

@@ -61,6 +61,9 @@ export class Event implements Omit<PrismaEvent, "photoKey"> {
   @ApiProperty({ nullable: true, required: false })
   contactEmail: string | null;
 
+  @ApiProperty()
+  dataRecipients: string;
+
   @ApiProperty({ nullable: true, required: false })
   organizerUuid: string | null;
 
