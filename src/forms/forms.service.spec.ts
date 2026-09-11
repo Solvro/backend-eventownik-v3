@@ -1,5 +1,5 @@
 import { BlocksService } from "src/blocks/blocks.service";
-import { AttributeType } from "src/generated/prisma/client";
+import { AttributeType, EventLinkType } from "src/generated/prisma/client";
 import { ParticipantsService } from "src/participants/participants.service";
 import { StorageService } from "src/storage/storage.service";
 
@@ -442,6 +442,7 @@ describe("FormsService", () => {
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
         registerFormUuid: formUuid,
+        links: [],
         participants: [],
         participantsLimit: 10,
       });
@@ -488,6 +489,7 @@ describe("FormsService", () => {
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
         registerFormUuid: formUuid,
+        links: [],
         participants: [],
         participantsLimit: 10,
       });
@@ -541,6 +543,7 @@ describe("FormsService", () => {
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
         registerFormUuid: formUuid,
+        links: [],
         participants: [],
         participantsLimit: 10,
       });
@@ -602,6 +605,7 @@ describe("FormsService", () => {
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
         registerFormUuid: formUuid,
+        links: [],
         participants: [],
         participantsLimit: 10,
       });
@@ -672,6 +676,7 @@ describe("FormsService", () => {
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
         registerFormUuid: formUuid,
+        links: [],
         participants: [],
         participantsLimit: 10,
       });
@@ -727,6 +732,7 @@ describe("FormsService", () => {
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
         registerFormUuid: formUuid,
+        links: [],
         participants: [],
         participantsLimit: 10,
       });
@@ -809,6 +815,7 @@ describe("FormsService", () => {
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
         registerFormUuid: formUuid,
+        links: [],
         participants: Array.from({ length: 5 }),
         participantsLimit: 5,
       });
@@ -832,6 +839,94 @@ describe("FormsService", () => {
       );
     });
 
+    it("should throw BadRequestException if event has a terms link and termsAccepted is missing", async () => {
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
+        registerFormUuid: formUuid,
+        participants: [],
+        participantsLimit: 10,
+        links: [
+          { type: EventLinkType.policy, url: "https://example.com/terms" },
+        ],
+      });
+      mockPrismaService.form.findUnique.mockResolvedValue({
+        uuid: formUuid,
+        formDefinitions: [],
+      });
+      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+
+      const submissionData = {
+        email: "test@example.com",
+        gdprConsent: true,
+        attributes: [],
+      } as unknown as FormSubmitionDto;
+
+      await expect(
+        service.formSubmit(eventSlug, formUuid, submissionData),
+      ).rejects.toThrow("Terms of participation must be accepted to register");
+    });
+
+    it("should register successfully when event has a terms link and termsAccepted is true", async () => {
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
+        registerFormUuid: formUuid,
+        participants: [],
+        participantsLimit: 10,
+        links: [
+          { type: EventLinkType.policy, url: "https://example.com/terms" },
+        ],
+      });
+      mockPrismaService.form.findUnique.mockResolvedValue({
+        uuid: formUuid,
+        formDefinitions: [],
+      });
+      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockParticipantsService.register.mockResolvedValue({
+        id: 1,
+        email: "test@example.com",
+      });
+
+      const submissionData = {
+        email: "test@example.com",
+        gdprConsent: true,
+        termsAccepted: true,
+        attributes: [],
+      } as unknown as FormSubmitionDto;
+
+      await service.formSubmit(eventSlug, formUuid, submissionData);
+
+      expect(mockParticipantsService.register).toHaveBeenCalled();
+    });
+
+    it("should not require termsAccepted when event has no terms link", async () => {
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
+        registerFormUuid: formUuid,
+        participants: [],
+        participantsLimit: 10,
+        links: [{ type: EventLinkType.general, url: "https://example.com" }],
+      });
+      mockPrismaService.form.findUnique.mockResolvedValue({
+        uuid: formUuid,
+        formDefinitions: [],
+      });
+      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockParticipantsService.register.mockResolvedValue({
+        id: 1,
+        email: "test@example.com",
+      });
+
+      const submissionData = {
+        email: "test@example.com",
+        gdprConsent: true,
+        attributes: [],
+      } as unknown as FormSubmitionDto;
+
+      await service.formSubmit(eventSlug, formUuid, submissionData);
+
+      expect(mockParticipantsService.register).toHaveBeenCalled();
+    });
+
     it("should resolve a drawing attribute's upload token to its file key, like a file attribute", async () => {
       const token = "550e8400-e29b-41d4-a716-446655440099";
       const submissionData = {
@@ -843,6 +938,7 @@ describe("FormsService", () => {
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
         registerFormUuid: formUuid,
+        links: [],
         participants: [],
         participantsLimit: 10,
       });
@@ -890,6 +986,7 @@ describe("FormsService", () => {
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
         registerFormUuid: formUuid,
+        links: [],
         participants: [],
         participantsLimit: 10,
       });
@@ -929,6 +1026,7 @@ describe("FormsService", () => {
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
         registerFormUuid: formUuid,
+        links: [],
         participants: [],
         participantsLimit: 10,
       });
@@ -999,6 +1097,7 @@ describe("FormsService", () => {
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
         registerFormUuid: formUuid,
+        links: [],
         participants: [],
         participantsLimit: 10,
       });

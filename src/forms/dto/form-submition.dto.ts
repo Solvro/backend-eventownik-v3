@@ -56,6 +56,16 @@ export class FormSubmitionDto {
   @IsBoolean()
   gdprConsent?: boolean;
 
+  @ApiPropertyOptional({
+    description:
+      "Guard confirming the frontend's terms-of-participation checkbox was checked. " +
+      "Required (must be true) when submitting the registration form and the event has a " +
+      "policy (terms) link attached; ignored otherwise.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  termsAccepted?: boolean;
+
   @ApiProperty({
     isArray: true,
     description: "Array of participant attributes with their values",
