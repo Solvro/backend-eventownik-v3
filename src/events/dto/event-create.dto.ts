@@ -6,6 +6,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  MaxLength,
   MinLength,
   ValidateNested,
 } from "class-validator";
@@ -127,6 +128,16 @@ export class EventCreateDto {
   @IsString()
   @IsEmail()
   contactEmail?: string | null;
+
+  @ApiProperty({
+    description:
+      "Data recipients disclosure for the event (GDPR), entered manually by the organizer",
+    type: String,
+    example: "Cloud hosting provider, payment processor",
+  })
+  @IsString()
+  @MaxLength(1000)
+  readonly dataRecipients!: string;
 
   @ApiProperty({
     description: "Unique slug for the event",

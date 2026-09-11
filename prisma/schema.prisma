@@ -79,6 +79,7 @@ model Event {
   photoKey          String?
   location          String?
   contactEmail      String?
+  dataRecipients    String
   organizerUuid     String?   @db.Uuid
   registerFormUuid  String?   @db.Uuid
 
