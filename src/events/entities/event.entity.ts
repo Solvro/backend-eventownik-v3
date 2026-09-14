@@ -66,4 +66,7 @@ export class Event implements Omit<PrismaEvent, "photoKey"> {
 
   @ApiProperty({ nullable: true, required: false })
   registerFormUuid: string | null;
+
+  @ApiProperty({ nullable: true, required: false })
+  sentToBbiAt: Date | null;
 }
