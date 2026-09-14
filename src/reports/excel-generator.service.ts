@@ -13,7 +13,25 @@ export interface ReportRow {
 @Injectable()
 export class ExcelGeneratorService {
   async generateBbiReport(rows: ReportRow[]): Promise<Buffer> {
+    const date = new Date();
+    const monthNames = [
+      "styczeń",
+      "luty",
+      "marzec",
+      "kwiecień",
+      "maj",
+      "czerwiec",
+      "lipiec",
+      "sierpień",
+      "wrzesień",
+      "październik",
+      "listopad",
+      "grudzień",
+    ];
+
     const workbook = new ExcelJS.Workbook();
+    workbook.creator = "Solvro";
+    workbook.title = `RCP PWR Eventownik Solvro ${monthNames[date.getMonth()]} ${date.getFullYear().toString()}`;
     const sheet = workbook.addWorksheet("RCP");
 
     sheet.columns = [
@@ -68,8 +86,13 @@ export class ExcelGeneratorService {
         width: 55,
       },
       {
-        header: "DPIA (jeśli tak, lokalizacja raportu)",
-        key: "dpia",
+        header: "DPIA (od strony użytkownika)",
+        key: "dpiaUser",
+        width: 25,
+      },
+      {
+        header: "DPIA (od strony systemu)",
+        key: "dpiaSystem",
         width: 25,
       },
       {
@@ -110,15 +133,77 @@ export class ExcelGeneratorService {
         systemName: "Eventownik Solvro",
         security:
           "Hostowanie rozwiązania na serwerach Politechniki, ograniczenie czasu sesji użytkownika, zastosowanie hashy autoryzacyjnych, zastosowanie uprawnień administratorów, przygotowanie regulaminów serwisu",
-        dpia: "od strony użytkownika https://docs.google.com/spreadsheets/d/1OkB_j8biS_WrEHEEDu7S73lj1giEzJ_i\n\nod strony systemu :\nhttps://docs.google.com/spreadsheets/d/1TXR06rI5kHVkiTV1ABWAIKteLSVzSxcSRzIjfYV2zaw/edit?gid=1415039930#gid=1415039930.",
+        dpiaUser: {
+          text: "Raport - Użytkownik",
+          hyperlink:
+            "https://docs.google.com/spreadsheets/d/1OkB_j8biS_WrEHEEDu7S73lj1giEzJ_i",
+        },
+        dpiaSystem: {
+          text: "Raport - System",
+          hyperlink:
+            "https://docs.google.com/spreadsheets/d/1TXR06rI5kHVkiTV1ABWAIKteLSVzSxcSRzIjfYV2zaw/edit?gid=1415039930#gid=1415039930",
+        },
         transfer: "nie dotyczy",
         transferDocs: "nie dotyczy",
       });
     }
 
-    sheet.eachRow((row) => {
+    // Formatowanie arkusza
+    const headerRow = sheet.getRow(1);
+    headerRow.eachCell((cell) => {
+      cell.font = {
+        name: "Calibri",
+        size: 8,
+        color: { argb: "FFFFFFFF" },
+        bold: true,
+        italic: true,
+      };
+      cell.alignment = {
+        horizontal: "center",
+        vertical: "middle",
+        wrapText: true,
+      };
+
+      const grayColumns = [
+        "lp",
+        "Nazwa wydarzenia",
+        "Nazwa czynności przetwarzania",
+        "Jednostka organizacyjna (departament, dział itp.)",
+        "Podstawa prawna",
+        "Źródło danych",
+        "Nazwa systemu lub oprogramowania",
+        "DPIA (od strony użytkownika)",
+        "DPIA (od strony systemu)",
+      ];
+
+      let headerText = "";
+      if (typeof cell.value === "string") {
+        headerText = cell.value;
+      }
+
+      const isGray =
+        headerText === "" ? false : grayColumns.includes(headerText);
+      const bgColor = isGray ? "FF404040" : "FFB32424";
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: bgColor },
+      };
+    });
+
+    sheet.eachRow((row, rowNumber) => {
       row.eachCell((cell) => {
-        cell.alignment = { wrapText: true, vertical: "top" };
+        cell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+
+        if (rowNumber > 1) {
+          cell.alignment = { wrapText: true, vertical: "top" };
+          cell.font = { name: "Calibri", size: 8 };
+        }
       });
     });
 
