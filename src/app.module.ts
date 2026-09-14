@@ -25,6 +25,7 @@ import { ImportExportModule } from "./import-export/import-export.module";
 import { OrganizersModule } from "./organizers/organizers.module";
 import { ParticipantsModule } from "./participants/participants.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { ReportsModule } from "./reports/reports.module";
 import { StorageModule } from "./storage/storage.module";
 
 @Module({
@@ -57,7 +58,7 @@ import { StorageModule } from "./storage/storage.module";
         SMTP_USER: Joi.string().required(),
         SMTP_PASS: Joi.string().required(),
         SMTP_FROM: Joi.string().required(),
-        BBI_EMAIL: Joi.string().required(),
+        BBI_EMAIL: Joi.string().default("eventownik@pwr.edu.pl"),
         S3_ENDPOINT: Joi.string().required(),
         S3_ACCESS_KEY: Joi.string().required(),
         S3_SECRET_KEY: Joi.string().required(),
@@ -134,6 +135,7 @@ import { StorageModule } from "./storage/storage.module";
       }),
     }),
     EmailsModule,
+    ReportsModule,
     StorageModule,
   ],
   controllers: [AppController],
