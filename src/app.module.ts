@@ -57,6 +57,7 @@ import { StorageModule } from "./storage/storage.module";
         SMTP_USER: Joi.string().required(),
         SMTP_PASS: Joi.string().required(),
         SMTP_FROM: Joi.string().required(),
+        BBI_EMAIL: Joi.string().required(),
         S3_ENDPOINT: Joi.string().required(),
         S3_ACCESS_KEY: Joi.string().required(),
         S3_SECRET_KEY: Joi.string().required(),
