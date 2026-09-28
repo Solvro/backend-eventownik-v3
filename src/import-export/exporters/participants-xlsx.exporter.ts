@@ -3,6 +3,7 @@ import * as ExcelJS from "exceljs";
 import { Injectable } from "@nestjs/common";
 
 import { ParticipantsExportFormat } from "../dto/export-participants-query.dto";
+import { buildAttributeHeaders } from "../utils/attribute-headers";
 import {
   ParticipantsExportPayload,
   ParticipantsExporter,
@@ -22,7 +23,7 @@ export class ParticipantsXlsxExporter implements ParticipantsExporter {
     const headers = [
       "participantUuid",
       "email",
-      ...this.getUniqueAttributeHeaders(payload.attributes),
+      ...buildAttributeHeaders(payload.attributes),
     ];
     worksheet.addRow(headers);
 
@@ -44,24 +45,5 @@ export class ParticipantsXlsxExporter implements ParticipantsExporter {
 
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
-  }
-
-  private getUniqueAttributeHeaders(
-    attributes: ParticipantsExportPayload["attributes"],
-  ): string[] {
-    const headerCounts = new Map<string, number>();
-
-    return attributes.map((attribute) => {
-      const baseHeader =
-        attribute.name.trim().length > 0 ? attribute.name : "N/A";
-      const count = (headerCounts.get(baseHeader) ?? 0) + 1;
-      headerCounts.set(baseHeader, count);
-
-      if (count === 1) {
-        return baseHeader;
-      }
-
-      return `${baseHeader} (${attribute.uuid})`;
-    });
   }
 }
