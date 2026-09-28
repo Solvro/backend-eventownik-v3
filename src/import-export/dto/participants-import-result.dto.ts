@@ -3,9 +3,7 @@ import { Participant } from "src/participants/entities/participant.entity";
 import { ApiProperty } from "@nestjs/swagger";
 
 export type ImportSkipReason =
-  | "already_exists"
-  | "duplicate_in_file"
-  | "failed";
+  "already_exists" | "duplicate_in_file" | "failed";
 
 export class SkippedParticipantDto {
   @ApiProperty({ example: "jan@example.com" })
