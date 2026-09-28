@@ -1,7 +1,9 @@
+import { memoryStorage } from "multer";
+
 import {
-  applyDecorators,
   BadRequestException,
   UseInterceptors,
+  applyDecorators,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import {
@@ -10,7 +12,6 @@ import {
   ApiExtraModels,
   getSchemaPath,
 } from "@nestjs/swagger";
-import { memoryStorage } from "multer";
 
 import { ParticipantsImportDto } from "../dto/participants-import.dto";
 

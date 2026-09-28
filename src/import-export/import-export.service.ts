@@ -1,9 +1,15 @@
 import { isEmail } from "class-validator";
-import { AttributeType } from "src/generated/prisma/enums";
+import * as ExcelJS from "exceljs";
 import { Prisma } from "src/generated/prisma/client";
+import { AttributeType } from "src/generated/prisma/enums";
+import {
+  ParticipantAttributeDto,
+  ParticipantCreateDto,
+} from "src/participants/dto/participant-create.dto";
+import { Participant } from "src/participants/entities/participant.entity";
 import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
-import * as ExcelJS from "exceljs";
+
 import {
   BadRequestException,
   Injectable,
@@ -25,11 +31,6 @@ import {
 } from "./exporters/participants-exporter.interface";
 import { ParticipantsXlsxExporter } from "./exporters/participants-xlsx.exporter";
 import { buildAttributeHeaders } from "./utils/attribute-headers";
-import {
-  ParticipantAttributeDto,
-  ParticipantCreateDto,
-} from "src/participants/dto/participant-create.dto";
-import { Participant } from "src/participants/entities/participant.entity";
 
 export interface ExportedFile {
   fileName: string;

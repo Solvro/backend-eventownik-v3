@@ -1,4 +1,3 @@
-import { ApiProperty } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import {
   ArrayMaxSize,
@@ -7,6 +6,8 @@ import {
   ValidateNested,
 } from "class-validator";
 import { ParticipantCreateDto } from "src/participants/dto/participant-create.dto";
+
+import { ApiProperty } from "@nestjs/swagger";
 
 export class ParticipantsImportDto {
   @ApiProperty({
