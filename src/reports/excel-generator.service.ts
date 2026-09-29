@@ -14,6 +14,7 @@ export interface ReportRow {
 export class ExcelGeneratorService {
   async generateBbiReport(rows: ReportRow[]): Promise<Buffer> {
     const date = new Date();
+    const prevMonthDate = new Date(date.getFullYear(), date.getMonth() - 1, 1);
     const monthNames = [
       "styczeń",
       "luty",
@@ -31,7 +32,7 @@ export class ExcelGeneratorService {
 
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "Solvro";
-    workbook.title = `RCP PWR Eventownik Solvro ${monthNames[date.getMonth()]} ${date.getFullYear().toString()}`;
+    workbook.title = `RCP PWR Eventownik Solvro ${monthNames[prevMonthDate.getMonth()]} ${prevMonthDate.getFullYear().toString()}`;
     const sheet = workbook.addWorksheet("RCP");
 
     sheet.columns = [
@@ -65,12 +66,12 @@ export class ExcelGeneratorService {
       },
       {
         header:
-          "Nazwa podmiotu przetwarzajacego i dane kontakowe (jeśli dotyczy)",
+          "Nazwa podmiotu przetwarzającego i dane kontaktowe (jeśli dotyczy)",
         key: "processor",
         width: 45,
       },
       {
-        header: "Kategorie odbiorców (innych niż podmiot przetwarzajacy)",
+        header: "Kategorie odbiorców (innych niż podmiot przetwarzający)",
         key: "recipients",
         width: 45,
       },
@@ -86,9 +87,14 @@ export class ExcelGeneratorService {
         width: 55,
       },
       {
-        header: "DPIA (jeśli tak, lokalizacja raportu)",
-        key: "dpia",
-        width: 35,
+        header: "DPIA (od strony użytkownika)",
+        key: "dpiaUser",
+        width: 25,
+      },
+      {
+        header: "DPIA (od strony systemu)",
+        key: "dpiaSystem",
+        width: 25,
       },
       {
         header:
@@ -128,13 +134,21 @@ export class ExcelGeneratorService {
         systemName: "Eventownik Solvro",
         security:
           "Hostowanie rozwiązania na serwerach Politechniki, ograniczenie czasu sesji użytkownika, zastosowanie hashy autoryzacyjnych, zastosowanie uprawnień administratorów, przygotowanie regulaminów serwisu",
-        dpia: "od strony użytkownika https://docs.google.com/spreadsheets/d/1OkB_j8biS_WrEHEEDu7S73lj1giEzJ_i\n\nod strony systemu :\nhttps://docs.google.com/spreadsheets/d/1TXR06rI5kHVkiTV1ABWAIKteLSVzSxcSRzIjfYV2zaw/edit?gid=1415039930#gid=1415039930.",
+        dpiaUser: {
+          text: "Raport - Użytkownik",
+          hyperlink:
+            "https://docs.google.com/spreadsheets/d/1OkB_j8biS_WrEHEEDu7S73lj1giEzJ_i",
+        },
+        dpiaSystem: {
+          text: "Raport - System",
+          hyperlink:
+            "https://docs.google.com/spreadsheets/d/1TXR06rI5kHVkiTV1ABWAIKteLSVzSxcSRzIjfYV2zaw/edit?gid=1415039930#gid=1415039930",
+        },
         transfer: "nie dotyczy",
         transferDocs: "nie dotyczy",
       });
     }
 
-    // Formatowanie arkusza
     const headerRow = sheet.getRow(1);
     headerRow.eachCell((cell) => {
       cell.font = {
@@ -158,7 +172,8 @@ export class ExcelGeneratorService {
         "Podstawa prawna",
         "Źródło danych",
         "Nazwa systemu lub oprogramowania",
-        "DPIA (jeśli tak, lokalizacja raportu)",
+        "DPIA (od strony użytkownika)",
+        "DPIA (od strony systemu)",
       ];
 
       let headerText = "";

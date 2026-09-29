@@ -78,7 +78,7 @@ describe("BbiReportService", () => {
       name: "New Event",
       organizerName: "Org",
       endDate: mockDate,
-      sentToBbiAt: null, // new event
+      sentToBbiAt: null,
       attributes: [],
     } as any;
 
@@ -109,12 +109,12 @@ describe("BbiReportService", () => {
       name: "Event",
       organizerName: "Org",
       endDate: mockDate,
-      sentToBbiAt: new Date("2023-01-01T00:00:00Z"), // old event
+      sentToBbiAt: new Date("2023-01-01T00:00:00Z"),
       attributes: [
         {
           uuid: "attr-1",
           name: "New Attr",
-          sentToBbiAt: null, // new attribute
+          sentToBbiAt: null,
           updatedAt: new Date(),
         },
       ],

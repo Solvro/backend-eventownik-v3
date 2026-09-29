@@ -29,6 +29,8 @@ export class BbiReportService {
   }
 
   async generateAndSendReport(): Promise<void> {
+    // Fetch all verified events because Prisma does not support comparing two columns in the same row (WHERE updatedAt > sentToBbiAt).
+    // This is required to capture attributes modified after the report was initially sent.
     const events = await this.prisma.event.findMany({
       where: {
         verifiedAt: { not: null },
@@ -55,9 +57,12 @@ export class BbiReportService {
       });
 
       if (isEventNew || newOrModifiedAttributes.length > 0) {
-        const attributesListString = newOrModifiedAttributes
-          .map((a) => `- ${a.name}`)
-          .join("\n");
+        // Safety fallback: in practice an event should always have attributes,
+        // but this safely formats the report text in case none are present.
+        const attributesListString =
+          newOrModifiedAttributes.length > 0
+            ? newOrModifiedAttributes.map((a) => `- ${a.name}`).join("\n")
+            : "brak";
 
         const attributesString = `Dla organizatorów:\n- adres email\n- imię\n- nazwisko\n- jednostka\n- hasło utworzone w systemie\n- powiązanie z systemem USOS (index)\n\nNiestandardowe atrybuty uczestników, zbierane automatycznie poprzez uzupełnianie formularzy związanych z wydarzeniem:\n${attributesListString}`;
 
