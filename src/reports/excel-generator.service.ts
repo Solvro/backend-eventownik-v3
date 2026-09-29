@@ -86,14 +86,9 @@ export class ExcelGeneratorService {
         width: 55,
       },
       {
-        header: "DPIA (od strony użytkownika)",
-        key: "dpiaUser",
-        width: 25,
-      },
-      {
-        header: "DPIA (od strony systemu)",
-        key: "dpiaSystem",
-        width: 25,
+        header: "DPIA (jeśli tak, lokalizacja raportu)",
+        key: "dpia",
+        width: 35,
       },
       {
         header:
@@ -110,7 +105,7 @@ export class ExcelGeneratorService {
     ];
 
     for (const row of rows) {
-      const deletionDateString = `${String(row.endDate.getDate()).padStart(2, "0")}.${String(row.endDate.getMonth() + 1).padStart(2, "0")}.${String(row.endDate.getFullYear() + 1)}`;
+      const deletionDateString = `${String(row.endDate.getDate()).padStart(2, "0")}.${String(row.endDate.getMonth() + 1).padStart(2, "0")}.${String(row.endDate.getFullYear() + 2)}`;
 
       sheet.addRow({
         lp: row.index,
@@ -133,16 +128,7 @@ export class ExcelGeneratorService {
         systemName: "Eventownik Solvro",
         security:
           "Hostowanie rozwiązania na serwerach Politechniki, ograniczenie czasu sesji użytkownika, zastosowanie hashy autoryzacyjnych, zastosowanie uprawnień administratorów, przygotowanie regulaminów serwisu",
-        dpiaUser: {
-          text: "Raport - Użytkownik",
-          hyperlink:
-            "https://docs.google.com/spreadsheets/d/1OkB_j8biS_WrEHEEDu7S73lj1giEzJ_i",
-        },
-        dpiaSystem: {
-          text: "Raport - System",
-          hyperlink:
-            "https://docs.google.com/spreadsheets/d/1TXR06rI5kHVkiTV1ABWAIKteLSVzSxcSRzIjfYV2zaw/edit?gid=1415039930#gid=1415039930",
-        },
+        dpia: "od strony użytkownika https://docs.google.com/spreadsheets/d/1OkB_j8biS_WrEHEEDu7S73lj1giEzJ_i\n\nod strony systemu :\nhttps://docs.google.com/spreadsheets/d/1TXR06rI5kHVkiTV1ABWAIKteLSVzSxcSRzIjfYV2zaw/edit?gid=1415039930#gid=1415039930.",
         transfer: "nie dotyczy",
         transferDocs: "nie dotyczy",
       });
@@ -172,8 +158,7 @@ export class ExcelGeneratorService {
         "Podstawa prawna",
         "Źródło danych",
         "Nazwa systemu lub oprogramowania",
-        "DPIA (od strony użytkownika)",
-        "DPIA (od strony systemu)",
+        "DPIA (jeśli tak, lokalizacja raportu)",
       ];
 
       let headerText = "";

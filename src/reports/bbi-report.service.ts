@@ -18,7 +18,7 @@ export class BbiReportService {
     private readonly config: ConfigService,
   ) {}
 
-  @Cron("0 0 1 * *")
+  @Cron("0 12 1 * *")
   async handleCron() {
     this.logger.log("Starting monthly BBI report generation...");
     try {
@@ -88,10 +88,15 @@ export class BbiReportService {
     const dateString = new Date().toISOString().slice(0, 10);
     const filename = `RCP_raport_${dateString}.xlsx`;
 
+    const eventsListString = rowsToReport
+      .map((r) => `- ${r.eventName}`)
+      .join("\n");
+    const mailText = `Szanowni Państwo,\n\nzgodnie z ustaleniami podsyłamy RCP na następujące wydarzenia:\n${eventsListString}\n\nDokument znajduje się w załączniku.\n\nZ poważaniem\nZespół Eventownik`;
+
     await this.mailerService.sendMail({
       to: emailTo,
       subject: `Raport RCP za miesiąc - ${dateString}`,
-      text: "W załączniku znajduje się comiesięczny raport RCP (Rejestr Czynności Przetwarzania).",
+      text: mailText,
       attachments: [
         {
           filename,
