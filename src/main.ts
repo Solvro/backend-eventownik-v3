@@ -13,7 +13,6 @@ import { NestFactory } from "@nestjs/core";
 import { SwaggerModule } from "@nestjs/swagger";
 
 import { AppModule } from "./app.module";
-import { HcaptchaExceptionFilter } from "./common/exception-filters/hcaptcha.exception";
 
 const BODY_SIZE_LIMIT = "15mb";
 
@@ -37,8 +36,6 @@ async function bootstrap() {
       whitelist: true,
     }),
   );
-
-  app.useGlobalFilters(new HcaptchaExceptionFilter());
 
   const expressApp = app.getHttpAdapter().getInstance() as express.Application;
 

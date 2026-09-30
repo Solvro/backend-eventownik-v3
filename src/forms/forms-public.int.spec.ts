@@ -1,5 +1,5 @@
-import { HcaptchaGuard } from "@gvrs/nestjs-hcaptcha";
 import { BlocksService } from "src/blocks/blocks.service";
+import { TurnstileGuard } from "src/common/guards/turnstile.guard";
 import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
 import { StorageService } from "src/storage/storage.service";
@@ -65,7 +65,7 @@ describe("Forms Public Integration", () => {
         EventEmitter2,
       ],
     })
-      .overrideGuard(HcaptchaGuard)
+      .overrideGuard(TurnstileGuard)
       .useValue({ canActivate: () => true })
       .compile();
     formsPublicController = module.get<FormsPublicController>(
