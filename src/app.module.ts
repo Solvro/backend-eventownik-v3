@@ -1,4 +1,3 @@
-import { HcaptchaModule } from "@gvrs/nestjs-hcaptcha";
 import { MailerModule } from "@nestjs-modules/mailer";
 import { HandlebarsAdapter } from "@nestjs-modules/mailer/adapters/handlebars.adapter";
 import * as Joi from "joi";
@@ -43,7 +42,7 @@ import { StorageModule } from "./storage/storage.module";
         FRONTEND_URL: Joi.string().required(),
         CORS_ORIGINS: Joi.string().required(),
         DATABASE_URL: Joi.string().required(),
-        HCAPTCHA_SECRET: Joi.string().required(),
+        TURNSTILE_SECRET: Joi.string().required(),
         JWT_SECRET: Joi.string().required(),
         JWT_EXPIRES_IN: Joi.string().default("60m"),
         REFRESH_TOKEN_TTL_DAYS: Joi.number().required().default(3),
@@ -117,12 +116,6 @@ import { StorageModule } from "./storage/storage.module";
     AdminsModule,
     ParticipantsModule,
     ImportExportModule,
-    HcaptchaModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.getOrThrow<string>("HCAPTCHA_SECRET"),
-      }),
-    }),
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({

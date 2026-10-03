@@ -71,9 +71,9 @@ export class FormSubmitionDto {
   attributes: ParticipantAttributeDto[];
 
   // @ApiProperty({
-  //   description: "hCaptcha response token",
+  //   description: "Cloudflare Turnstile response token",
   // })
   // @IsString()
   // @IsNotEmpty()
-  // "h-captcha-response": string;
+  // "cf-turnstile-response": string;
 }

@@ -1,5 +1,5 @@
-import { HcaptchaGuard } from "@gvrs/nestjs-hcaptcha";
 import type { Request } from "express";
+import { TurnstileGuard } from "src/common/guards/turnstile.guard";
 
 import {
   Body,
@@ -81,7 +81,7 @@ export class FormsPublicController {
 
   @Post(":id/submit")
   @HttpCode(HttpStatus.OK)
-  @UseGuards(HcaptchaGuard)
+  @UseGuards(TurnstileGuard)
   @ApiOperation({ summary: "Submit a form for an event" })
   @ApiParam({ name: "eventSlug", description: "Event slug of the event" })
   @ApiParam({ name: "id", description: "UUID of the form" })
