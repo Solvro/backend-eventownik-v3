@@ -14,7 +14,11 @@ export interface ReportRow {
 export class ExcelGeneratorService {
   async generateBbiReport(rows: ReportRow[]): Promise<Buffer> {
     const date = new Date();
-    const prevMonthDate = new Date(date.getFullYear(), date.getMonth() - 1, 1);
+    const previousMonthDate = new Date(
+      date.getFullYear(),
+      date.getMonth() - 1,
+      1,
+    );
     const monthNames = [
       "styczeń",
       "luty",
@@ -32,7 +36,7 @@ export class ExcelGeneratorService {
 
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "Solvro";
-    workbook.title = `RCP PWR Eventownik Solvro ${monthNames[prevMonthDate.getMonth()]} ${prevMonthDate.getFullYear().toString()}`;
+    workbook.title = `RCP PWR Eventownik Solvro ${monthNames[previousMonthDate.getMonth()]} ${previousMonthDate.getFullYear().toString()}`;
     const sheet = workbook.addWorksheet("RCP");
 
     sheet.columns = [
