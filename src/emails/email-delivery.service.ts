@@ -223,6 +223,7 @@ export class EmailDeliveryService {
       participant = {
         uuid: "00000000-0000-0000-0000-000000000000",
         email: targetEmail,
+        ticketToken: "test-ticket-token",
         createdAt: now,
         updatedAt: now,
         attributes: [],
