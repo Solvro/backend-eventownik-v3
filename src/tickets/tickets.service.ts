@@ -173,6 +173,44 @@ export class TicketsService {
     return this.toEntity(ticket);
   }
 
+  async findForBlockContext(
+    eventUuid: string,
+    ticketUuid: string,
+    blockUuid: string | undefined,
+  ) {
+    const ticket = await this.prisma.ticket.findFirst({
+      where: { uuid: ticketUuid, eventUuid },
+      include: ticketInclude,
+    });
+    if (ticket === null) {
+      throw new NotFoundException(`Ticket with UUID ${ticketUuid} not found`);
+    }
+
+    if (ticket.mode === TicketMode.EVENT && blockUuid !== undefined) {
+      throw new BadRequestException(
+        "blockUuid must not be provided for an EVENT ticket",
+      );
+    }
+    if (ticket.mode === TicketMode.BLOCK) {
+      if (blockUuid === undefined || ticket.attributeUuid === null) {
+        throw new BadRequestException(
+          "blockUuid is required for a BLOCK ticket",
+        );
+      }
+      const block = await this.prisma.block.findFirst({
+        where: { uuid: blockUuid, attributeUuid: ticket.attributeUuid },
+        select: { uuid: true },
+      });
+      if (block === null) {
+        throw new NotFoundException(
+          `Block with UUID ${blockUuid} not found in the ticket's attribute`,
+        );
+      }
+    }
+
+    return ticket;
+  }
+
   async update(
     eventUuid: string,
     ticketUuid: string,

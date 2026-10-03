@@ -13,6 +13,7 @@ import { Test } from "@nestjs/testing";
 
 import { TicketScanStatus } from "./entities/ticket-scan-result.entity";
 import { TicketScanService } from "./ticket-scan.service";
+import { TicketsService } from "./tickets.service";
 
 describe("TicketScanService", () => {
   let service: TicketScanService;
@@ -76,6 +77,7 @@ describe("TicketScanService", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TicketScanService,
+        TicketsService,
         { provide: PrismaService, useValue: mockPrismaService },
       ],
     }).compile();

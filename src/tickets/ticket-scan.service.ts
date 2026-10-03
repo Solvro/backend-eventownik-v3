@@ -1,12 +1,10 @@
 import { Prisma } from "src/generated/prisma/client";
-import { AttributeType, TicketMode } from "src/generated/prisma/enums";
+import { TicketMode } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import {
-  BadRequestException,
   ConflictException,
   Injectable,
-  NotFoundException,
   UnprocessableEntityException,
 } from "@nestjs/common";
 
@@ -17,20 +15,19 @@ import {
   TicketScanResult,
   TicketScanStatus,
 } from "./entities/ticket-scan-result.entity";
-
-function toStringArray(value: Prisma.JsonValue | null | undefined): string[] {
-  if (typeof value === "string") {
-    return [value];
-  }
-  if (Array.isArray(value)) {
-    return value.filter((item): item is string => typeof item === "string");
-  }
-  return [];
-}
+import {
+  collectBlockUuids,
+  formatShownAttributes,
+  toStringArray,
+} from "./ticket-attribute-format";
+import { TicketsService } from "./tickets.service";
 
 @Injectable()
 export class TicketScanService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ticketsService: TicketsService,
+  ) {}
 
   private async blockNamesFor(
     blockUuids: string[],
@@ -54,35 +51,11 @@ export class TicketScanService {
     ticketUuid: string,
     dto: TicketScanDto,
   ): Promise<TicketScanResult> {
-    const ticket = await this.prisma.ticket.findFirst({
-      where: { uuid: ticketUuid, eventUuid },
-      include: { attributes: { select: { attributeUuid: true } } },
-    });
-    if (ticket === null) {
-      throw new NotFoundException(`Ticket with UUID ${ticketUuid} not found`);
-    }
-
-    if (ticket.mode === TicketMode.EVENT && dto.blockUuid !== undefined) {
-      throw new BadRequestException(
-        "blockUuid must not be provided for an EVENT ticket",
-      );
-    }
-    if (ticket.mode === TicketMode.BLOCK) {
-      if (dto.blockUuid === undefined || ticket.attributeUuid === null) {
-        throw new BadRequestException(
-          "blockUuid is required for a BLOCK ticket",
-        );
-      }
-      const block = await this.prisma.block.findFirst({
-        where: { uuid: dto.blockUuid, attributeUuid: ticket.attributeUuid },
-        select: { uuid: true },
-      });
-      if (block === null) {
-        throw new NotFoundException(
-          `Block with UUID ${dto.blockUuid} not found in the ticket's attribute`,
-        );
-      }
-    }
+    const ticket = await this.ticketsService.findForBlockContext(
+      eventUuid,
+      ticketUuid,
+      dto.blockUuid,
+    );
 
     const shownAttributeUuids = ticket.attributes.map(
       (attribute) => attribute.attributeUuid,
@@ -175,27 +148,11 @@ export class TicketScanService {
       orderBy: { order: "asc" },
     });
 
-    const blockUuids = attributes
-      .filter((attribute) => attribute.type === AttributeType.block)
-      .flatMap((attribute) => toStringArray(valueOf(attribute.uuid)));
-    const blockNames = await this.blockNamesFor(blockUuids);
+    const blockNames = await this.blockNamesFor(
+      collectBlockUuids(attributes, valueOf),
+    );
 
-    return attributes.map((attribute) => {
-      const value = valueOf(attribute.uuid);
-      return {
-        attributeUuid: attribute.uuid,
-        name: attribute.name,
-        type: attribute.type,
-        value,
-        ...(attribute.type === AttributeType.block
-          ? {
-              blockNames: toStringArray(value)
-                .map((uuid) => blockNames.get(uuid))
-                .filter((name): name is string => name !== undefined),
-            }
-          : {}),
-      };
-    });
+    return formatShownAttributes(attributes, valueOf, blockNames);
   }
 
   async scan(

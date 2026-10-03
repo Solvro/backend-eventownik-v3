@@ -91,3 +91,25 @@ export class TicketCheckIn {
   @ApiProperty({ example: "2026-01-01T10:00:00.000Z" })
   confirmedAt: Date;
 }
+
+export class TicketAttendance {
+  @ApiProperty()
+  confirmed: boolean;
+
+  @ApiProperty({ nullable: true, type: Date })
+  confirmedAt: Date | null;
+}
+
+export class TicketParticipant {
+  @ApiProperty({ example: "123e4567-e89b-12d3-a456-426614174000" })
+  uuid: string;
+
+  @ApiProperty({ example: "jan.kowalski@example.com" })
+  email: string;
+
+  @ApiProperty({ type: TicketScanAttribute, isArray: true })
+  attributes: TicketScanAttribute[];
+
+  @ApiProperty({ type: TicketAttendance })
+  attendance: TicketAttendance;
+}

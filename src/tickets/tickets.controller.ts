@@ -1,6 +1,8 @@
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
+import { ApiPaginatedResponse } from "src/common/decorators/api-paginated-response.decorator";
+import { PageDto } from "src/common/dto/page.dto";
 import { PermissionType } from "src/generated/prisma/enums";
 
 import {
@@ -13,6 +15,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from "@nestjs/common";
 import {
@@ -31,8 +34,11 @@ import {
 } from "@nestjs/swagger";
 
 import { CreateTicketDto } from "./dto/create-ticket.dto";
+import { TicketParticipantsListingDto } from "./dto/ticket-participants-listing.dto";
 import { UpdateTicketDto } from "./dto/update-ticket.dto";
+import { TicketParticipant } from "./entities/ticket-scan-result.entity";
 import { Ticket } from "./entities/ticket.entity";
+import { TicketParticipantsService } from "./ticket-participants.service";
 import { TicketsService } from "./tickets.service";
 
 @ApiTags("Tickets")
@@ -42,7 +48,10 @@ import { TicketsService } from "./tickets.service";
 @ApiForbiddenResponse({ description: "Forbidden - insufficient permissions" })
 @Controller("events/:eventId/tickets")
 export class TicketsController {
-  constructor(private readonly ticketsService: TicketsService) {}
+  constructor(
+    private readonly ticketsService: TicketsService,
+    private readonly ticketParticipantsService: TicketParticipantsService,
+  ) {}
 
   @Post()
   @RequirePermission(PermissionType.MANAGE_TICKET)
@@ -85,6 +94,25 @@ export class TicketsController {
     @Param("ticketId", ParseUUIDPipe) ticketId: string,
   ): Promise<Ticket> {
     return this.ticketsService.findOne(eventId, ticketId);
+  }
+
+  @Get(":ticketId/participants")
+  @RequirePermission([PermissionType.MANAGE_TICKET, PermissionType.SCAN_TICKET])
+  @ApiOperation({
+    summary:
+      "List the participants of a ticket with the shown attributes and attendance",
+  })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({ name: "ticketId", description: "UUID of the ticket" })
+  @ApiPaginatedResponse(TicketParticipant)
+  @ApiBadRequestResponse({ description: "blockUuid missing or not allowed" })
+  @ApiNotFoundResponse({ description: "Ticket or block not found" })
+  async findParticipants(
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @Param("ticketId", ParseUUIDPipe) ticketId: string,
+    @Query() query: TicketParticipantsListingDto,
+  ): Promise<PageDto<TicketParticipant>> {
+    return this.ticketParticipantsService.findAll(eventId, ticketId, query);
   }
 
   @Patch(":ticketId")

@@ -7,7 +7,8 @@ import { Reflector } from "@nestjs/core";
 import { TicketScanController } from "./ticket-scan.controller";
 import { TicketsController } from "./tickets.controller";
 
-type HandlerName = "create" | "findAll" | "findOne" | "update" | "remove";
+type HandlerName =
+  "create" | "findAll" | "findOne" | "findParticipants" | "update" | "remove";
 
 const eventId = "3fa85f64-5717-4562-b3fc-2c963f66afa6";
 const guard = new PermissionsGuard(new Reflector());
@@ -59,7 +60,7 @@ describe("TicketsController permissions", () => {
     },
   );
 
-  it.each<HandlerName>(["findAll", "findOne"])(
+  it.each<HandlerName>(["findAll", "findOne", "findParticipants"])(
     "%s allows MANAGE_TICKET and SCAN_TICKET",
     (handlerName) => {
       expect(canCall(handlerName, PermissionType.MANAGE_TICKET)).toBe(true);
@@ -70,12 +71,16 @@ describe("TicketsController permissions", () => {
     },
   );
 
-  it.each<HandlerName>(["create", "findAll", "findOne", "update", "remove"])(
-    "%s allows MANAGE_ALL",
-    (handlerName) => {
-      expect(canCall(handlerName, PermissionType.MANAGE_ALL)).toBe(true);
-    },
-  );
+  it.each<HandlerName>([
+    "create",
+    "findAll",
+    "findOne",
+    "findParticipants",
+    "update",
+    "remove",
+  ])("%s allows MANAGE_ALL", (handlerName) => {
+    expect(canCall(handlerName, PermissionType.MANAGE_ALL)).toBe(true);
+  });
 });
 
 describe("TicketScanController permissions", () => {
