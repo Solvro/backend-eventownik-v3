@@ -4,6 +4,7 @@ import { PermissionType } from "src/generated/prisma/enums";
 import type { ExecutionContext } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 
+import { TicketScanController } from "./ticket-scan.controller";
 import { TicketsController } from "./tickets.controller";
 
 type HandlerName = "create" | "findAll" | "findOne" | "update" | "remove";
@@ -11,15 +12,19 @@ type HandlerName = "create" | "findAll" | "findOne" | "update" | "remove";
 const eventId = "3fa85f64-5717-4562-b3fc-2c963f66afa6";
 const guard = new PermissionsGuard(new Reflector());
 
-function canCall(handlerName: HandlerName, permission: PermissionType) {
+function canCallOn(
+  controller: new (...arguments_: never[]) => unknown,
+  handlerName: string,
+  permission: PermissionType,
+) {
   const handler = Object.getOwnPropertyDescriptor(
-    TicketsController.prototype,
+    controller.prototype,
     handlerName,
   )?.value as (...arguments_: never[]) => unknown;
 
   const context = {
     getHandler: () => handler,
-    getClass: () => TicketsController,
+    getClass: () => controller,
     switchToHttp: () => ({
       getRequest: () => ({
         params: { eventId },
@@ -32,6 +37,14 @@ function canCall(handlerName: HandlerName, permission: PermissionType) {
   } as unknown as ExecutionContext;
 
   return guard.canActivate(context);
+}
+
+function canCall(handlerName: HandlerName, permission: PermissionType) {
+  return canCallOn(TicketsController, handlerName, permission);
+}
+
+function canScan(handlerName: "scan" | "confirm", permission: PermissionType) {
+  return canCallOn(TicketScanController, handlerName, permission);
 }
 
 describe("TicketsController permissions", () => {
@@ -61,6 +74,20 @@ describe("TicketsController permissions", () => {
     "%s allows MANAGE_ALL",
     (handlerName) => {
       expect(canCall(handlerName, PermissionType.MANAGE_ALL)).toBe(true);
+    },
+  );
+});
+
+describe("TicketScanController permissions", () => {
+  it.each<"scan" | "confirm">(["scan", "confirm"])(
+    "%s requires SCAN_TICKET",
+    (handlerName) => {
+      expect(canScan(handlerName, PermissionType.SCAN_TICKET)).toBe(true);
+      expect(canScan(handlerName, PermissionType.MANAGE_ALL)).toBe(true);
+      expect(canScan(handlerName, PermissionType.MANAGE_TICKET)).toBe(false);
+      expect(canScan(handlerName, PermissionType.MANAGE_PARTICIPANT)).toBe(
+        false,
+      );
     },
   );
 });
