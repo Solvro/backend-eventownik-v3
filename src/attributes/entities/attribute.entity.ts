@@ -35,4 +35,7 @@ export class Attribute implements PrismaAttribute {
 
   @ApiProperty({ nullable: true })
   config: PrismaAttribute["config"];
+
+  @ApiProperty({ nullable: true })
+  sentToBbiAt: Date | null;
 }

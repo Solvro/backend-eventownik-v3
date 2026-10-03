@@ -73,6 +73,7 @@ model Event {
   isFeatured        Boolean   @default(false)
   participantsLimit Int?
   verifiedAt        DateTime?
+  sentToBbiAt       DateTime?
   description       String?
   primaryColor      String?
   organizerName     String?
@@ -142,6 +143,7 @@ model Attribute {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  sentToBbiAt DateTime?
 
   event                 Event                  @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
   blocks                Block[]
