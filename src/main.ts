@@ -1,6 +1,7 @@
 import cookieParser from "cookie-parser";
 import * as express from "express";
 import * as qs from "qs";
+import { parseTrustProxy } from "src/common/utils/trust-proxy.utility";
 import { swaggerConfig } from "src/config/swagger.config";
 
 import {
@@ -39,6 +40,10 @@ async function bootstrap() {
 
   const expressApp = app.getHttpAdapter().getInstance() as express.Application;
 
+  expressApp.set(
+    "trust proxy",
+    parseTrustProxy(configService.get<string>("TRUST_PROXY")),
+  );
   expressApp.set("query parser", (string_: string) => qs.parse(string_));
 
   const documentFactory = () =>

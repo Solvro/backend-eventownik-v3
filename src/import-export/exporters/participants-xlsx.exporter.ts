@@ -9,6 +9,13 @@ import {
   ParticipantsExporter,
 } from "./participants-exporter.interface";
 
+const CONSENT_HEADERS = [
+  "gdprConsent",
+  "gdprConsentAt",
+  "consentIp",
+  "consentUserAgent",
+];
+
 @Injectable()
 export class ParticipantsXlsxExporter implements ParticipantsExporter {
   readonly format = ParticipantsExportFormat.xlsx;
@@ -23,6 +30,7 @@ export class ParticipantsXlsxExporter implements ParticipantsExporter {
     const headers = [
       "participantUuid",
       "email",
+      ...(payload.includeConsent ? CONSENT_HEADERS : []),
       ...buildAttributeHeaders(payload.attributes),
     ];
     worksheet.addRow(headers);
@@ -31,6 +39,14 @@ export class ParticipantsXlsxExporter implements ParticipantsExporter {
       worksheet.addRow([
         row.participantUuid,
         row.email,
+        ...(payload.includeConsent
+          ? [
+              row.consent?.gdprConsent ?? false,
+              row.consent?.gdprConsentAt?.toISOString() ?? "",
+              row.consent?.ip ?? "",
+              row.consent?.userAgent ?? "",
+            ]
+          : []),
         ...payload.attributes.map(
           (attribute) => row.attributes[attribute.uuid] ?? "",
         ),

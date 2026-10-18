@@ -1,6 +1,7 @@
 import { Transform, Type, plainToInstance } from "class-transformer";
 import {
   IsArray,
+  IsBoolean,
   IsEmail,
   IsOptional,
   IsString,
@@ -69,6 +70,22 @@ export class FormSubmitionDto {
     return value as unknown;
   })
   attributes: ParticipantAttributeDto[];
+
+  @ApiPropertyOptional({
+    description:
+      "GDPR consent given by the participant. Must be true on the registration form, ignored on other forms",
+  })
+  @IsOptional()
+  @IsBoolean()
+  gdprConsent?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      "Acceptance of the platform terms. Must be true on the registration form, ignored on other forms",
+  })
+  @IsOptional()
+  @IsBoolean()
+  termsAccepted?: boolean;
 
   // @ApiProperty({
   //   description: "Cloudflare Turnstile response token",

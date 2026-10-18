@@ -61,6 +61,14 @@ export class Event implements Omit<PrismaEvent, "photoKey"> {
   @ApiProperty({ nullable: true, required: false })
   contactEmail: string | null;
 
+  @ApiProperty({
+    nullable: true,
+    required: false,
+    description:
+      "Recipients of participants' data, to display next to the GDPR consent",
+  })
+  dataRecipients: string | null;
+
   @ApiProperty({ nullable: true, required: false })
   organizerUuid: string | null;
 

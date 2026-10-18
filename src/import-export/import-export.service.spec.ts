@@ -119,7 +119,15 @@ describe("ImportExportService", () => {
           where: { eventUuid: eventId },
         }),
       );
+      expect(mockPrismaService.participant.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: expect.not.objectContaining({
+            consent: expect.anything() as unknown,
+          }) as unknown,
+        }),
+      );
       expect(mockXlsxExporter.build).toHaveBeenCalledWith({
+        includeConsent: false,
         attributes: [
           { uuid: "attr-1", name: "T-shirt size" },
           { uuid: "attr-2", name: "Interests" },
@@ -141,6 +149,66 @@ describe("ImportExportService", () => {
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         content: Buffer.from("xlsx-content"),
       });
+    });
+
+    it("should include consent data when includeConsent is set", async () => {
+      const consentedAt = new Date("2026-10-01T10:00:00.000Z");
+      mockPrismaService.event.findUnique.mockResolvedValue({ uuid: eventId });
+      mockPrismaService.attribute.findMany.mockResolvedValue([]);
+      mockPrismaService.participant.findMany.mockResolvedValue([
+        {
+          uuid: "participant-1",
+          email: "consented@example.com",
+          attributes: [],
+          consent: {
+            gdprConsentedAt: consentedAt,
+            ip: "203.0.113.5",
+            userAgent: "jest-agent",
+          },
+        },
+        {
+          uuid: "participant-2",
+          email: "imported@example.com",
+          attributes: [],
+          consent: null,
+        },
+      ]);
+      mockXlsxExporter.build.mockResolvedValue(Buffer.from("xlsx-content"));
+
+      await service.exportParticipants(eventId, { includeConsent: true });
+
+      expect(mockPrismaService.participant.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: expect.objectContaining({
+            consent: {
+              select: { gdprConsentedAt: true, ip: true, userAgent: true },
+            },
+          }) as unknown,
+        }),
+      );
+      expect(mockXlsxExporter.build).toHaveBeenCalledWith(
+        expect.objectContaining({
+          includeConsent: true,
+          rows: [
+            expect.objectContaining({
+              consent: {
+                gdprConsent: true,
+                gdprConsentAt: consentedAt,
+                ip: "203.0.113.5",
+                userAgent: "jest-agent",
+              },
+            }) as unknown,
+            expect.objectContaining({
+              consent: {
+                gdprConsent: false,
+                gdprConsentAt: null,
+                ip: null,
+                userAgent: null,
+              },
+            }) as unknown,
+          ],
+        }),
+      );
     });
 
     it("should validate that participantIds belong to the event", async () => {

@@ -42,6 +42,7 @@ import { StorageModule } from "./storage/storage.module";
         FRONTEND_URL: Joi.string().required(),
         CORS_ORIGINS: Joi.string().required(),
         DATABASE_URL: Joi.string().required(),
+        TRUST_PROXY: Joi.string().allow("").optional(),
         TURNSTILE_SECRET: Joi.string().required(),
         JWT_SECRET: Joi.string().required(),
         JWT_EXPIRES_IN: Joi.string().default("60m"),

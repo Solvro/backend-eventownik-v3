@@ -37,6 +37,8 @@ cp .env.test.example .env.test
 
 The defaults match the compose services. `.env.test` must point at `postgres-test` (port 5433).
 
+`TRUST_PROXY` can stay empty locally. Behind a reverse proxy or load balancer set it (a hop count like `1`, or a list of proxy IPs/CIDRs), otherwise the client IP stored as GDPR consent evidence is the proxy's address.
+
 ## 4. Prisma
 
 ```bash
