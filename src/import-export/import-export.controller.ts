@@ -78,6 +78,13 @@ export class ImportExportController {
     enum: ["xlsx"],
     description: "Export format. Defaults to xlsx.",
   })
+  @ApiQuery({
+    name: "includeConsent",
+    required: false,
+    type: Boolean,
+    description:
+      "Include GDPR consent columns (gdprConsent, gdprConsentAt, consentIp, consentUserAgent). Defaults to false.",
+  })
   @ApiOkResponse({
     description: "Participants exported as downloadable file",
     schema: {
