@@ -24,4 +24,18 @@ export class Participant {
     description: "List of email statuses for the participant",
   })
   emails?: ParticipantEmailStatus[];
+
+  @ApiPropertyOptional({
+    description:
+      "Whether GDPR consent was recorded for the participant. Returned by the list and detail endpoints",
+  })
+  gdprConsent?: boolean;
+
+  @ApiPropertyOptional({
+    type: Date,
+    nullable: true,
+    description:
+      "When GDPR consent was given, null if none was recorded. Returned by the list and detail endpoints",
+  })
+  gdprConsentAt?: Date | null;
 }

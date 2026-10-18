@@ -14,6 +14,7 @@ import {
   AttributeType,
   EmailTemplate,
   ParticipantAttribute,
+  ParticipantConsent,
   ParticipantEmailStatus,
   Prisma,
   Participant as PrismaParticipant,
@@ -45,6 +46,7 @@ type ParticipantWithRelations = PrismaParticipant & {
   emails?: (ParticipantEmailStatus & {
     email?: EmailTemplate | null;
   })[];
+  consent?: ParticipantConsent | null;
 };
 
 const FILE_LIKE_ATTRIBUTE_TYPES: AttributeType[] = [
@@ -104,6 +106,12 @@ export class ParticipantsService {
         trigger: emailStatus.email?.trigger,
         triggerConfig: emailStatus.email?.triggerConfig,
       })),
+      ...(participant.consent === undefined
+        ? {}
+        : {
+            gdprConsent: participant.consent !== null,
+            gdprConsentAt: participant.consent?.gdprConsentedAt ?? null,
+          }),
     };
   }
 
@@ -638,6 +646,7 @@ export class ParticipantsService {
             },
             include: { attribute: true },
           },
+          consent: true,
         },
       }),
     ]);
@@ -664,6 +673,7 @@ export class ParticipantsService {
         emails: {
           include: { email: true },
         },
+        consent: true,
       },
     });
 
