@@ -1,6 +1,7 @@
 import { BlocksService } from "src/blocks/blocks.service";
 import type { Attribute, Event, Form } from "src/generated/prisma/client";
 import { AttributeType } from "src/generated/prisma/enums";
+import { ParticipantListingDto } from "src/participants/dto/participant-listing.dto";
 import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
 import { StorageService } from "src/storage/storage.service";
@@ -16,6 +17,7 @@ import { FormsService } from "./forms.service";
 
 describe("Forms -> Participants Integration", () => {
   let formsService: FormsService;
+  let participantsService: ParticipantsService;
   let prisma: PrismaService;
   let mockStorageService: {
     upload: jest.Mock;
@@ -25,6 +27,8 @@ describe("Forms -> Participants Integration", () => {
   };
 
   const createdEventUuids: string[] = [];
+  const registrationConsent = { gdprConsent: true, termsAccepted: true };
+  const requestMetadata = { ip: "203.0.113.5", userAgent: "int-test-agent" };
 
   beforeAll(async () => {
     mockStorageService = {
@@ -61,6 +65,7 @@ describe("Forms -> Participants Integration", () => {
     }).compile();
 
     formsService = module.get<FormsService>(FormsService);
+    participantsService = module.get<ParticipantsService>(ParticipantsService);
     prisma = module.get<PrismaService>(PrismaService);
   });
 
@@ -150,6 +155,7 @@ describe("Forms -> Participants Integration", () => {
 
       const submissionData = {
         email: `participant-${String(Date.now())}@example.com`,
+        ...registrationConsent,
         attributes: [[{ attributeUuid: selectAttribute.uuid, value: "" }]],
       } as unknown as FormSubmitionDto;
 
@@ -157,6 +163,7 @@ describe("Forms -> Participants Integration", () => {
         event.slug,
         form.uuid,
         submissionData,
+        requestMetadata,
       );
 
       expect(participant).toBeDefined();
@@ -187,6 +194,7 @@ describe("Forms -> Participants Integration", () => {
 
       const submissionData = {
         email: `participant-${String(Date.now())}@example.com`,
+        ...registrationConsent,
         attributes: [[{ attributeUuid: dateAttribute.uuid, value: "" }]],
       } as unknown as FormSubmitionDto;
 
@@ -194,9 +202,151 @@ describe("Forms -> Participants Integration", () => {
         event.slug,
         form.uuid,
         submissionData,
+        requestMetadata,
       );
 
       expect(participant).toBeDefined();
+    });
+  });
+
+  describe("registration consent", () => {
+    async function createRegistrationForm(dataRecipients?: string) {
+      const event = await createEvent();
+      const form = await createForm(event.uuid);
+      await prisma.event.update({
+        where: { uuid: event.uuid },
+        data: { registerFormUuid: form.uuid, dataRecipients },
+      });
+      return { event, form };
+    }
+
+    it("stores the consent evidence together with the participant", async () => {
+      const { event, form } = await createRegistrationForm(
+        "Shared with Example Sp. z o.o.",
+      );
+      const before = new Date();
+
+      const participant = await formsService.formSubmit(
+        event.slug,
+        form.uuid,
+        {
+          email: `consent-${String(Date.now())}@example.com`,
+          ...registrationConsent,
+          attributes: [],
+        } as unknown as FormSubmitionDto,
+        requestMetadata,
+      );
+
+      const consent = await prisma.participantConsent.findUnique({
+        where: { participantUuid: participant.uuid },
+      });
+      expect(consent).toMatchObject({
+        ip: requestMetadata.ip,
+        userAgent: requestMetadata.userAgent,
+        dataRecipientsSnapshot: "Shared with Example Sp. z o.o.",
+      });
+      expect(consent?.gdprConsentedAt.getTime()).toBeGreaterThanOrEqual(
+        before.getTime(),
+      );
+      expect(consent?.termsAcceptedAt).toEqual(consent?.gdprConsentedAt);
+    });
+
+    it("keeps the original dataRecipients text after the admin edits it", async () => {
+      const { event, form } = await createRegistrationForm("Old recipients");
+
+      const participant = await formsService.formSubmit(
+        event.slug,
+        form.uuid,
+        {
+          email: `snapshot-${String(Date.now())}@example.com`,
+          ...registrationConsent,
+          attributes: [],
+        } as unknown as FormSubmitionDto,
+        requestMetadata,
+      );
+      await prisma.event.update({
+        where: { uuid: event.uuid },
+        data: { dataRecipients: "New recipients" },
+      });
+
+      const consent = await prisma.participantConsent.findUnique({
+        where: { participantUuid: participant.uuid },
+      });
+      expect(consent?.dataRecipientsSnapshot).toBe("Old recipients");
+    });
+
+    it("creates neither participant nor consent when consent is missing", async () => {
+      const { event, form } = await createRegistrationForm();
+      const email = `no-consent-${String(Date.now())}@example.com`;
+
+      await expect(
+        formsService.formSubmit(
+          event.slug,
+          form.uuid,
+          { email, attributes: [] } as unknown as FormSubmitionDto,
+          requestMetadata,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(
+        await prisma.participant.count({ where: { eventUuid: event.uuid } }),
+      ).toBe(0);
+    });
+
+    it("removes the consent row when the participant is deleted", async () => {
+      const { event, form } = await createRegistrationForm();
+      const participant = await formsService.formSubmit(
+        event.slug,
+        form.uuid,
+        {
+          email: `erasure-${String(Date.now())}@example.com`,
+          ...registrationConsent,
+          attributes: [],
+        } as unknown as FormSubmitionDto,
+        requestMetadata,
+      );
+
+      await prisma.participant.delete({ where: { uuid: participant.uuid } });
+
+      expect(
+        await prisma.participantConsent.count({
+          where: { participantUuid: participant.uuid },
+        }),
+      ).toBe(0);
+    });
+
+    it("reports consent in the participants list", async () => {
+      const { event, form } = await createRegistrationForm();
+      await formsService.formSubmit(
+        event.slug,
+        form.uuid,
+        {
+          email: `listed-${String(Date.now())}@example.com`,
+          ...registrationConsent,
+          attributes: [],
+        } as unknown as FormSubmitionDto,
+        requestMetadata,
+      );
+      await prisma.participant.create({
+        data: {
+          email: `imported-${String(Date.now())}@example.com`,
+          eventUuid: event.uuid,
+        },
+      });
+
+      const list = await participantsService.findAll(
+        event.uuid,
+        new ParticipantListingDto(),
+      );
+
+      const byPrefix = (prefix: string) =>
+        list.data.find((p) => p.email.startsWith(prefix));
+      expect(byPrefix("listed-")).toMatchObject({ gdprConsent: true });
+      expect(byPrefix("listed-")?.gdprConsentAt).toBeInstanceOf(Date);
+      expect(byPrefix("imported-")).toMatchObject({
+        gdprConsent: false,
+        gdprConsentAt: null,
+      });
     });
   });
 
@@ -304,6 +454,7 @@ describe("Forms -> Participants Integration", () => {
 
       const submissionData = {
         email: `participant-${String(Date.now())}@example.com`,
+        ...registrationConsent,
         attributes: [
           [{ attributeUuid: drawingAttribute.uuid, value: uploadedFile.uuid }],
         ],
@@ -313,6 +464,7 @@ describe("Forms -> Participants Integration", () => {
         event.slug,
         form.uuid,
         submissionData,
+        requestMetadata,
       );
 
       const storedAttribute = await prisma.participantAttribute.findUnique({
@@ -352,13 +504,19 @@ describe("Forms -> Participants Integration", () => {
 
       const submissionData = {
         email: `participant-${String(Date.now())}@example.com`,
+        ...registrationConsent,
         attributes: [
           [{ attributeUuid: drawingAttribute.uuid, value: uploadedFile.uuid }],
         ],
       } as unknown as FormSubmitionDto;
 
       await expect(
-        formsService.formSubmit(event.slug, form.uuid, submissionData),
+        formsService.formSubmit(
+          event.slug,
+          form.uuid,
+          submissionData,
+          requestMetadata,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
   });

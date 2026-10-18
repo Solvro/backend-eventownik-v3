@@ -217,6 +217,66 @@ describe("ParticipantsService", () => {
       expect(result.attributes[0].name).toBe("Attr 1");
       expect(mockPrismaService.participant.create).toHaveBeenCalled();
     });
+
+    it("should create the consent row with the event's dataRecipients snapshot", async () => {
+      const givenAt = new Date("2026-10-01T10:00:00.000Z");
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
+        dataRecipients: "Shared with Example Sp. z o.o.",
+      });
+      mockPrismaService.attribute.findMany.mockResolvedValue([
+        { uuid: "attr-1", type: "text" },
+      ]);
+      mockPrismaService.participant.create.mockResolvedValue({
+        uuid: "part-int",
+        email,
+        createdAt: new Date(),
+        attributes: [],
+      });
+
+      await service.register(eventUuid, email, attributes, {
+        consent: { givenAt, ip: "203.0.113.5", userAgent: null },
+      });
+
+      expect(mockPrismaService.participant.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            consent: {
+              create: {
+                gdprConsentedAt: givenAt,
+                termsAcceptedAt: givenAt,
+                ip: "203.0.113.5",
+                userAgent: null,
+                dataRecipientsSnapshot: "Shared with Example Sp. z o.o.",
+              },
+            },
+          }) as unknown,
+        }),
+      );
+    });
+
+    it("should not create a consent row when no consent is passed", async () => {
+      mockPrismaService.event.findUnique.mockResolvedValue({ uuid: eventUuid });
+      mockPrismaService.attribute.findMany.mockResolvedValue([
+        { uuid: "attr-1", type: "text" },
+      ]);
+      mockPrismaService.participant.create.mockResolvedValue({
+        uuid: "part-int",
+        email,
+        createdAt: new Date(),
+        attributes: [],
+      });
+
+      await service.register(eventUuid, email, attributes);
+
+      expect(mockPrismaService.participant.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.not.objectContaining({
+            consent: expect.anything() as unknown,
+          }) as unknown,
+        }),
+      );
+    });
   });
 
   describe("update", () => {

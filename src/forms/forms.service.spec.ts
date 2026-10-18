@@ -3,7 +3,10 @@ import { AttributeType } from "src/generated/prisma/client";
 import { ParticipantsService } from "src/participants/participants.service";
 import { StorageService } from "src/storage/storage.service";
 
-import { BadRequestException } from "@nestjs/common";
+import {
+  BadRequestException,
+  InternalServerErrorException,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import type { TestingModule } from "@nestjs/testing";
@@ -402,6 +405,8 @@ describe("FormsService", () => {
     const eventUuid = "event-123";
     const formUuid = "form-123";
     const participantId = "part-123";
+    const registrationConsent = { gdprConsent: true, termsAccepted: true };
+    const requestMetadata = { ip: "203.0.113.5", userAgent: "jest-agent" };
 
     beforeEach(() => {
       jest.clearAllMocks();
@@ -435,6 +440,7 @@ describe("FormsService", () => {
     it("should pass an out-of-options select value through unchanged", async () => {
       const submissionData = {
         email: "test@example.com",
+        ...registrationConsent,
         attributes: [[{ attributeUuid: "attr-select", value: "choice-1" }]],
       } as unknown as FormSubmitionDto;
 
@@ -467,19 +473,32 @@ describe("FormsService", () => {
         email: submissionData.email,
       });
 
-      await service.formSubmit(eventSlug, formUuid, submissionData);
+      await service.formSubmit(
+        eventSlug,
+        formUuid,
+        submissionData,
+        requestMetadata,
+      );
 
       expect(mockParticipantsService.register).toHaveBeenCalledWith(
         eventUuid,
         submissionData.email,
         [{ attributeUuid: "attr-select", value: "choice-1" }],
-        { trustedFileValues: true },
+        {
+          trustedFileValues: true,
+          consent: {
+            givenAt: expect.any(Date) as Date,
+            ip: requestMetadata.ip,
+            userAgent: requestMetadata.userAgent,
+          },
+        },
       );
     });
 
     it("should pass an out-of-options multiSelect value through unchanged", async () => {
       const submissionData = {
         email: "test@example.com",
+        ...registrationConsent,
         attributes: [[{ attributeUuid: "attr-multi", value: ["invalid"] }]],
       } as unknown as FormSubmitionDto;
 
@@ -512,19 +531,32 @@ describe("FormsService", () => {
         email: submissionData.email,
       });
 
-      await service.formSubmit(eventSlug, formUuid, submissionData);
+      await service.formSubmit(
+        eventSlug,
+        formUuid,
+        submissionData,
+        requestMetadata,
+      );
 
       expect(mockParticipantsService.register).toHaveBeenCalledWith(
         eventUuid,
         submissionData.email,
         [{ attributeUuid: "attr-multi", value: ["invalid"] }],
-        { trustedFileValues: true },
+        {
+          trustedFileValues: true,
+          consent: {
+            givenAt: expect.any(Date) as Date,
+            ip: requestMetadata.ip,
+            userAgent: requestMetadata.userAgent,
+          },
+        },
       );
     });
 
     it("should pass a multiSelect value exceeding maxSelections through unchanged", async () => {
       const submissionData = {
         email: "test@example.com",
+        ...registrationConsent,
         attributes: [
           [
             {
@@ -564,7 +596,12 @@ describe("FormsService", () => {
         email: submissionData.email,
       });
 
-      await service.formSubmit(eventSlug, formUuid, submissionData);
+      await service.formSubmit(
+        eventSlug,
+        formUuid,
+        submissionData,
+        requestMetadata,
+      );
 
       expect(mockParticipantsService.register).toHaveBeenCalledWith(
         eventUuid,
@@ -575,13 +612,21 @@ describe("FormsService", () => {
             value: ["allowed-1", "allowed-2", "allowed-3"],
           },
         ],
-        { trustedFileValues: true },
+        {
+          trustedFileValues: true,
+          consent: {
+            givenAt: expect.any(Date) as Date,
+            ip: requestMetadata.ip,
+            userAgent: requestMetadata.userAgent,
+          },
+        },
       );
     });
 
     it("should validate block submissions and save successfully", async () => {
       const submissionData = {
         email: "test@example.com",
+        ...registrationConsent,
         attributes: [
           [
             {
@@ -628,6 +673,7 @@ describe("FormsService", () => {
         eventSlug,
         formUuid,
         submissionData,
+        requestMetadata,
       );
 
       expect(mockParticipantsService.register).toHaveBeenCalledWith(
@@ -642,7 +688,14 @@ describe("FormsService", () => {
             ],
           },
         ],
-        { trustedFileValues: true },
+        {
+          trustedFileValues: true,
+          consent: {
+            givenAt: expect.any(Date) as Date,
+            ip: requestMetadata.ip,
+            userAgent: requestMetadata.userAgent,
+          },
+        },
       );
       expect(result).toBeDefined();
     });
@@ -650,6 +703,7 @@ describe("FormsService", () => {
     it("should pass a block value exceeding maxSelections through unchanged (capacity pre-check still applies)", async () => {
       const submissionData = {
         email: "test@example.com",
+        ...registrationConsent,
         attributes: [
           [
             {
@@ -693,7 +747,12 @@ describe("FormsService", () => {
         email: submissionData.email,
       });
 
-      await service.formSubmit(eventSlug, formUuid, submissionData);
+      await service.formSubmit(
+        eventSlug,
+        formUuid,
+        submissionData,
+        requestMetadata,
+      );
 
       expect(mockParticipantsService.register).toHaveBeenCalledWith(
         eventUuid,
@@ -708,13 +767,21 @@ describe("FormsService", () => {
             ],
           },
         ],
-        { trustedFileValues: true },
+        {
+          trustedFileValues: true,
+          consent: {
+            givenAt: expect.any(Date) as Date,
+            ip: requestMetadata.ip,
+            userAgent: requestMetadata.userAgent,
+          },
+        },
       );
     });
 
     it("should register a new participant if it is a registration form", async () => {
       const submissionData = {
         email: "test@example.com",
+        ...registrationConsent,
         attributes: [[{ attributeUuid: "attr-1", value: "value-1" }]],
       } as unknown as FormSubmitionDto;
 
@@ -746,15 +813,142 @@ describe("FormsService", () => {
         eventSlug,
         formUuid,
         submissionData,
+        requestMetadata,
       );
 
       expect(mockParticipantsService.register).toHaveBeenCalledWith(
         eventUuid,
         submissionData.email,
         [{ attributeUuid: "attr-1", value: "value-1" }],
-        { trustedFileValues: true },
+        {
+          trustedFileValues: true,
+          consent: {
+            givenAt: expect.any(Date) as Date,
+            ip: requestMetadata.ip,
+            userAgent: requestMetadata.userAgent,
+          },
+        },
       );
       expect(result).toBeDefined();
+    });
+
+    describe("registration consent", () => {
+      const baseSubmission = {
+        email: "test@example.com",
+        attributes: [],
+      };
+
+      beforeEach(() => {
+        mockPrismaService.event.findUnique.mockResolvedValue({
+          uuid: eventUuid,
+          registerFormUuid: formUuid,
+          participants: [],
+          participantsLimit: 10,
+        });
+        mockPrismaService.form.findUnique.mockResolvedValue({
+          uuid: formUuid,
+          formDefinitions: [],
+        });
+        jest.spyOn(service, "isOpen").mockResolvedValue(true);
+        mockParticipantsService.register.mockResolvedValue({ id: 1 });
+      });
+
+      it.each([
+        ["gdprConsent is missing", { termsAccepted: true }],
+        ["gdprConsent is false", { gdprConsent: false, termsAccepted: true }],
+        ["termsAccepted is missing", { gdprConsent: true }],
+        ["termsAccepted is false", { gdprConsent: true, termsAccepted: false }],
+      ])(
+        "should reject the registration when %s",
+        async (_name, consentFields) => {
+          await expect(
+            service.formSubmit(
+              eventSlug,
+              formUuid,
+              { ...baseSubmission, ...consentFields } as FormSubmitionDto,
+              requestMetadata,
+            ),
+          ).rejects.toThrow(BadRequestException);
+          expect(mockParticipantsService.register).not.toHaveBeenCalled();
+        },
+      );
+
+      it("should fail when the client IP cannot be resolved", async () => {
+        await expect(
+          service.formSubmit(
+            eventSlug,
+            formUuid,
+            {
+              ...baseSubmission,
+              ...registrationConsent,
+            } as FormSubmitionDto,
+            { userAgent: requestMetadata.userAgent },
+          ),
+        ).rejects.toThrow(InternalServerErrorException);
+        expect(mockParticipantsService.register).not.toHaveBeenCalled();
+      });
+
+      it("should store a null user agent when the header is missing", async () => {
+        await service.formSubmit(
+          eventSlug,
+          formUuid,
+          { ...baseSubmission, ...registrationConsent } as FormSubmitionDto,
+          { ip: requestMetadata.ip },
+        );
+
+        expect(mockParticipantsService.register).toHaveBeenCalledWith(
+          eventUuid,
+          baseSubmission.email,
+          [],
+          expect.objectContaining({
+            consent: expect.objectContaining({ userAgent: null }) as unknown,
+          }),
+        );
+      });
+
+      it("should truncate an oversized user agent to 512 characters", async () => {
+        await service.formSubmit(
+          eventSlug,
+          formUuid,
+          { ...baseSubmission, ...registrationConsent } as FormSubmitionDto,
+          { ip: requestMetadata.ip, userAgent: "a".repeat(2000) },
+        );
+
+        expect(mockParticipantsService.register).toHaveBeenCalledWith(
+          eventUuid,
+          baseSubmission.email,
+          [],
+          expect.objectContaining({
+            consent: expect.objectContaining({
+              userAgent: "a".repeat(512),
+            }) as unknown,
+          }),
+        );
+      });
+
+      it("should not require consent on non-registration forms", async () => {
+        const otherFormUuid = "form-other";
+        mockPrismaService.form.findUnique.mockResolvedValue({
+          uuid: otherFormUuid,
+          formDefinitions: [],
+        });
+        mockParticipantsService.update.mockResolvedValue({ id: 1 });
+
+        await service.formSubmit(
+          eventSlug,
+          otherFormUuid,
+          { participantId, attributes: [] } as unknown as FormSubmitionDto,
+          requestMetadata,
+        );
+
+        expect(mockParticipantsService.update).toHaveBeenCalledWith(
+          eventUuid,
+          participantId,
+          expect.anything(),
+          { trustedFileValues: true },
+        );
+        expect(mockParticipantsService.register).not.toHaveBeenCalled();
+      });
     });
 
     it("should update existing participant if it is not a registration form", async () => {
@@ -785,7 +979,12 @@ describe("FormsService", () => {
         status: "updated",
       });
 
-      await service.formSubmit(eventSlug, formUuid, submissionData);
+      await service.formSubmit(
+        eventSlug,
+        formUuid,
+        submissionData,
+        requestMetadata,
+      );
 
       expect(mockParticipantsService.update).toHaveBeenCalledWith(
         eventUuid,
@@ -815,11 +1014,17 @@ describe("FormsService", () => {
 
       const submissionData = {
         email: "full@test.com",
+        ...registrationConsent,
         attributes: [],
       } as unknown as FormSubmitionDto;
 
       await expect(
-        service.formSubmit(eventSlug, formUuid, submissionData),
+        service.formSubmit(
+          eventSlug,
+          formUuid,
+          submissionData,
+          requestMetadata,
+        ),
       ).rejects.toThrow(
         `Event with a slug: ${eventSlug} has reached the participants limit`,
       );
@@ -829,6 +1034,7 @@ describe("FormsService", () => {
       const token = "550e8400-e29b-41d4-a716-446655440099";
       const submissionData = {
         email: "test@example.com",
+        ...registrationConsent,
         attributes: [[{ attributeUuid: "attr-drawing", value: token }]],
       } as unknown as FormSubmitionDto;
 
@@ -861,13 +1067,25 @@ describe("FormsService", () => {
         email: submissionData.email,
       });
 
-      await service.formSubmit(eventSlug, formUuid, submissionData);
+      await service.formSubmit(
+        eventSlug,
+        formUuid,
+        submissionData,
+        requestMetadata,
+      );
 
       expect(mockParticipantsService.register).toHaveBeenCalledWith(
         eventUuid,
         submissionData.email,
         [{ attributeUuid: "attr-drawing", value: "drawing-key.png" }],
-        { trustedFileValues: true },
+        {
+          trustedFileValues: true,
+          consent: {
+            givenAt: expect.any(Date) as Date,
+            ip: requestMetadata.ip,
+            userAgent: requestMetadata.userAgent,
+          },
+        },
       );
     });
 
@@ -875,6 +1093,7 @@ describe("FormsService", () => {
       const token = "550e8400-e29b-41d4-a716-446655440099";
       const submissionData = {
         email: "test@example.com",
+        ...registrationConsent,
         attributes: [[{ attributeUuid: "attr-drawing", value: token }]],
       } as unknown as FormSubmitionDto;
 
@@ -904,13 +1123,19 @@ describe("FormsService", () => {
       jest.spyOn(service, "isOpen").mockResolvedValue(true);
 
       await expect(
-        service.formSubmit(eventSlug, formUuid, submissionData),
+        service.formSubmit(
+          eventSlug,
+          formUuid,
+          submissionData,
+          requestMetadata,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
     it("should reject a malformed (non-UUID) file token with 400 without querying the database", async () => {
       const submissionData = {
         email: "test@example.com",
+        ...registrationConsent,
         attributes: [
           [{ attributeUuid: "attr-file", value: "not-a-valid-token" }],
         ],
@@ -935,7 +1160,12 @@ describe("FormsService", () => {
       jest.spyOn(service, "isOpen").mockResolvedValue(true);
 
       await expect(
-        service.formSubmit(eventSlug, formUuid, submissionData),
+        service.formSubmit(
+          eventSlug,
+          formUuid,
+          submissionData,
+          requestMetadata,
+        ),
       ).rejects.toThrow(BadRequestException);
       expect(mockPrismaService.uploadedFile.findUnique).not.toHaveBeenCalled();
     });
@@ -969,7 +1199,12 @@ describe("FormsService", () => {
         status: "updated",
       });
 
-      await service.formSubmit(eventSlug, formUuid, submissionData);
+      await service.formSubmit(
+        eventSlug,
+        formUuid,
+        submissionData,
+        requestMetadata,
+      );
 
       expect(mockParticipantsService.update).toHaveBeenCalledWith(
         eventUuid,
@@ -982,6 +1217,7 @@ describe("FormsService", () => {
     it("should fail a registration submission that omits a required attribute", async () => {
       const submissionData = {
         email: "test@example.com",
+        ...registrationConsent,
         attributes: [],
       } as unknown as FormSubmitionDto;
 
@@ -1004,7 +1240,12 @@ describe("FormsService", () => {
       jest.spyOn(service, "isOpen").mockResolvedValue(true);
 
       await expect(
-        service.formSubmit(eventSlug, formUuid, submissionData),
+        service.formSubmit(
+          eventSlug,
+          formUuid,
+          submissionData,
+          requestMetadata,
+        ),
       ).rejects.toThrow(BadRequestException);
       expect(
         mockPrismaService.participantAttribute.findMany,
