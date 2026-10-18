@@ -93,6 +93,16 @@ describe("Forms -> Participants Integration", () => {
     return event;
   }
 
+  async function createRegistrationForm(dataRecipients?: string) {
+    const event = await createEvent();
+    const form = await createForm(event.uuid);
+    await prisma.event.update({
+      where: { uuid: event.uuid },
+      data: { registerFormUuid: form.uuid, dataRecipients },
+    });
+    return { event, form };
+  }
+
   async function createAttribute(
     eventUuid: string,
     overrides: Partial<{
@@ -210,16 +220,6 @@ describe("Forms -> Participants Integration", () => {
   });
 
   describe("registration consent", () => {
-    async function createRegistrationForm(dataRecipients?: string) {
-      const event = await createEvent();
-      const form = await createForm(event.uuid);
-      await prisma.event.update({
-        where: { uuid: event.uuid },
-        data: { registerFormUuid: form.uuid, dataRecipients },
-      });
-      return { event, form };
-    }
-
     it("stores the consent evidence together with the participant", async () => {
       const { event, form } = await createRegistrationForm(
         "Shared with Example Sp. z o.o.",
