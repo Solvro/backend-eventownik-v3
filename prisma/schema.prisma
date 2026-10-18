@@ -19,6 +19,8 @@ enum PermissionType {
   MANAGE_PARTICIPANT
   MANAGE_EMAIL
   MANAGE_SETTINGS
+  MANAGE_TICKET
+  SCAN_TICKET
 }
 
 enum LogTrigger {
@@ -42,6 +44,7 @@ model Admin {
   permissions        EventPermission[]
   refreshToken       RefreshToken[]
   passwordResetToken PasswordResetToken[]
+  ticketCheckIns     TicketCheckIn[]
 
   @@map("Admins")
 }
@@ -91,6 +94,7 @@ model Event {
   adminPermissions EventPermission[]
   participants     Participant[]
   links            EventLink[]
+  tickets          Ticket[]
 
   @@map("Events")
 }
@@ -141,14 +145,16 @@ model Attribute {
   showInList Boolean       @default(true)
   config     Json?         @default("{}")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   sentToBbiAt DateTime?
 
   event                 Event                  @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
   blocks                Block[]
   formDefinitions       FormDefinition[]
   participantAttributes ParticipantAttribute[]
+  ticket                Ticket?
+  ticketAttributes      TicketAttribute[]
 
   @@map("Attributes")
 }
@@ -165,9 +171,10 @@ model Block {
   attributeUuid String?  @db.Uuid
   isRootBlock   Boolean  @default(false)
 
-  parent    Block?     @relation("BlockToBlock", fields: [parentUuid], references: [uuid], onDelete: Cascade)
-  children  Block[]    @relation("BlockToBlock")
-  attribute Attribute? @relation(fields: [attributeUuid], references: [uuid], onDelete: Cascade)
+  parent         Block?          @relation("BlockToBlock", fields: [parentUuid], references: [uuid], onDelete: Cascade)
+  children       Block[]         @relation("BlockToBlock")
+  attribute      Attribute?      @relation(fields: [attributeUuid], references: [uuid], onDelete: Cascade)
+  ticketCheckIns TicketCheckIn[]
 
   @@map("Blocks")
 }
@@ -261,17 +268,19 @@ model FormDefinition {
 }
 
 model Participant {
-  uuid      String   @id @default(uuid()) @db.Uuid
-  email     String
-  eventUuid String   @db.Uuid
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  uuid        String   @id @default(uuid()) @db.Uuid
+  email       String
+  eventUuid   String   @db.Uuid
+  ticketToken String   @unique @default(dbgenerated("replace((gen_random_uuid())::text || (gen_random_uuid())::text, '-', '')"))
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   event               Event                     @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
   attributes          ParticipantAttribute[]
   emails              ParticipantEmailStatus[]
   attributeLogs       ParticipantAttributeLog[]
   participantFormLogs ParticipantFormLog[]
+  ticketCheckIns      TicketCheckIn[]
 
   @@unique([email, eventUuid])
   @@map("Participants")
@@ -346,6 +355,57 @@ model ParticipantAttributeLog {
   participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
 
   @@map("ParticipantsAttributesLogs")
+}
+
+enum TicketMode {
+  EVENT
+  BLOCK
+}
+
+model Ticket {
+  uuid          String     @id @default(uuid()) @db.Uuid
+  eventUuid     String     @db.Uuid
+  attributeUuid String?    @unique @db.Uuid
+  mode          TicketMode
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  event      Event             @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+  attribute  Attribute?        @relation(fields: [attributeUuid], references: [uuid], onDelete: Cascade)
+  attributes TicketAttribute[]
+  checkIns   TicketCheckIn[]
+
+  @@index([eventUuid])
+  @@map("Tickets")
+}
+
+model TicketAttribute {
+  uuid          String @id @default(uuid()) @db.Uuid
+  ticketUuid    String @db.Uuid
+  attributeUuid String @db.Uuid
+
+  ticket    Ticket    @relation(fields: [ticketUuid], references: [uuid], onDelete: Cascade)
+  attribute Attribute @relation(fields: [attributeUuid], references: [uuid], onDelete: Cascade)
+
+  @@unique([ticketUuid, attributeUuid])
+  @@map("TicketAttributes")
+}
+
+model TicketCheckIn {
+  uuid                 String   @id @default(uuid()) @db.Uuid
+  ticketUuid           String   @db.Uuid
+  participantUuid      String   @db.Uuid
+  blockUuid            String?  @db.Uuid
+  confirmedAt          DateTime @default(now())
+  confirmedByAdminUuid String?  @db.Uuid
+
+  ticket      Ticket      @relation(fields: [ticketUuid], references: [uuid], onDelete: Cascade)
+  participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
+  block       Block?      @relation(fields: [blockUuid], references: [uuid], onDelete: Cascade)
+  confirmedBy Admin?      @relation(fields: [confirmedByAdminUuid], references: [uuid], onDelete: SetNull)
+
+  @@index([participantUuid])
+  @@map("TicketCheckIns")
 }
 
 model RefreshToken {
