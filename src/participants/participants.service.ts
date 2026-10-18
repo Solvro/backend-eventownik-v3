@@ -58,6 +58,12 @@ function isFileLikeAttributeType(
   return type != null && FILE_LIKE_ATTRIBUTE_TYPES.includes(type);
 }
 
+export interface ParticipantConsentInput {
+  givenAt: Date;
+  ip: string;
+  userAgent: string | null;
+}
+
 @Injectable()
 export class ParticipantsService {
   constructor(
@@ -255,7 +261,10 @@ export class ParticipantsService {
     eventUuid: string,
     email: string,
     participantAttributes?: ParticipantAttributeDto[],
-    options: { trustedFileValues?: boolean } = {},
+    options: {
+      trustedFileValues?: boolean;
+      consent?: ParticipantConsentInput;
+    } = {},
   ): Promise<Participant> {
     try {
       const participant = await this.prisma.$transaction(async (tx) => {
@@ -277,6 +286,19 @@ export class ParticipantsService {
             attributes: {
               create: attributesToCreate,
             },
+            ...(options.consent === undefined
+              ? {}
+              : {
+                  consent: {
+                    create: {
+                      gdprConsentedAt: options.consent.givenAt,
+                      termsAcceptedAt: options.consent.givenAt,
+                      ip: options.consent.ip,
+                      userAgent: options.consent.userAgent,
+                      dataRecipientsSnapshot: event.dataRecipients,
+                    },
+                  },
+                }),
           },
           include: {
             attributes: {

@@ -88,12 +88,19 @@ export class FormsPublicController {
   @ApiConsumes("application/json")
   @ApiOkResponse({ description: "Form submitted successfully." })
   @ApiNotFoundResponse({ description: "Event or Form not found." })
-  @ApiBadRequestResponse({ description: "Form is closed or invalid." })
+  @ApiBadRequestResponse({
+    description:
+      "Form is closed or invalid, or GDPR consent or terms acceptance is missing on the registration form.",
+  })
   async submit(
     @Param("eventSlug") eventSlug: string,
     @Param("id", ParseUUIDPipe) formId: string,
     @Body() submissionData: FormSubmitionDto,
+    @Req() request: Request,
   ) {
-    return this.formsService.formSubmit(eventSlug, formId, submissionData);
+    return this.formsService.formSubmit(eventSlug, formId, submissionData, {
+      ip: request.ip,
+      userAgent: request.headers["user-agent"],
+    });
   }
 }

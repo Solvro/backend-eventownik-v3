@@ -33,6 +33,8 @@ import { UpdateFormDto } from "./dto/update-form.dto";
 
 const IMAGE_MIME_PREFIX = "image/";
 
+const MAX_USER_AGENT_LENGTH = 512;
+
 @Injectable()
 export class FormsService {
   private readonly bucket: string;
@@ -547,6 +549,7 @@ export class FormsService {
     eventSlug: string,
     formUuid: string,
     submissionData: FormSubmitionDto,
+    requestMetadata: { ip?: string; userAgent?: string } = {},
   ) {
     let eventUuid = "";
     const participant = await this.prisma.$transaction(async (prisma) => {
@@ -587,6 +590,23 @@ export class FormsService {
       ) {
         throw new BadRequestException(
           `Participant UUID is required for non-registration forms`,
+        );
+      }
+
+      const isRegistrationForm = event.registerFormUuid === formUuid;
+      if (isRegistrationForm && submissionData.gdprConsent !== true) {
+        throw new BadRequestException(
+          `GDPR consent is required for the registration form`,
+        );
+      }
+      if (isRegistrationForm && submissionData.termsAccepted !== true) {
+        throw new BadRequestException(
+          `Terms must be accepted on the registration form`,
+        );
+      }
+      if (isRegistrationForm && requestMetadata.ip === undefined) {
+        throw new InternalServerErrorException(
+          `Could not resolve the client IP address`,
         );
       }
 
@@ -794,7 +814,16 @@ export class FormsService {
             attributeUuid,
             value,
           })),
-          { trustedFileValues: true },
+          {
+            trustedFileValues: true,
+            consent: {
+              givenAt: new Date(),
+              ip: requestMetadata.ip ?? "",
+              userAgent:
+                requestMetadata.userAgent?.slice(0, MAX_USER_AGENT_LENGTH) ??
+                null,
+            },
+          },
         );
       }
 
