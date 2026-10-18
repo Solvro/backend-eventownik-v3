@@ -18,31 +18,11 @@ Integration tests fix this by running every Prisma call against a real PostgreSQ
 
 ---
 
-## Local setup (one-time)
+## Local setup
 
-1. **Create `.env.test`** — copy the example file:
+Set up the test database (compose service, `.env.test`, migrations) by following [local-setup.md](local-setup.md). Run `npm run migrate:test` again whenever new migrations are added, then run the suite with `npm test`.
 
-   ```bash
-   cp .env.test.example .env.test
-   ```
-
-   Edit it to point at a local PostgreSQL database **that is separate from your dev database**. The test suite writes real rows to it.
-
-2. **Apply migrations to the test database:**
-
-   ```bash
-   npm run migrate:test
-   ```
-
-   Run this again whenever new migrations are added.
-
-3. **Run the tests:**
-
-   ```bash
-   npm test
-   ```
-
-   `DATABASE_URL` from `.env.test` is automatically picked up by the test runner (configured in `jest.setup.ts`). CI already injects `DATABASE_URL` as an environment variable, so no changes are needed there.
+`DATABASE_URL` from `.env.test` is picked up automatically by the test runner (configured in `jest.setup.ts`). CI injects `DATABASE_URL` as an environment variable, so nothing changes there.
 
 ---
 
@@ -184,7 +164,7 @@ Notice:
 | ------------------------------------------------------------ | ------------------------------------ |
 | Email sending (`MailerService`)                              | `PrismaService`                      |
 | BullMQ queues (assert jobs were enqueued, not that they ran) | Any service you are directly testing |
-| External HTTP calls (hCaptcha, etc.)                         | Database transactions                |
+| External HTTP calls (Turnstile, etc.)                        | Database transactions                |
 | JWT generation / validation                                  | Cascade / constraint behavior        |
 
 If you find yourself mocking `PrismaService` in a `*.int.spec.ts`, stop — that belongs in `*.service.spec.ts` instead.
@@ -260,9 +240,7 @@ describe("MyService (integration)", () => {
 
   async function createFoo(): Promise<{ uuid: string }> {
     const foo = await prisma.foo.create({
-      data: {
-        /* ... */
-      },
+      data: {/* ... */},
     });
     createdFooUuids.push(foo.uuid);
     return foo;
