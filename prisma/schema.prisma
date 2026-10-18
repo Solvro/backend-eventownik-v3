@@ -80,6 +80,7 @@ model Event {
   photoKey          String?
   location          String?
   contactEmail      String?
+  dataRecipients    String?
   organizerUuid     String?   @db.Uuid
   registerFormUuid  String?   @db.Uuid
 
@@ -141,8 +142,8 @@ model Attribute {
   showInList Boolean       @default(true)
   config     Json?         @default("{}")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   sentToBbiAt DateTime?
 
   event                 Event                  @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
@@ -272,9 +273,25 @@ model Participant {
   emails              ParticipantEmailStatus[]
   attributeLogs       ParticipantAttributeLog[]
   participantFormLogs ParticipantFormLog[]
+  consent             ParticipantConsent?
 
   @@unique([email, eventUuid])
   @@map("Participants")
+}
+
+model ParticipantConsent {
+  uuid                   String   @id @default(uuid()) @db.Uuid
+  participantUuid        String   @unique @db.Uuid
+  gdprConsentedAt        DateTime
+  termsAcceptedAt        DateTime
+  ip                     String
+  userAgent              String?
+  dataRecipientsSnapshot String?
+  createdAt              DateTime @default(now())
+
+  participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("ParticipantsConsents")
 }
 
 model ParticipantAttribute {
