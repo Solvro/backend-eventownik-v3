@@ -1,3 +1,5 @@
+import { EmailAttachmentsReaperService } from "./email-attachments-reaper.service";
+import { EmailAttachmentsService } from "./email-attachments.service";
 import { EmailContentParserService } from "./email-content-parser.service";
 import { EmailDeliveryService } from "./email-delivery.service";
 import { EmailTemplatesService } from "./email-templates.service";
@@ -20,6 +22,8 @@ describe("EmailsModule wiring", () => {
     expect(providers).toEqual(
       expect.arrayContaining([
         EmailTemplatesService,
+        EmailAttachmentsService,
+        EmailAttachmentsReaperService,
         EmailContentParserService,
         EmailDeliveryService,
         EmailsConsumer,

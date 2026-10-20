@@ -1,10 +1,13 @@
 import {
+  ArrayMaxSize,
+  IsArray,
   IsEnum,
   IsNotEmpty,
   IsNumber,
   IsObject,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   ValidateIf,
 } from "class-validator";
@@ -57,4 +60,16 @@ export class CreateEmailDto {
     message: `schema must not exceed ${String(EMAIL_SCHEMA_MAX_BYTES / 1_000_000)}MB when serialized as JSON`,
   })
   schema?: Prisma.JsonObject;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      "UUIDs of previously uploaded email attachments (pending upload tokens)",
+  })
+  @IsOptional()
+  @IsArray()
+  @IsUUID("4", { each: true })
+  // Soft ceiling for the DTO layer; EMAIL_ATTACHMENT_MAX_COUNT is enforced in service.
+  @ArrayMaxSize(20)
+  attachmentIds?: string[];
 }

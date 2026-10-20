@@ -1,5 +1,6 @@
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -42,19 +43,48 @@ export class StorageService {
   }
 
   async upload(bucket: string, file: Express.Multer.File): Promise<string> {
-    const extension = extname(file.originalname);
+    return this.uploadBuffer(
+      bucket,
+      file.buffer,
+      file.originalname,
+      file.mimetype,
+    );
+  }
+
+  async uploadBuffer(
+    bucket: string,
+    buffer: Buffer,
+    originalName: string,
+    mimeType: string,
+  ): Promise<string> {
+    const extension = extname(originalName);
     const key = `${String(Date.now())}-${String(Math.round(Math.random() * 1e9))}${extension}`;
 
     await this.client.send(
       new PutObjectCommand({
         Bucket: bucket,
         Key: key,
-        Body: file.buffer,
-        ContentType: file.mimetype,
+        Body: buffer,
+        ContentType: mimeType,
       }),
     );
 
     return key;
+  }
+
+  async download(bucket: string, key: string): Promise<Buffer> {
+    const response = await this.client.send(
+      new GetObjectCommand({
+        Bucket: bucket,
+        Key: key,
+      }),
+    );
+
+    if (response.Body == null) {
+      throw new Error(`Empty body when downloading ${key} from ${bucket}`);
+    }
+
+    return Buffer.from(await response.Body.transformToByteArray());
   }
 
   async delete(bucket: string, key: string): Promise<void> {

@@ -7,6 +7,7 @@ import { Test } from "@nestjs/testing";
 import type { TestingModule } from "@nestjs/testing";
 
 import { EmailListingDto } from "./dto/email-listing.dto";
+import { EmailAttachmentsService } from "./email-attachments.service";
 import { EmailTemplatesService } from "./email-templates.service";
 
 describe("EmailTemplatesService (integration)", () => {
@@ -19,17 +20,52 @@ describe("EmailTemplatesService (integration)", () => {
   // event UUIDs is enough to clean up completely.
   const createdEventUuids: string[] = [];
 
+  const mockEmailAttachmentsService = {
+    claimForCreate: jest.fn().mockResolvedValue([]),
+    syncForUpdate: jest.fn().mockResolvedValue([]),
+    listForEmail: jest.fn().mockResolvedValue([]),
+    deleteStorageForEmail: jest.fn().mockResolvedValue(undefined),
+    duplicateForEmail: jest.fn().mockResolvedValue(undefined),
+    toDto: jest.fn(
+      (attachment: {
+        uuid: string;
+        originalName: string;
+        mimeType: string;
+        size: number;
+      }) => ({
+        id: attachment.uuid,
+        originalName: attachment.originalName,
+        mimeType: attachment.mimeType,
+        size: attachment.size,
+      }),
+    ),
+  };
+
   // ---------------------------------------------------------------------------
   // Module setup / teardown
   // ---------------------------------------------------------------------------
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [EmailTemplatesService, PrismaService],
+      providers: [
+        EmailTemplatesService,
+        PrismaService,
+        {
+          provide: EmailAttachmentsService,
+          useValue: mockEmailAttachmentsService,
+        },
+      ],
     }).compile();
 
     service = module.get<EmailTemplatesService>(EmailTemplatesService);
     prisma = module.get<PrismaService>(PrismaService);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    mockEmailAttachmentsService.claimForCreate.mockResolvedValue([]);
+    mockEmailAttachmentsService.syncForUpdate.mockResolvedValue([]);
+    mockEmailAttachmentsService.listForEmail.mockResolvedValue([]);
   });
 
   afterAll(async () => {

@@ -8,6 +8,7 @@ import { Test } from "@nestjs/testing";
 import type { CreateEmailDto } from "./dto/create-email.dto";
 import type { EmailListingDto } from "./dto/email-listing.dto";
 import type { UpdateEmailDto } from "./dto/update-email.dto";
+import { EmailAttachmentsService } from "./email-attachments.service";
 import { EmailTemplatesService } from "./email-templates.service";
 
 describe("EmailTemplatesService", () => {
@@ -38,6 +39,27 @@ describe("EmailTemplatesService", () => {
     $transaction: jest.fn(),
   };
 
+  const mockEmailAttachmentsService = {
+    claimForCreate: jest.fn().mockResolvedValue([]),
+    syncForUpdate: jest.fn().mockResolvedValue([]),
+    listForEmail: jest.fn().mockResolvedValue([]),
+    deleteStorageForEmail: jest.fn().mockResolvedValue(undefined),
+    duplicateForEmail: jest.fn().mockResolvedValue(undefined),
+    toDto: jest.fn(
+      (attachment: {
+        uuid: string;
+        originalName: string;
+        mimeType: string;
+        size: number;
+      }) => ({
+        id: attachment.uuid,
+        originalName: attachment.originalName,
+        mimeType: attachment.mimeType,
+        size: attachment.size,
+      }),
+    ),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -45,6 +67,10 @@ describe("EmailTemplatesService", () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: EmailAttachmentsService,
+          useValue: mockEmailAttachmentsService,
         },
       ],
     }).compile();
@@ -56,6 +82,13 @@ describe("EmailTemplatesService", () => {
     jest.clearAllMocks();
     jest.resetAllMocks();
     mockPrismaService.participantEmailStatus.groupBy.mockResolvedValue([]);
+    mockEmailAttachmentsService.claimForCreate.mockResolvedValue([]);
+    mockEmailAttachmentsService.syncForUpdate.mockResolvedValue([]);
+    mockEmailAttachmentsService.listForEmail.mockResolvedValue([]);
+    mockEmailAttachmentsService.deleteStorageForEmail.mockResolvedValue(
+      undefined,
+    );
+    mockEmailAttachmentsService.duplicateForEmail.mockResolvedValue(undefined);
   });
 
   it("should be defined", () => {
@@ -81,7 +114,7 @@ describe("EmailTemplatesService", () => {
         name: dto.name,
         content: dto.content,
         trigger: dto.trigger,
-        eventId: mockEventId,
+        eventUuid: mockEventId,
         createdAt: new Date("2025-02-22T19:13:10.471Z"),
         updatedAt: new Date("2025-02-22T19:13:10.471Z"),
       });
@@ -100,6 +133,7 @@ describe("EmailTemplatesService", () => {
       });
 
       expect(result.id).toEqual(mockEmailId);
+      expect(result.attachments).toEqual([]);
     });
     it("should throw BadRequestException when an event with provided eventId does not exist", async () => {
       const dto = {
@@ -250,6 +284,7 @@ describe("EmailTemplatesService", () => {
         order: 0,
         createdAt: new Date("2025-02-22T19:13:10.471Z"),
         updatedAt: new Date("2025-02-22T19:13:10.471Z"),
+        attachments: [],
       };
       const expectedOutput = {
         id: mockEmailId,
@@ -261,6 +296,7 @@ describe("EmailTemplatesService", () => {
         order: 0,
         createdAt: "2025-02-22T19:13:10.471Z",
         updatedAt: "2025-02-22T19:13:10.471Z",
+        attachments: [],
         participants: [],
       };
 
@@ -274,6 +310,11 @@ describe("EmailTemplatesService", () => {
         where: {
           uuid: mockEmailId,
           eventUuid: mockEventId,
+        },
+        include: {
+          attachments: {
+            orderBy: { createdAt: "asc" },
+          },
         },
       });
       expect(result).toEqual(expectedOutput);
@@ -338,6 +379,7 @@ describe("EmailTemplatesService", () => {
         eventId: mockEventId,
         createdAt: "2025-02-22T19:13:10.471Z",
         updatedAt: "2025-02-22T19:13:10.471Z",
+        attachments: [],
       });
     });
     it("should throw NotFoundException when event with provided eventId does not exist.", async () => {
@@ -351,7 +393,6 @@ describe("EmailTemplatesService", () => {
 
   describe("delete", () => {
     it("should delete the email template and return nothing.", async () => {
-      mockTransaction(mockPrismaService);
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue({
         uuid: mockEmailId,
       });
@@ -371,6 +412,10 @@ describe("EmailTemplatesService", () => {
         select: { uuid: true },
       });
 
+      expect(
+        mockEmailAttachmentsService.deleteStorageForEmail,
+      ).toHaveBeenCalledWith(mockEmailId);
+
       expect(mockPrismaService.emailTemplate.delete).toHaveBeenCalledWith({
         where: { uuid: mockEmailId },
       });
@@ -379,12 +424,14 @@ describe("EmailTemplatesService", () => {
     });
 
     it("should throw NotFoundException when email or/and event does not exist.", async () => {
-      mockTransaction(mockPrismaService);
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue(null);
 
       await expect(service.remove(mockEventId, mockEmailId)).rejects.toThrow(
         NotFoundException,
       );
+      expect(
+        mockEmailAttachmentsService.deleteStorageForEmail,
+      ).not.toHaveBeenCalled();
       expect(mockPrismaService.emailTemplate.delete).not.toHaveBeenCalled();
     });
   });
