@@ -19,6 +19,7 @@ import { ConfigService } from "@nestjs/config";
 import { Test } from "@nestjs/testing";
 import type { TestingModule } from "@nestjs/testing";
 
+import { EmailAttachmentsService } from "./email-attachments.service";
 import { EmailContentParserService } from "./email-content-parser.service";
 import { EmailDeliveryService } from "./email-delivery.service";
 import { EMAIL_QUEUE_NAME } from "./emails.constants";
@@ -54,6 +55,10 @@ describe("EmailDeliveryService (integration)", () => {
     }),
   };
 
+  const mockEmailAttachmentsService = {
+    getNodemailerAttachments: jest.fn().mockResolvedValue([]),
+  };
+
   // ---------------------------------------------------------------------------
   // Module setup / teardown
   // ---------------------------------------------------------------------------
@@ -67,6 +72,10 @@ describe("EmailDeliveryService (integration)", () => {
         { provide: MailerService, useValue: mockMailerService },
         { provide: getQueueToken(EMAIL_QUEUE_NAME), useValue: mockQueue },
         { provide: ConfigService, useValue: mockConfigService },
+        {
+          provide: EmailAttachmentsService,
+          useValue: mockEmailAttachmentsService,
+        },
       ],
     }).compile();
 
@@ -78,6 +87,7 @@ describe("EmailDeliveryService (integration)", () => {
     jest.clearAllMocks();
     // Only reset sendMail's implementation (mockRejectedValue etc.) - a
     // blanket jest.resetAllMocks() would also wipe mockConfigService's
+    mockEmailAttachmentsService.getNodemailerAttachments.mockResolvedValue([]);
     // baked-in default implementation set at file scope above.
     mockMailerService.sendMail.mockReset();
   });

@@ -195,8 +195,25 @@ model EmailTemplate {
   event             Event                    @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
   participantEmails ParticipantEmailStatus[]
   participantForms  ParticipantFormLog[]
+  attachments       EmailAttachment[]
 
   @@map("EmailTemplates")
+}
+
+model EmailAttachment {
+  uuid         String    @id @default(uuid()) @db.Uuid
+  fileKey      String
+  originalName String
+  mimeType     String
+  size         Int
+  emailUuid    String?   @db.Uuid
+  createdAt    DateTime  @default(now())
+  claimedAt    DateTime?
+
+  email EmailTemplate? @relation(fields: [emailUuid], references: [uuid], onDelete: Cascade)
+
+  @@index([claimedAt, createdAt])
+  @@map("EmailAttachments")
 }
 
 enum OpenCondition {

@@ -11,6 +11,7 @@ import { Test } from "@nestjs/testing";
 import type { CreateEmailDto } from "./dto/create-email.dto";
 import { EmailListingDto } from "./dto/email-listing.dto";
 import type { UpdateEmailDto } from "./dto/update-email.dto";
+import { EmailAttachmentsService } from "./email-attachments.service";
 import { EmailContentParserService } from "./email-content-parser.service";
 import { EmailDeliveryService } from "./email-delivery.service";
 import { EmailTemplatesService } from "./email-templates.service";
@@ -56,6 +57,18 @@ describe("EmailsController", () => {
     sendMail: jest.fn(),
   };
 
+  const mockEmailAttachmentsService = {
+    upload: jest.fn(),
+    deleteUnclaimed: jest.fn(),
+    claimForCreate: jest.fn().mockResolvedValue([]),
+    syncForUpdate: jest.fn().mockResolvedValue([]),
+    listForEmail: jest.fn().mockResolvedValue([]),
+    deleteStorageForEmail: jest.fn().mockResolvedValue(undefined),
+    duplicateForEmail: jest.fn().mockResolvedValue(undefined),
+    getNodemailerAttachments: jest.fn().mockResolvedValue([]),
+    toDto: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -77,6 +90,10 @@ describe("EmailsController", () => {
             get: jest.fn(),
             getOrThrow: jest.fn(),
           },
+        },
+        {
+          provide: EmailAttachmentsService,
+          useValue: mockEmailAttachmentsService,
         },
       ],
       controllers: [EmailsController],
@@ -100,6 +117,9 @@ describe("EmailsController", () => {
     jest.clearAllMocks();
     jest.resetAllMocks();
     mockPrismaService.participantEmailStatus.groupBy.mockResolvedValue([]);
+    mockEmailAttachmentsService.claimForCreate.mockResolvedValue([]);
+    mockEmailAttachmentsService.syncForUpdate.mockResolvedValue([]);
+    mockEmailAttachmentsService.listForEmail.mockResolvedValue([]);
   });
 
   it("should be defined", () => {
@@ -265,6 +285,7 @@ describe("EmailsController", () => {
         order: null,
         createdAt: new Date(),
         updatedAt: new Date(),
+        attachments: [],
       };
 
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue(

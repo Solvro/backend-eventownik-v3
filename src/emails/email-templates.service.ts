@@ -18,6 +18,7 @@ import { EmailListElementDto } from "./dto/email-list-element.dto";
 import { EmailListingDto } from "./dto/email-listing.dto";
 import { EmailResponseDto } from "./dto/email-response.dto";
 import { UpdateEmailDto } from "./dto/update-email.dto";
+import { EmailAttachmentsService } from "./email-attachments.service";
 
 interface StatusCounts {
   failedCount: number;
@@ -27,7 +28,10 @@ interface StatusCounts {
 
 @Injectable()
 export class EmailTemplatesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailAttachmentsService: EmailAttachmentsService,
+  ) {}
 
   async create(
     eventUuid: string,
@@ -61,6 +65,12 @@ export class EmailTemplatesService {
         },
       });
 
+      const attachments = await this.emailAttachmentsService.claimForCreate(
+        emailTemplate.uuid,
+        query.attachmentIds,
+        tx,
+      );
+
       return {
         id: emailTemplate.uuid,
         name: emailTemplate.name,
@@ -70,6 +80,9 @@ export class EmailTemplatesService {
         schema: emailTemplate.schema,
         createdAt: emailTemplate.createdAt.toISOString(),
         updatedAt: emailTemplate.updatedAt.toISOString(),
+        attachments: attachments.map((attachment) =>
+          this.emailAttachmentsService.toDto(attachment),
+        ),
       };
     });
   }
@@ -195,7 +208,11 @@ export class EmailTemplatesService {
         uuid: emailUuid,
         eventUuid,
       },
-      // Do not eagerly load participantEmails to avoid large memory usage
+      include: {
+        attachments: {
+          orderBy: { createdAt: "asc" },
+        },
+      },
     });
 
     if (emailTemplate === null) {
@@ -213,6 +230,9 @@ export class EmailTemplatesService {
       order: emailTemplate.order,
       createdAt: emailTemplate.createdAt.toISOString(),
       updatedAt: emailTemplate.updatedAt.toISOString(),
+      attachments: emailTemplate.attachments.map((attachment) =>
+        this.emailAttachmentsService.toDto(attachment),
+      ),
       participants: [],
     };
 
@@ -259,6 +279,12 @@ export class EmailTemplatesService {
         },
       });
 
+      const attachments = await this.emailAttachmentsService.syncForUpdate(
+        emailUuid,
+        query.attachmentIds,
+        tx,
+      );
+
       return {
         id: emailTemplate.uuid,
         name: emailTemplate.name,
@@ -268,6 +294,9 @@ export class EmailTemplatesService {
         schema: emailTemplate.schema,
         createdAt: emailTemplate.createdAt.toISOString(),
         updatedAt: emailTemplate.updatedAt.toISOString(),
+        attachments: attachments.map((attachment) =>
+          this.emailAttachmentsService.toDto(attachment),
+        ),
       };
     });
   }
@@ -330,23 +359,24 @@ export class EmailTemplatesService {
   }
 
   async remove(eventUuid: string, emailUuid: string): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      const existingEmail = await tx.emailTemplate.findFirst({
-        where: {
-          uuid: emailUuid,
-          eventUuid,
-        },
-        select: { uuid: true },
-      });
-      if (existingEmail == null) {
-        throw new NotFoundException("Email template or event does not exist");
-      }
+    const existingEmail = await this.prisma.emailTemplate.findFirst({
+      where: {
+        uuid: emailUuid,
+        eventUuid,
+      },
+      select: { uuid: true },
+    });
+    if (existingEmail == null) {
+      throw new NotFoundException("Email template or event does not exist");
+    }
 
-      await tx.emailTemplate.delete({
-        where: {
-          uuid: emailUuid,
-        },
-      });
+    // Cascade deletes DB rows; S3 objects must be removed explicitly.
+    await this.emailAttachmentsService.deleteStorageForEmail(emailUuid);
+
+    await this.prisma.emailTemplate.delete({
+      where: {
+        uuid: emailUuid,
+      },
     });
   }
 
@@ -381,6 +411,17 @@ export class EmailTemplatesService {
         },
       });
 
+      await this.emailAttachmentsService.duplicateForEmail(
+        emailUuid,
+        emailTemplate.uuid,
+        tx,
+      );
+
+      const attachments = await this.emailAttachmentsService.listForEmail(
+        emailTemplate.uuid,
+        tx,
+      );
+
       return {
         id: emailTemplate.uuid,
         name: emailTemplate.name,
@@ -390,6 +431,9 @@ export class EmailTemplatesService {
         schema: emailTemplate.schema,
         createdAt: emailTemplate.createdAt.toISOString(),
         updatedAt: emailTemplate.updatedAt.toISOString(),
+        attachments: attachments.map((attachment) =>
+          this.emailAttachmentsService.toDto(attachment),
+        ),
       };
     });
   }

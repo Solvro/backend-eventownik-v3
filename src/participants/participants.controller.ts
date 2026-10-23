@@ -50,6 +50,7 @@ import { ParticipantsService } from "./participants.service";
 export class ParticipantsController {
   constructor(private readonly participantsService: ParticipantsService) {}
 
+  // eslint-disable-next-line @darraghor/nestjs-typed/api-method-should-specify-api-response
   @Get()
   @RequirePermission(PermissionType.MANAGE_PARTICIPANT)
   @ApiOperation({ summary: "Get all participants for a specific event" })

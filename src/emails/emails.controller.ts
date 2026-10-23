@@ -17,6 +17,7 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
 } from "@nestjs/common";
 import {
@@ -36,6 +37,7 @@ import {
 
 import { CreateEmailDto } from "./dto/create-email.dto";
 import { DuplicateEmailDto } from "./dto/duplicate-email.dto";
+import { EmailAttachmentUploadResponseDto } from "./dto/email-attachment-upload-response.dto";
 import { EmailCompleteElementDto } from "./dto/email-complete-element.dto";
 import { EmailListElementDto } from "./dto/email-list-element.dto";
 import { EmailListingDto } from "./dto/email-listing.dto";
@@ -43,8 +45,10 @@ import { EmailResponseDto } from "./dto/email-response.dto";
 import { SendEmailDto } from "./dto/send-email.dto";
 import { SendTestEmailDto } from "./dto/send-test-email.dto";
 import { UpdateEmailDto } from "./dto/update-email.dto";
+import { EmailAttachmentsService } from "./email-attachments.service";
 import { EmailDeliveryService } from "./email-delivery.service";
 import { EmailTemplatesService } from "./email-templates.service";
+import { UploadEmailAttachment } from "./utils/upload-email-attachment.decorator";
 
 @ApiTags("EmailTemplates")
 @ApiBearerAuth()
@@ -56,7 +60,50 @@ export class EmailsController {
   constructor(
     private readonly emailTemplatesService: EmailTemplatesService,
     private readonly emailDeliveryService: EmailDeliveryService,
+    private readonly emailAttachmentsService: EmailAttachmentsService,
   ) {}
+
+  @Post("attachments")
+  @RequirePermission(PermissionType.MANAGE_EMAIL)
+  @HttpCode(HttpStatus.CREATED)
+  @UploadEmailAttachment()
+  @ApiOperation({
+    summary: "Upload an email attachment (pending claim until template save)",
+  })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiCreatedResponse({
+    description: "Attachment uploaded to staging area",
+    type: EmailAttachmentUploadResponseDto,
+  })
+  @ApiBadRequestResponse({ description: "Invalid file size or type" })
+  @ApiNotFoundResponse({ description: "Event not found" })
+  async uploadAttachment(
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.emailAttachmentsService.upload(eventId, file);
+  }
+
+  @Delete("attachments/:attachmentId")
+  @RequirePermission(PermissionType.MANAGE_EMAIL)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: "Delete an unclaimed email attachment from the staging area",
+  })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiParam({
+    name: "attachmentId",
+    description: "UUID of the unclaimed attachment",
+  })
+  @ApiNoContentResponse({ description: "Unclaimed attachment deleted" })
+  @ApiBadRequestResponse({ description: "Attachment is already claimed" })
+  @ApiNotFoundResponse({ description: "Event or attachment not found" })
+  async deleteAttachment(
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @Param("attachmentId", ParseUUIDPipe) attachmentId: string,
+  ) {
+    return this.emailAttachmentsService.deleteUnclaimed(eventId, attachmentId);
+  }
 
   @Post()
   @RequirePermission(PermissionType.MANAGE_EMAIL)

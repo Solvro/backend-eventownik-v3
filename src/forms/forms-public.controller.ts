@@ -20,6 +20,7 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import {
   ApiBadRequestResponse,
   ApiConsumes,
+  ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -60,6 +61,17 @@ export class FormsPublicController {
   @ApiOperation({ summary: "Upload a single file for a form" })
   @ApiParam({ name: "eventSlug", description: "Event slug of the event" })
   @ApiParam({ name: "id", description: "UUID of the form" })
+  @ApiConsumes("multipart/form-data")
+  @ApiCreatedResponse({
+    description: "File uploaded successfully, returns a temporary file token.",
+    schema: {
+      type: "object",
+      properties: {
+        fileToken: { type: "string" },
+        expiresAt: { type: "number" },
+      },
+    },
+  })
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @UseInterceptors(FileInterceptor("file"))
