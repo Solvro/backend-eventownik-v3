@@ -62,7 +62,8 @@ export class CreateEmailDto {
   schema?: Prisma.JsonObject;
 
   @ApiPropertyOptional({
-    type: [String],
+    type: String,
+    isArray: true,
     description:
       "UUIDs of previously uploaded email attachments (pending upload tokens)",
   })

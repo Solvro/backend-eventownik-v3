@@ -18,6 +18,7 @@ import { EventsService } from "./events.service";
 export class PublicEventsController {
   constructor(private readonly eventsService: EventsService) {}
 
+  // eslint-disable-next-line @darraghor/nestjs-typed/api-method-should-specify-api-response
   @Get("")
   @ApiOperation({
     summary: "Get list of public events with pagination and filtering",

@@ -49,6 +49,7 @@ import { UploadPhoto } from "./utils/upload-photo.decorator";
 export class EventsController {
   constructor(private readonly eventsService: EventsService) {}
 
+  // eslint-disable-next-line @darraghor/nestjs-typed/api-method-should-specify-api-response
   @Get()
   @ApiOperation({ summary: "Get list of events with pagination and filtering" })
   @ApiPaginatedResponse(Event)

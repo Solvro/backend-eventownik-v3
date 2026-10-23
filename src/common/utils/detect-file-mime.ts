@@ -17,9 +17,10 @@ export async function detectFileMime(
   buffer: Buffer,
 ): Promise<string | undefined> {
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
-  const { fileTypeFromBuffer } = (await new Function(
+  const dynamicImport = new Function(
     'return import("file-type")',
-  )()) as FileTypeModule;
+  ) as () => Promise<unknown>;
+  const { fileTypeFromBuffer } = (await dynamicImport()) as FileTypeModule;
 
   const detected = await fileTypeFromBuffer(buffer);
   return detected?.mime;
