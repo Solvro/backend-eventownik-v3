@@ -40,6 +40,10 @@ async function bootstrap() {
   const expressApp = app.getHttpAdapter().getInstance() as express.Application;
 
   expressApp.set("query parser", (string_: string) => qs.parse(string_));
+  expressApp.set(
+    "trust proxy",
+    configService.getOrThrow<number>("TRUST_PROXY"),
+  );
 
   const documentFactory = () =>
     SwaggerModule.createDocument(app, swaggerConfig);
