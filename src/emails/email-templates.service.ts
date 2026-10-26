@@ -55,7 +55,7 @@ export class EmailTemplatesService {
           content: query.content,
           trigger: query.trigger,
           triggerConfig: query.triggerConfig ?? {},
-          schema: query.schema,
+          schema: query.schema === null ? Prisma.DbNull : query.schema,
           order: query.order,
           eventUuid,
         },
@@ -260,7 +260,7 @@ export class EmailTemplatesService {
           trigger: query.trigger,
           triggerConfig:
             query.triggerConfig ?? (triggerChanged ? {} : undefined),
-          schema: query.schema,
+          schema: query.schema === null ? Prisma.DbNull : query.schema,
           order: query.order,
         },
       });

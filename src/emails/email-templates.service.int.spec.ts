@@ -170,6 +170,19 @@ describe("EmailTemplatesService (integration)", () => {
       expect(result.id).toBeDefined();
     });
 
+    it("creates a template without a schema when schema is null", async () => {
+      const event = await createEvent();
+
+      const result = await service.create(event.uuid, {
+        name: "No schema",
+        content: "<p>Hi</p>",
+        trigger: EmailTrigger.MANUAL,
+        schema: null,
+      });
+
+      expect(result.schema).toBeNull();
+    });
+
     it("throws BadRequestException for ATTRIBUTE_CHANGED trigger without a triggerConfig", async () => {
       const event = await createEvent();
 
@@ -333,6 +346,26 @@ describe("EmailTemplatesService (integration)", () => {
           triggerConfig: { formUuid: "00000000-0000-0000-0000-000000000004" },
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it("clears the schema when it is set to null", async () => {
+      const event = await createEvent();
+      const template = await prisma.emailTemplate.create({
+        data: {
+          name: "With schema",
+          content: "<p>Hi</p>",
+          trigger: EmailTrigger.MANUAL,
+          schema: { version: "1.0" },
+          eventUuid: event.uuid,
+        },
+      });
+
+      await service.update(event.uuid, template.uuid, { schema: null });
+
+      const stored = await prisma.emailTemplate.findUnique({
+        where: { uuid: template.uuid },
+      });
+      expect(stored?.schema).toBeNull();
     });
 
     it("keeps triggerConfig when it is omitted from the update", async () => {
