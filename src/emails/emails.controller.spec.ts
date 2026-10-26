@@ -286,6 +286,16 @@ describe("EmailsController", () => {
     });
   });
 
+  describe("routing", () => {
+    it("declares the static reorder route before the :emailId routes", () => {
+      const handlers = Object.getOwnPropertyNames(EmailsController.prototype);
+
+      expect(handlers.indexOf("reorder")).toBeLessThan(
+        handlers.indexOf("update"),
+      );
+    });
+  });
+
   describe("update an email template", () => {
     it("should update and return the email template", async () => {
       const dto: UpdateEmailDto = { name: "test2" };

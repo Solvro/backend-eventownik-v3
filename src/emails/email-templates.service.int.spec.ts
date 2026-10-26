@@ -93,6 +93,13 @@ describe("EmailTemplatesService (integration)", () => {
     });
   }
 
+  async function storedOrder(uuid: string) {
+    const template = await prisma.emailTemplate.findUnique({
+      where: { uuid },
+    });
+    return template?.order;
+  }
+
   async function createParticipantEmailStatus(
     emailUuid: string,
     status: EmailStatus,
@@ -476,6 +483,58 @@ describe("EmailTemplatesService (integration)", () => {
 
       await expect(
         service.update(event.uuid, template.uuid, { name: "Nope" }),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // reorder
+  // ---------------------------------------------------------------------------
+
+  describe("reorder", () => {
+    it("sets each template's order to its position in the list", async () => {
+      const event = await createEvent();
+      const a = await createEmailTemplate(event.uuid, { name: "A", order: 5 });
+      const b = await createEmailTemplate(event.uuid, { name: "B" });
+      const c = await createEmailTemplate(event.uuid, { name: "C", order: 0 });
+
+      await service.reorder(event.uuid, [c.uuid, a.uuid, b.uuid]);
+
+      expect(await storedOrder(c.uuid)).toBe(0);
+      expect(await storedOrder(a.uuid)).toBe(1);
+      expect(await storedOrder(b.uuid)).toBe(2);
+    });
+
+    it("leaves templates that are not listed untouched", async () => {
+      const event = await createEvent();
+      const listed = await createEmailTemplate(event.uuid, { order: 7 });
+      const unlisted = await createEmailTemplate(event.uuid, { order: 9 });
+
+      await service.reorder(event.uuid, [listed.uuid]);
+
+      expect(await storedOrder(listed.uuid)).toBe(0);
+      expect(await storedOrder(unlisted.uuid)).toBe(9);
+    });
+
+    it("throws NotFoundException and changes nothing when a template belongs to another event", async () => {
+      const event = await createEvent();
+      const otherEvent = await createEvent();
+      const own = await createEmailTemplate(event.uuid, { order: 4 });
+      const foreign = await createEmailTemplate(otherEvent.uuid, { order: 6 });
+
+      await expect(
+        service.reorder(event.uuid, [own.uuid, foreign.uuid]),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(await storedOrder(own.uuid)).toBe(4);
+      expect(await storedOrder(foreign.uuid)).toBe(6);
+    });
+
+    it("throws NotFoundException for an unknown template", async () => {
+      const event = await createEvent();
+
+      await expect(
+        service.reorder(event.uuid, ["00000000-0000-4000-8000-000000000007"]),
       ).rejects.toThrow(NotFoundException);
     });
   });

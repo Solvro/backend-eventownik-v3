@@ -344,6 +344,26 @@ export class EmailTemplatesService {
     }
   }
 
+  async reorder(eventUuid: string, emailUuids: string[]): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const matching = await tx.emailTemplate.count({
+        where: { eventUuid, uuid: { in: emailUuids } },
+      });
+      if (matching !== emailUuids.length) {
+        throw new NotFoundException(
+          "One or more email templates do not belong to this event",
+        );
+      }
+
+      for (const [index, uuid] of emailUuids.entries()) {
+        await tx.emailTemplate.update({
+          where: { uuid },
+          data: { order: index },
+        });
+      }
+    });
+  }
+
   async remove(eventUuid: string, emailUuid: string): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const existingEmail = await tx.emailTemplate.findFirst({
