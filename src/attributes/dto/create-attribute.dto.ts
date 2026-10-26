@@ -32,7 +32,15 @@ export class CreateAttributeDto {
   @IsEnum(AttributeType)
   type!: AttributeType;
 
-  @ApiPropertyOptional({})
+  @ApiPropertyOptional({
+    description:
+      "Type specific settings:\n" +
+      "- select: options (non-empty string[], required), allowOther (boolean)\n" +
+      "- multiSelect: options (non-empty string[], required), allowOther (boolean), maxSelections (positive integer)\n" +
+      '- block: maxSelections (positive integer, default 1), participantFields (string[] of attribute UUIDs or "email")\n' +
+      "- other types: no keys, stored as {}",
+    type: Object,
+  })
   @IsOptional()
   @IsObject()
   @IsConfigValidForAttributeType()

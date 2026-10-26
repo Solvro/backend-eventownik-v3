@@ -139,12 +139,12 @@ describe("Forms Integration", () => {
     ).rejects.toThrow();
   });
 
-  it("should not create a form for second first form", async () => {
+  it("should make a new first form replace the event's current one", async () => {
     const dto = {
       name: "Integration Test Form",
       isEditable: true,
       openDate: new Date(),
-      closeDate: new Date(),
+      closeDate: new Date(Date.now() + 1000),
       description: "An integration test form",
       isFirstForm: true,
       attributes: [
@@ -159,9 +159,16 @@ describe("Forms Integration", () => {
       uuid: "event-uuid-123",
       registerFormUuid: "some-existing-form-uuid",
     });
-    await expect(
-      formsController.create("event-uuid-123", dto),
-    ).rejects.toThrow();
+    mockPrismaService.form.create.mockResolvedValue({ uuid: "new-form-uuid" });
+    mockPrismaService.attribute.count.mockResolvedValue(1);
+    mockPrismaService.formDefinition.createMany.mockResolvedValue({});
+
+    await formsController.create("event-uuid-123", dto);
+
+    expect(mockPrismaService.event.update).toHaveBeenCalledWith({
+      where: { uuid: "event-uuid-123" },
+      data: { registerFormUuid: "new-form-uuid" },
+    });
   });
 
   it("should get all forms for an event", async () => {

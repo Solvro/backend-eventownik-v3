@@ -204,11 +204,6 @@ export class FormsService {
         },
       });
       if (createFormDto.isFirstForm ?? false) {
-        if (event.registerFormUuid != null) {
-          throw new BadRequestException(
-            `Event with id: ${eventUuid} already has a first form assigned`,
-          );
-        }
         await prisma.event.update({
           where: { uuid: eventUuid },
           data: { registerFormUuid: form.uuid },
@@ -409,19 +404,7 @@ export class FormsService {
         );
       }
 
-      if (
-        updateFormDto.isFirstForm !== undefined &&
-        updateFormDto.isFirstForm
-      ) {
-        if (
-          event.registerFormUuid !== null &&
-          event.registerFormUuid !== formUuid
-        ) {
-          throw new BadRequestException(
-            `Event with id: ${eventUuid} already has a first form assigned`,
-          );
-        }
-
+      if (updateFormDto.isFirstForm === true) {
         await prisma.event.update({
           where: { uuid: eventUuid },
           data: { registerFormUuid: formUuid },

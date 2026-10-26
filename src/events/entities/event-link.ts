@@ -15,14 +15,11 @@ export class EventLink implements PrismaEventLink {
   @ApiProperty()
   url: string;
 
-  @ApiProperty()
+  @ApiProperty({ enum: EventLinkType })
   type: EventLinkType;
 
   @ApiProperty({ nullable: true, required: false })
   label: string | null;
-
-  @ApiProperty({ nullable: true, required: false })
-  formUuid: string | null;
 
   @ApiProperty()
   createdAt: Date;

@@ -421,6 +421,7 @@ describe("FormsService", () => {
       await expect(
         service.formSubmit(eventSlug, formUuid, {
           attributes: [],
+          "cf-turnstile-response": "token",
         }),
       ).rejects.toThrow(BadRequestException);
     });
