@@ -213,7 +213,7 @@ export class EventsService {
         links: true,
         registerForm: {
           include: {
-            formDefinitions: true,
+            formDefinitions: { include: { attribute: true } },
           },
         },
       },

@@ -687,6 +687,39 @@ describe("EventsService (integration)", () => {
       );
     });
 
+    it("includes the attributes of the registration form definitions", async () => {
+      const admin = await createAdmin();
+      const event = await createEvent(admin.uuid, {
+        slug: "register-form-public-slug",
+        isPublic: true,
+      });
+      const attribute = await prisma.attribute.create({
+        data: {
+          eventUuid: event.uuid,
+          type: "text",
+          name: "Nickname",
+          order: 1,
+        },
+      });
+      const form = await prisma.form.create({
+        data: {
+          name: "Registration",
+          eventUuid: event.uuid,
+          formDefinitions: { create: { attributeUuid: attribute.uuid } },
+        },
+      });
+      await prisma.event.update({
+        where: { uuid: event.uuid },
+        data: { registerFormUuid: form.uuid },
+      });
+
+      const result = await service.findOnePublic("register-form-public-slug");
+
+      expect(result.registerForm?.formDefinitions[0].attribute?.name).toBe(
+        "Nickname",
+      );
+    });
+
     it("resolves photoKey to url", async () => {
       const admin = await createAdmin();
       const _event = await createEvent(admin.uuid, {
