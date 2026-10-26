@@ -291,7 +291,7 @@ export class BlocksService {
     }
 
     if (block.capacity === null) {
-      return false;
+      return true;
     }
 
     const count = await this.getBlockParticipantsCount(blockId, tx);
@@ -320,7 +320,7 @@ export class BlocksService {
     for (const block of blocks) {
       let blockParticipantCount: number | undefined;
 
-      if (block.capacity !== null) {
+      if (!block.isRootBlock) {
         blockParticipantCount = await this.getBlockParticipantsCount(
           block.uuid,
         );
