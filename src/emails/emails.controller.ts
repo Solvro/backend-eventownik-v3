@@ -36,12 +36,10 @@ import {
 
 import { CreateEmailDto } from "./dto/create-email.dto";
 import { DuplicateEmailDto } from "./dto/duplicate-email.dto";
-import {
-  EmailCompleteElementDto,
-  EmailParticipantDto,
-} from "./dto/email-complete-element.dto";
+import { EmailCompleteElementDto } from "./dto/email-complete-element.dto";
 import { EmailListElementDto } from "./dto/email-list-element.dto";
 import { EmailListingDto } from "./dto/email-listing.dto";
+import { EmailParticipantDto } from "./dto/email-participant.dto";
 import { EmailResponseDto } from "./dto/email-response.dto";
 import { SendEmailDto } from "./dto/send-email.dto";
 import { SendTestEmailDto } from "./dto/send-test-email.dto";

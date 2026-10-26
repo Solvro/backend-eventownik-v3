@@ -253,7 +253,7 @@ describe("EmailsController", () => {
   });
 
   describe("find one email by event", () => {
-    it("should return a complete email template with participants", async () => {
+    it("should return a complete email template", async () => {
       const mockPrismaOutput = {
         uuid: mockEmailId,
         eventUuid: mockEventId,
@@ -275,7 +275,6 @@ describe("EmailsController", () => {
 
       expect(result.id).toEqual(mockEmailId);
       expect(result.name).toEqual("Single Email");
-      expect(result.participants).toEqual([]);
     });
 
     it("should throw NotFoundException when the email does not exist", async () => {

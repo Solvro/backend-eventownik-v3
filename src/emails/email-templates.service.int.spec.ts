@@ -280,17 +280,18 @@ describe("EmailTemplatesService (integration)", () => {
   // ---------------------------------------------------------------------------
 
   describe("findOne", () => {
-    it("returns the template with an empty participants array", async () => {
+    it("returns the template without delivery statuses", async () => {
       const event = await createEvent();
       const template = await createEmailTemplate(event.uuid, {
         content: "<p>Body</p>",
       });
+      await createParticipantEmailStatus(template.uuid, EmailStatus.sent);
 
       const result = await service.findOne(event.uuid, template.uuid);
 
       expect(result.id).toBe(template.uuid);
       expect(result.content).toBe("<p>Body</p>");
-      expect(result.participants).toEqual([]);
+      expect(result).not.toHaveProperty("participants");
     });
 
     it("throws NotFoundException when the template belongs to a different event", async () => {

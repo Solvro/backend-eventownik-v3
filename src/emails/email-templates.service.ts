@@ -197,7 +197,6 @@ export class EmailTemplatesService {
         uuid: emailUuid,
         eventUuid,
       },
-      // Do not eagerly load participantEmails to avoid large memory usage
     });
 
     if (emailTemplate === null) {
@@ -215,7 +214,6 @@ export class EmailTemplatesService {
       order: emailTemplate.order,
       createdAt: emailTemplate.createdAt.toISOString(),
       updatedAt: emailTemplate.updatedAt.toISOString(),
-      participants: [],
     };
 
     return formattedResponse;

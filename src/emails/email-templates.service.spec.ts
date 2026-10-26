@@ -261,7 +261,6 @@ describe("EmailTemplatesService", () => {
         order: 0,
         createdAt: "2025-02-22T19:13:10.471Z",
         updatedAt: "2025-02-22T19:13:10.471Z",
-        participants: [],
       };
 
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue(
