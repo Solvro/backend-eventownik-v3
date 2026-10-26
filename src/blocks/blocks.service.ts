@@ -151,27 +151,27 @@ export class BlocksService {
       return [];
     }
 
-    const sortBlocks = (block: Block) => {
-      if (block.children == null) {
-        return;
-      }
-
-      block.children.sort((a: Block, b: Block) => {
-        const orderA = a.order ?? 0;
-        const orderB = b.order ?? 0;
-        if (orderA !== orderB) {
-          return orderA - orderB;
-        }
-        return a.createdAt.getTime() - b.createdAt.getTime();
-      });
-      for (const child of block.children) {
-        sortBlocks(child);
-      }
-    };
-
-    sortBlocks(rootBlock);
+    this.sortBlockTree(rootBlock);
 
     return rootBlock;
+  }
+
+  private sortBlockTree(block: Block) {
+    if (block.children == null) {
+      return;
+    }
+
+    block.children.sort((a: Block, b: Block) => {
+      const orderA = a.order ?? 0;
+      const orderB = b.order ?? 0;
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+      return a.createdAt.getTime() - b.createdAt.getTime();
+    });
+    for (const child of block.children) {
+      this.sortBlockTree(child);
+    }
   }
 
   async findOne(eventId: string, attributeId: string, id: string) {
@@ -350,6 +350,8 @@ export class BlocksService {
         `Attribute with UUID ${attributeUuid} doesn't have a block tree`,
       );
     }
+
+    this.sortBlockTree(root);
 
     return root;
   }

@@ -8,7 +8,7 @@ import { Test } from "@nestjs/testing";
 
 import { BlocksService } from "./blocks.service";
 
-describe("BlocksService capacity (integration)", () => {
+describe("BlocksService (integration)", () => {
   let service: BlocksService;
   let prisma: PrismaService;
 
@@ -42,7 +42,7 @@ describe("BlocksService capacity (integration)", () => {
     const event = await prisma.event.create({
       data: {
         name: "Test Event",
-        slug: `blocks-capacity-int-${String(Date.now())}-${Math.random().toString(36).slice(2)}`,
+        slug: `blocks-service-int-${String(Date.now())}-${Math.random().toString(36).slice(2)}`,
         startDate: new Date("2025-06-01"),
         endDate: new Date("2025-06-02"),
       },
@@ -72,6 +72,7 @@ describe("BlocksService capacity (integration)", () => {
     attribute: Attribute,
     parent: Block,
     capacity: number | null,
+    order: number | null = null,
   ): Promise<Block> {
     return prisma.block.create({
       data: {
@@ -79,6 +80,7 @@ describe("BlocksService capacity (integration)", () => {
         attributeUuid: attribute.uuid,
         parentUuid: parent.uuid,
         capacity,
+        order,
       },
     });
   }
@@ -97,6 +99,14 @@ describe("BlocksService capacity (integration)", () => {
         },
       },
     });
+  }
+
+  async function createUnorderedChildren() {
+    const setup = await createBlockAttribute();
+    const second = await createBlock(setup.attribute, setup.root, null, 2);
+    const unordered = await createBlock(setup.attribute, setup.root, null);
+    const first = await createBlock(setup.attribute, setup.root, null, 1);
+    return { ...setup, expected: [unordered, first, second] };
   }
 
   describe("canSignInToBlock", () => {
@@ -167,6 +177,32 @@ describe("BlocksService capacity (integration)", () => {
         tree as { children: { uuid: string; blockParticipantCount?: number }[] }
       ).children.find((candidate) => candidate.uuid === block.uuid);
       expect(child?.blockParticipantCount).toBe(1);
+    });
+  });
+
+  describe("child ordering", () => {
+    it("sorts the public tree by order, treating a missing order as 0", async () => {
+      const { event, attribute, expected } = await createUnorderedChildren();
+
+      const tree = (await service.getBlockTree(event.slug, attribute.uuid)) as {
+        children: { uuid: string }[];
+      };
+
+      expect(tree.children.map((child) => child.uuid)).toEqual(
+        expected.map((block) => block.uuid),
+      );
+    });
+
+    it("sorts the admin tree the same way", async () => {
+      const { event, attribute, expected } = await createUnorderedChildren();
+
+      const tree = (await service.findAll(event.uuid, attribute.uuid)) as {
+        children: { uuid: string }[];
+      };
+
+      expect(tree.children.map((child) => child.uuid)).toEqual(
+        expected.map((block) => block.uuid),
+      );
     });
   });
 });
