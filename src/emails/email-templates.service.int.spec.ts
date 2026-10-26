@@ -122,6 +122,8 @@ describe("EmailTemplatesService (integration)", () => {
       expect(result.id).toBeDefined();
       expect(result.name).toBe("Welcome email");
       expect(result.eventId).toBe(event.uuid);
+      expect(result.triggerConfig).toEqual({});
+      expect(result.order).toBeNull();
 
       const stored = await prisma.emailTemplate.findUnique({
         where: { uuid: result.id },
@@ -327,6 +329,8 @@ describe("EmailTemplatesService (integration)", () => {
 
       expect(result.name).toBe("Renamed");
       expect(result.content).toBe("<p>Updated</p>");
+      expect(result).toHaveProperty("triggerConfig");
+      expect(result).toHaveProperty("order");
 
       const stored = await prisma.emailTemplate.findUnique({
         where: { uuid: template.uuid },
