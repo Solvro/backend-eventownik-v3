@@ -59,7 +59,7 @@ Never edit a migration that was already applied. Add a new one.
 npm run migrate:test
 ```
 
-Run it once on first setup, and again **whenever new migrations are added** (after pulling, or after creating one). A stale test schema causes confusing failures.
+This drops and recreates the test database, then applies all migrations from scratch. Run it once on first setup, and again **after switching branches, pulling, or adding a migration**. A stale test schema causes confusing failures.
 
 ## 5. Run
 
