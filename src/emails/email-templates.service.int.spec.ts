@@ -79,6 +79,7 @@ describe("EmailTemplatesService (integration)", () => {
       content: string;
       trigger: EmailTrigger;
       triggerConfig: object;
+      order: number;
     }> = {},
   ) {
     return prisma.emailTemplate.create({
@@ -264,6 +265,49 @@ describe("EmailTemplatesService (integration)", () => {
       const names = result.data.map((t) => t.name);
       expect(names).toContain("Registered one");
       expect(names).not.toContain("Manual one");
+    });
+
+    it("returns the order of each template", async () => {
+      const event = await createEvent();
+      await createEmailTemplate(event.uuid, { name: "Second", order: 2 });
+      await createEmailTemplate(event.uuid, { name: "Unordered" });
+
+      const result = await service.findAll(event.uuid, new EmailListingDto());
+
+      const orders = Object.fromEntries(
+        result.data.map((t) => [t.name, t.order]),
+      );
+      expect(orders).toEqual({ Second: 2, Unordered: null });
+    });
+
+    it("sorts by order with unordered templates last", async () => {
+      const event = await createEvent();
+      await createEmailTemplate(event.uuid, { name: "Unordered" });
+      await createEmailTemplate(event.uuid, { name: "Third", order: 3 });
+      await createEmailTemplate(event.uuid, { name: "First", order: 1 });
+
+      const query = Object.assign(new EmailListingDto(), { sort: "order:asc" });
+      const result = await service.findAll(event.uuid, query);
+
+      expect(result.data.map((t) => t.name)).toEqual([
+        "First",
+        "Third",
+        "Unordered",
+      ]);
+    });
+
+    it("keeps unordered templates in creation order when sorting by order", async () => {
+      const event = await createEvent();
+      await createEmailTemplate(event.uuid, { name: "Unordered A" });
+      await createEmailTemplate(event.uuid, { name: "Unordered B" });
+
+      const query = Object.assign(new EmailListingDto(), { sort: "order:asc" });
+      const result = await service.findAll(event.uuid, query);
+
+      expect(result.data.map((t) => t.name)).toEqual([
+        "Unordered A",
+        "Unordered B",
+      ]);
     });
 
     it("throws BadRequestException when the event does not exist", async () => {

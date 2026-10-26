@@ -152,6 +152,7 @@ describe("EmailTemplatesService", () => {
           trigger: EmailTrigger.PARTICIPANT_REGISTERED,
           triggerConfig: undefined,
           schema: undefined,
+          order: undefined,
           createdAt: "2025-02-22T19:13:10.471Z",
           updatedAt: "2025-02-22T19:13:10.471Z",
           meta: {
@@ -167,6 +168,7 @@ describe("EmailTemplatesService", () => {
           trigger: EmailTrigger.MANUAL,
           triggerConfig: undefined,
           schema: undefined,
+          order: undefined,
           createdAt: "2025-02-22T19:13:10.471Z",
           updatedAt: "2025-02-22T19:13:10.471Z",
           meta: {
@@ -209,6 +211,7 @@ describe("EmailTemplatesService", () => {
           trigger: true,
           triggerConfig: true,
           schema: true,
+          order: true,
           createdAt: true,
           updatedAt: true,
         },

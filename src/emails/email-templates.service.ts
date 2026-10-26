@@ -88,7 +88,12 @@ export class EmailTemplatesService {
     }
 
     const { skip, take, sort, trigger } = query;
-    const orderBy = parseSortInput(sort, ["createdAt", "updatedAt", "name"]);
+    const orderBy = parseSortInput(sort, [
+      "createdAt",
+      "updatedAt",
+      "name",
+      "order",
+    ]);
     const where = {
       eventUuid,
       trigger,
@@ -96,6 +101,8 @@ export class EmailTemplatesService {
 
     if (orderBy.length === 0) {
       orderBy.push({ createdAt: "desc" });
+    } else if (orderBy.some((criterion) => "order" in criterion)) {
+      orderBy.push({ createdAt: "asc" });
     }
 
     const [itemCount, templates] = await this.prisma.$transaction([
@@ -112,6 +119,7 @@ export class EmailTemplatesService {
           trigger: true,
           triggerConfig: true,
           schema: true,
+          order: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -129,6 +137,7 @@ export class EmailTemplatesService {
       trigger: record.trigger,
       triggerConfig: record.triggerConfig,
       schema: record.schema,
+      order: record.order,
       createdAt: record.createdAt.toISOString(),
       updatedAt: record.updatedAt.toISOString(),
       meta: countsByTemplate.get(record.uuid) ?? {
