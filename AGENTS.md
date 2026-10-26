@@ -38,4 +38,6 @@ Full guide: [docs/integration-tests.md](docs/integration-tests.md).
 ## Other
 
 - Commits follow commitlint (conventional commits). CI rejects the PR otherwise.
+- Commit name format: `<type>(<optional scope>): <lowercase imperative summary>`, e.g. `fix(emails): accept null schema on email templates`. Scope is the module name (`forms`, `emails`, `organizers`). Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`.
+- Commit message is a single title line, no body.
 - Never edit an applied migration. Add a new one: `npx prisma migrate dev --name <name>`.
