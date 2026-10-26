@@ -5,10 +5,10 @@ import { EmailElementDto } from "./email-element.dto";
 export class EmailCompleteElementDto extends EmailElementDto {
   content: string;
   order: number | null;
-  participants: EmailParticipant[];
+  participants: EmailParticipantDto[];
 }
 
-class EmailParticipant {
+export class EmailParticipantDto {
   id?: string;
   email?: string;
   createdAt?: string;

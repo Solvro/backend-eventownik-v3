@@ -204,7 +204,7 @@ export class BlocksService {
       throw new BadRequestException("Root block cannot be modified this way");
     }
 
-    if (updateBlockDto.parentUuid) {
+    if (updateBlockDto.parentUuid !== undefined) {
       if (updateBlockDto.parentUuid === id) {
         throw new BadRequestException("Block cannot be its own parent");
       }

@@ -335,6 +335,7 @@ describe("EmailTemplatesService", () => {
         name: "test",
         content: "<p>test2</p>",
         trigger: EmailTrigger.MANUAL,
+        order: 0,
         eventId: mockEventId,
         createdAt: "2025-02-22T19:13:10.471Z",
         updatedAt: "2025-02-22T19:13:10.471Z",

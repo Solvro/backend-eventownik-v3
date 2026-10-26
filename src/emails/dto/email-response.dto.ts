@@ -5,6 +5,8 @@ export class EmailResponseDto {
   name: string;
   content: string;
   trigger: string;
+  triggerConfig: Prisma.JsonValue | null;
+  order: number | null;
   eventId: string;
   schema?: Prisma.JsonValue | null;
   createdAt: string;

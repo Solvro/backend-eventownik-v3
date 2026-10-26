@@ -36,7 +36,10 @@ import {
 
 import { CreateEmailDto } from "./dto/create-email.dto";
 import { DuplicateEmailDto } from "./dto/duplicate-email.dto";
-import { EmailCompleteElementDto } from "./dto/email-complete-element.dto";
+import {
+  EmailCompleteElementDto,
+  EmailParticipantDto,
+} from "./dto/email-complete-element.dto";
 import { EmailListElementDto } from "./dto/email-list-element.dto";
 import { EmailListingDto } from "./dto/email-listing.dto";
 import { EmailResponseDto } from "./dto/email-response.dto";
@@ -115,7 +118,7 @@ export class EmailsController {
   })
   @ApiParam({ name: "eventId", description: "UUID of the event" })
   @ApiParam({ name: "emailId", description: "UUID of the email" })
-  @ApiOkResponse({ description: "Paginated participants list" })
+  @ApiPaginatedResponse(EmailParticipantDto)
   async findParticipants(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("emailId", ParseUUIDPipe) emailId: string,

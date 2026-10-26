@@ -2,6 +2,7 @@ import { Transform, Type, plainToInstance } from "class-transformer";
 import {
   IsArray,
   IsEmail,
+  IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
@@ -70,10 +71,8 @@ export class FormSubmitionDto {
   })
   attributes: ParticipantAttributeDto[];
 
-  // @ApiProperty({
-  //   description: "Cloudflare Turnstile response token",
-  // })
-  // @IsString()
-  // @IsNotEmpty()
-  // "cf-turnstile-response": string;
+  @ApiProperty({ description: "Cloudflare Turnstile response token" })
+  @IsString()
+  @IsNotEmpty()
+  "cf-turnstile-response": string;
 }
