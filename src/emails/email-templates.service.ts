@@ -232,17 +232,20 @@ export class EmailTemplatesService {
           uuid: emailUuid,
           eventUuid,
         },
-        select: { uuid: true },
+        select: { uuid: true, trigger: true },
       });
       if (existingEmail == null) {
         throw new NotFoundException("Email template or event does not exist");
       }
 
-      if (query.trigger) {
+      const triggerChanged =
+        query.trigger !== undefined && query.trigger !== existingEmail.trigger;
+
+      if (triggerChanged || query.triggerConfig !== undefined) {
         await this.validateTriggerConfig(
           tx,
           eventUuid,
-          query.trigger,
+          query.trigger ?? existingEmail.trigger,
           query.triggerConfig,
         );
       }
@@ -255,7 +258,8 @@ export class EmailTemplatesService {
           name: query.name,
           content: query.content,
           trigger: query.trigger,
-          triggerConfig: query.triggerConfig ?? {},
+          triggerConfig:
+            query.triggerConfig ?? (triggerChanged ? {} : undefined),
           schema: query.schema,
           order: query.order,
         },

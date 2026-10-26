@@ -335,6 +335,58 @@ describe("EmailTemplatesService (integration)", () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it("keeps triggerConfig when it is omitted from the update", async () => {
+      const event = await createEvent();
+      const form = await createForm(event.uuid);
+      const template = await createEmailTemplate(event.uuid, {
+        trigger: EmailTrigger.FORM_FILLED,
+        triggerConfig: { formUuid: form.uuid },
+      });
+
+      await service.update(event.uuid, template.uuid, { name: "Renamed" });
+      await service.update(event.uuid, template.uuid, {
+        trigger: EmailTrigger.FORM_FILLED,
+      });
+
+      const stored = await prisma.emailTemplate.findUnique({
+        where: { uuid: template.uuid },
+      });
+      expect(stored?.triggerConfig).toEqual({ formUuid: form.uuid });
+    });
+
+    it("validates triggerConfig sent without a trigger against the stored trigger", async () => {
+      const event = await createEvent();
+      const form = await createForm(event.uuid);
+      const template = await createEmailTemplate(event.uuid, {
+        trigger: EmailTrigger.FORM_FILLED,
+        triggerConfig: { formUuid: form.uuid },
+      });
+
+      await expect(
+        service.update(event.uuid, template.uuid, {
+          triggerConfig: { formUuid: "00000000-0000-0000-0000-000000000006" },
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("clears triggerConfig when the trigger changes to one without config", async () => {
+      const event = await createEvent();
+      const form = await createForm(event.uuid);
+      const template = await createEmailTemplate(event.uuid, {
+        trigger: EmailTrigger.FORM_FILLED,
+        triggerConfig: { formUuid: form.uuid },
+      });
+
+      await service.update(event.uuid, template.uuid, {
+        trigger: EmailTrigger.MANUAL,
+      });
+
+      const stored = await prisma.emailTemplate.findUnique({
+        where: { uuid: template.uuid },
+      });
+      expect(stored?.triggerConfig).toEqual({});
+    });
+
     it("throws NotFoundException when the template does not exist in this event", async () => {
       const event = await createEvent();
       const otherEvent = await createEvent();
