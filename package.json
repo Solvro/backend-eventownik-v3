@@ -10,7 +10,7 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "migrate:test": "dotenv -e .env.test -- prisma migrate deploy",
+    "migrate:test": "dotenv -e .env.test -- prisma migrate reset --force",
     "prepare": "husky || true",
     "seed:dev": "ts-node --transpile-only prisma/seed.ts",
     "start": "nest start",

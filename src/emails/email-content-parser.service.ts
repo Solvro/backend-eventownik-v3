@@ -153,7 +153,10 @@ export class EmailContentParserService {
       );
 
       if (attribute != null) {
-        const dynamicTag = `<span data-id="/participant_${attribute.uuid}"></span>`;
+        const dynamicTag = new RegExp(
+          `<span[^>]*data-id="/participant_${attribute.uuid}"[^>]*>.*?</span>`,
+          "g",
+        );
         const rawValue = participantAttribute.value;
 
         if (attribute.type === AttributeType.multiSelect) {
@@ -171,8 +174,7 @@ export class EmailContentParserService {
                   .join(", ")
               : this.stringifyJsonValue(rawValue);
 
-          content = content.replaceAll(
-            new RegExp(dynamicTag, "g"),
+          content = content.replaceAll(dynamicTag, () =>
             this.escapeHtml(replacement),
           );
         } else if (attribute.type === AttributeType.block) {
@@ -191,13 +193,11 @@ export class EmailContentParserService {
             )
             .filter((name): name is string => name != null);
 
-          content = content.replaceAll(
-            new RegExp(dynamicTag, "g"),
+          content = content.replaceAll(dynamicTag, () =>
             this.escapeHtml(blockNames.join(", ")),
           );
         } else {
-          content = content.replaceAll(
-            new RegExp(dynamicTag, "g"),
+          content = content.replaceAll(dynamicTag, () =>
             this.escapeHtml(this.stringifyJsonValue(rawValue)),
           );
         }
@@ -206,7 +206,8 @@ export class EmailContentParserService {
 
     // form links replacement eg /form_{formUuid} will be replaced with a link
     // to {FRONTEND_URL}/{eventSlug}/{formUuid}/{participantUuid}
-    const formLinkRegex = /<span[^>]*data-id="\/form_([^"]+)"[^>]*><\/span>/g;
+    const formLinkRegex =
+      /<span[^>]*data-id="\/form_([^"]+)"[^>]*>.*?<\/span>/g;
     content = content.replaceAll(
       formLinkRegex,
       (match: string, formUuid: string) => {

@@ -95,7 +95,11 @@ export class ParticipantsController {
 
   @Patch(":id")
   @RequirePermission(PermissionType.MANAGE_PARTICIPANT)
-  @ApiOperation({ summary: "Update a participant" })
+  @ApiOperation({
+    summary: "Update a participant",
+    description:
+      "Omitted fields and attributes are kept. An attribute sent with a null value is cleared, and a file or drawing it held is deleted from storage.",
+  })
   @ApiParam({ name: "eventId", description: "UUID of the event" })
   @ApiParam({ name: "id", description: "UUID of the participant" })
   @ApiOkResponse({ type: Participant })

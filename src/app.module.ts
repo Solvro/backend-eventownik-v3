@@ -42,6 +42,7 @@ import { TicketsModule } from "./tickets/tickets.module";
         APP_DOMAIN: Joi.string().required(),
         FRONTEND_URL: Joi.string().required(),
         CORS_ORIGINS: Joi.string().required(),
+        TRUST_PROXY: Joi.number().integer().min(0).default(0),
         DATABASE_URL: Joi.string().required(),
         TURNSTILE_SECRET: Joi.string().required(),
         JWT_SECRET: Joi.string().required(),

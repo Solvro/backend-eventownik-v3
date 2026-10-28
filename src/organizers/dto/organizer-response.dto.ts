@@ -1,16 +1,19 @@
-import { OrganizerType } from "src/generated/prisma/enums";
+import { OrganizerType, PermissionType } from "src/generated/prisma/enums";
 
 import { ApiProperty } from "@nestjs/swagger";
 
 export class OrganizerPermissionResponseDto {
   @ApiProperty()
-  permissionUuid: string;
+  uuid: string;
 
   @ApiProperty()
-  action: string;
+  eventUuid: string;
 
   @ApiProperty()
-  subject: string;
+  adminUuid: string;
+
+  @ApiProperty({ enum: PermissionType })
+  permission: PermissionType;
 }
 
 export class OrganizerResponseDto {

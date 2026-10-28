@@ -1,6 +1,9 @@
+import { FormWithDefinitions } from "src/forms/entities/form-with-definitions.entity";
+
 import { ApiProperty } from "@nestjs/swagger";
 
 import { Event as PrismaEvent } from "../../generated/prisma/client";
+import { EventLink } from "./event-link";
 
 export class Event implements Omit<PrismaEvent, "photoKey"> {
   @ApiProperty()
@@ -69,4 +72,20 @@ export class Event implements Omit<PrismaEvent, "photoKey"> {
 
   @ApiProperty({ nullable: true, required: false })
   sentToBbiAt: Date | null;
+
+  @ApiProperty({
+    type: () => [EventLink],
+    required: false,
+    description: "Present when the endpoint includes the event links",
+  })
+  links?: EventLink[];
+
+  @ApiProperty({
+    type: () => FormWithDefinitions,
+    nullable: true,
+    required: false,
+    description:
+      "Registration form with its definitions and attributes. Present on the public event endpoint",
+  })
+  registerForm?: FormWithDefinitions | null;
 }

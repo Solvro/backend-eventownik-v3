@@ -280,7 +280,11 @@ export class AttributesService {
         order: updateAttributeDto.order,
         showInList: updateAttributeDto.showInList,
         type: updateAttributeDto.type,
-        config: this.normalizeConfig(nextType, updateAttributeDto.config),
+        config:
+          updateAttributeDto.config === undefined &&
+          nextType === foundAttribute.type
+            ? undefined
+            : this.normalizeConfig(nextType, updateAttributeDto.config),
       },
     });
 

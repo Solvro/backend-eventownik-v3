@@ -200,14 +200,10 @@ export class FormsService {
           eventUuid: event.uuid,
           openCondition: createFormDto.openCondition,
           isOpen: createFormDto.isOpen,
+          order: createFormDto.order,
         },
       });
       if (createFormDto.isFirstForm ?? false) {
-        if (event.registerFormUuid != null) {
-          throw new BadRequestException(
-            `Event with id: ${eventUuid} already has a first form assigned`,
-          );
-        }
         await prisma.event.update({
           where: { uuid: eventUuid },
           data: { registerFormUuid: form.uuid },
@@ -262,7 +258,12 @@ export class FormsService {
         : { name: { contains: name, mode: "insensitive" } }),
       ...(isEditable === undefined ? {} : { isEditable }),
     };
-    const orderBy = parseSortInput(sort, ["name", "createdAt", "openDate"]);
+    const orderBy = parseSortInput(sort, [
+      "name",
+      "createdAt",
+      "openDate",
+      "order",
+    ]);
     if (orderBy.length === 0) {
       orderBy.push({ createdAt: "desc" });
     }
@@ -320,6 +321,7 @@ export class FormsService {
           eventUuid: sourceForm.eventUuid,
           openCondition: sourceForm.openCondition,
           isOpen: sourceForm.isOpen,
+          order: sourceForm.order,
         },
       });
 
@@ -402,19 +404,7 @@ export class FormsService {
         );
       }
 
-      if (
-        updateFormDto.isFirstForm !== undefined &&
-        updateFormDto.isFirstForm
-      ) {
-        if (
-          event.registerFormUuid !== null &&
-          event.registerFormUuid !== formUuid
-        ) {
-          throw new BadRequestException(
-            `Event with id: ${eventUuid} already has a first form assigned`,
-          );
-        }
-
+      if (updateFormDto.isFirstForm === true) {
         await prisma.event.update({
           where: { uuid: eventUuid },
           data: { registerFormUuid: formUuid },
@@ -477,6 +467,7 @@ export class FormsService {
           description: updateFormDto.description,
           openCondition: updateFormDto.openCondition,
           isOpen: updateFormDto.isOpen,
+          order: updateFormDto.order,
         },
         include: {
           formDefinitions: {

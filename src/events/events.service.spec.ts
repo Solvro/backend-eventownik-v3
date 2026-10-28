@@ -385,7 +385,7 @@ describe("EventsService", () => {
           links: true,
           registerForm: {
             include: {
-              formDefinitions: true,
+              formDefinitions: { include: { attribute: true } },
             },
           },
         },
@@ -410,7 +410,7 @@ describe("EventsService", () => {
           links: true,
           registerForm: {
             include: {
-              formDefinitions: true,
+              formDefinitions: { include: { attribute: true } },
             },
           },
         },

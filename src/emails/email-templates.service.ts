@@ -55,7 +55,7 @@ export class EmailTemplatesService {
           content: query.content,
           trigger: query.trigger,
           triggerConfig: query.triggerConfig ?? {},
-          schema: query.schema,
+          schema: query.schema === null ? Prisma.DbNull : query.schema,
           order: query.order,
           eventUuid,
         },
@@ -66,6 +66,8 @@ export class EmailTemplatesService {
         name: emailTemplate.name,
         content: emailTemplate.content,
         trigger: emailTemplate.trigger,
+        triggerConfig: emailTemplate.triggerConfig,
+        order: emailTemplate.order,
         eventId: emailTemplate.eventUuid,
         schema: emailTemplate.schema,
         createdAt: emailTemplate.createdAt.toISOString(),
@@ -86,7 +88,12 @@ export class EmailTemplatesService {
     }
 
     const { skip, take, sort, trigger } = query;
-    const orderBy = parseSortInput(sort, ["createdAt", "updatedAt", "name"]);
+    const orderBy = parseSortInput(sort, [
+      "createdAt",
+      "updatedAt",
+      "name",
+      "order",
+    ]);
     const where = {
       eventUuid,
       trigger,
@@ -94,6 +101,8 @@ export class EmailTemplatesService {
 
     if (orderBy.length === 0) {
       orderBy.push({ createdAt: "desc" });
+    } else if (orderBy.some((criterion) => "order" in criterion)) {
+      orderBy.push({ createdAt: "asc" });
     }
 
     const [itemCount, templates] = await this.prisma.$transaction([
@@ -110,6 +119,7 @@ export class EmailTemplatesService {
           trigger: true,
           triggerConfig: true,
           schema: true,
+          order: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -127,6 +137,7 @@ export class EmailTemplatesService {
       trigger: record.trigger,
       triggerConfig: record.triggerConfig,
       schema: record.schema,
+      order: record.order,
       createdAt: record.createdAt.toISOString(),
       updatedAt: record.updatedAt.toISOString(),
       meta: countsByTemplate.get(record.uuid) ?? {
@@ -195,7 +206,6 @@ export class EmailTemplatesService {
         uuid: emailUuid,
         eventUuid,
       },
-      // Do not eagerly load participantEmails to avoid large memory usage
     });
 
     if (emailTemplate === null) {
@@ -213,7 +223,6 @@ export class EmailTemplatesService {
       order: emailTemplate.order,
       createdAt: emailTemplate.createdAt.toISOString(),
       updatedAt: emailTemplate.updatedAt.toISOString(),
-      participants: [],
     };
 
     return formattedResponse;
@@ -230,17 +239,20 @@ export class EmailTemplatesService {
           uuid: emailUuid,
           eventUuid,
         },
-        select: { uuid: true },
+        select: { uuid: true, trigger: true },
       });
       if (existingEmail == null) {
         throw new NotFoundException("Email template or event does not exist");
       }
 
-      if (query.trigger) {
+      const triggerChanged =
+        query.trigger !== undefined && query.trigger !== existingEmail.trigger;
+
+      if (triggerChanged || query.triggerConfig !== undefined) {
         await this.validateTriggerConfig(
           tx,
           eventUuid,
-          query.trigger,
+          query.trigger ?? existingEmail.trigger,
           query.triggerConfig,
         );
       }
@@ -253,8 +265,9 @@ export class EmailTemplatesService {
           name: query.name,
           content: query.content,
           trigger: query.trigger,
-          triggerConfig: query.triggerConfig ?? {},
-          schema: query.schema,
+          triggerConfig:
+            query.triggerConfig ?? (triggerChanged ? {} : undefined),
+          schema: query.schema === null ? Prisma.DbNull : query.schema,
           order: query.order,
         },
       });
@@ -264,6 +277,8 @@ export class EmailTemplatesService {
         name: emailTemplate.name,
         content: emailTemplate.content,
         trigger: emailTemplate.trigger,
+        triggerConfig: emailTemplate.triggerConfig,
+        order: emailTemplate.order,
         eventId: emailTemplate.eventUuid,
         schema: emailTemplate.schema,
         createdAt: emailTemplate.createdAt.toISOString(),
@@ -329,6 +344,26 @@ export class EmailTemplatesService {
     }
   }
 
+  async reorder(eventUuid: string, emailUuids: string[]): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const matching = await tx.emailTemplate.count({
+        where: { eventUuid, uuid: { in: emailUuids } },
+      });
+      if (matching !== emailUuids.length) {
+        throw new NotFoundException(
+          "One or more email templates do not belong to this event",
+        );
+      }
+
+      for (const [index, uuid] of emailUuids.entries()) {
+        await tx.emailTemplate.update({
+          where: { uuid },
+          data: { order: index },
+        });
+      }
+    });
+  }
+
   async remove(eventUuid: string, emailUuid: string): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const existingEmail = await tx.emailTemplate.findFirst({
@@ -386,6 +421,8 @@ export class EmailTemplatesService {
         name: emailTemplate.name,
         content: emailTemplate.content,
         trigger: emailTemplate.trigger,
+        triggerConfig: emailTemplate.triggerConfig,
+        order: emailTemplate.order,
         eventId: emailTemplate.eventUuid,
         schema: emailTemplate.schema,
         createdAt: emailTemplate.createdAt.toISOString(),

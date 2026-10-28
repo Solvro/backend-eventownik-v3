@@ -4,6 +4,7 @@ import {
   IsBoolean,
   IsDate,
   IsEnum,
+  IsInt,
   IsObject,
   IsOptional,
   IsString,
@@ -73,4 +74,11 @@ export class CreateFormDto {
   @IsOptional()
   @IsBoolean()
   isOpen?: boolean;
+
+  @ApiPropertyOptional({
+    description: "Custom order of the form within the event.",
+  })
+  @IsOptional()
+  @IsInt()
+  order?: number;
 }

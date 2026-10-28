@@ -253,7 +253,7 @@ describe("EmailsController", () => {
   });
 
   describe("find one email by event", () => {
-    it("should return a complete email template with participants", async () => {
+    it("should return a complete email template", async () => {
       const mockPrismaOutput = {
         uuid: mockEmailId,
         eventUuid: mockEventId,
@@ -275,7 +275,6 @@ describe("EmailsController", () => {
 
       expect(result.id).toEqual(mockEmailId);
       expect(result.name).toEqual("Single Email");
-      expect(result.participants).toEqual([]);
     });
 
     it("should throw NotFoundException when the email does not exist", async () => {
@@ -284,6 +283,16 @@ describe("EmailsController", () => {
       await expect(
         controller.findOne(mockEventId, mockEmailId),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe("routing", () => {
+    it("declares the static reorder route before the :emailId routes", () => {
+      const handlers = Object.getOwnPropertyNames(EmailsController.prototype);
+
+      expect(handlers.indexOf("reorder")).toBeLessThan(
+        handlers.indexOf("update"),
+      );
     });
   });
 

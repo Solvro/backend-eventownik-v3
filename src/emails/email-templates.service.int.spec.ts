@@ -79,6 +79,7 @@ describe("EmailTemplatesService (integration)", () => {
       content: string;
       trigger: EmailTrigger;
       triggerConfig: object;
+      order: number;
     }> = {},
   ) {
     return prisma.emailTemplate.create({
@@ -90,6 +91,13 @@ describe("EmailTemplatesService (integration)", () => {
         ...overrides,
       },
     });
+  }
+
+  async function storedOrder(uuid: string) {
+    const template = await prisma.emailTemplate.findUnique({
+      where: { uuid },
+    });
+    return template?.order;
   }
 
   async function createParticipantEmailStatus(
@@ -122,6 +130,8 @@ describe("EmailTemplatesService (integration)", () => {
       expect(result.id).toBeDefined();
       expect(result.name).toBe("Welcome email");
       expect(result.eventId).toBe(event.uuid);
+      expect(result.triggerConfig).toEqual({});
+      expect(result.order).toBeNull();
 
       const stored = await prisma.emailTemplate.findUnique({
         where: { uuid: result.id },
@@ -168,6 +178,19 @@ describe("EmailTemplatesService (integration)", () => {
       });
 
       expect(result.id).toBeDefined();
+    });
+
+    it("creates a template without a schema when schema is null", async () => {
+      const event = await createEvent();
+
+      const result = await service.create(event.uuid, {
+        name: "No schema",
+        content: "<p>Hi</p>",
+        trigger: EmailTrigger.MANUAL,
+        schema: null,
+      });
+
+      expect(result.schema).toBeNull();
     });
 
     it("throws BadRequestException for ATTRIBUTE_CHANGED trigger without a triggerConfig", async () => {
@@ -251,6 +274,49 @@ describe("EmailTemplatesService (integration)", () => {
       expect(names).not.toContain("Manual one");
     });
 
+    it("returns the order of each template", async () => {
+      const event = await createEvent();
+      await createEmailTemplate(event.uuid, { name: "Second", order: 2 });
+      await createEmailTemplate(event.uuid, { name: "Unordered" });
+
+      const result = await service.findAll(event.uuid, new EmailListingDto());
+
+      const orders = Object.fromEntries(
+        result.data.map((t) => [t.name, t.order]),
+      );
+      expect(orders).toEqual({ Second: 2, Unordered: null });
+    });
+
+    it("sorts by order with unordered templates last", async () => {
+      const event = await createEvent();
+      await createEmailTemplate(event.uuid, { name: "Unordered" });
+      await createEmailTemplate(event.uuid, { name: "Third", order: 3 });
+      await createEmailTemplate(event.uuid, { name: "First", order: 1 });
+
+      const query = Object.assign(new EmailListingDto(), { sort: "order:asc" });
+      const result = await service.findAll(event.uuid, query);
+
+      expect(result.data.map((t) => t.name)).toEqual([
+        "First",
+        "Third",
+        "Unordered",
+      ]);
+    });
+
+    it("keeps unordered templates in creation order when sorting by order", async () => {
+      const event = await createEvent();
+      await createEmailTemplate(event.uuid, { name: "Unordered A" });
+      await createEmailTemplate(event.uuid, { name: "Unordered B" });
+
+      const query = Object.assign(new EmailListingDto(), { sort: "order:asc" });
+      const result = await service.findAll(event.uuid, query);
+
+      expect(result.data.map((t) => t.name)).toEqual([
+        "Unordered A",
+        "Unordered B",
+      ]);
+    });
+
     it("throws BadRequestException when the event does not exist", async () => {
       const fakeEventUuid = "00000000-0000-0000-0000-000000000002";
 
@@ -265,17 +331,18 @@ describe("EmailTemplatesService (integration)", () => {
   // ---------------------------------------------------------------------------
 
   describe("findOne", () => {
-    it("returns the template with an empty participants array", async () => {
+    it("returns the template without delivery statuses", async () => {
       const event = await createEvent();
       const template = await createEmailTemplate(event.uuid, {
         content: "<p>Body</p>",
       });
+      await createParticipantEmailStatus(template.uuid, EmailStatus.sent);
 
       const result = await service.findOne(event.uuid, template.uuid);
 
       expect(result.id).toBe(template.uuid);
       expect(result.content).toBe("<p>Body</p>");
-      expect(result.participants).toEqual([]);
+      expect(result).not.toHaveProperty("participants");
     });
 
     it("throws NotFoundException when the template belongs to a different event", async () => {
@@ -314,6 +381,8 @@ describe("EmailTemplatesService (integration)", () => {
 
       expect(result.name).toBe("Renamed");
       expect(result.content).toBe("<p>Updated</p>");
+      expect(result).toHaveProperty("triggerConfig");
+      expect(result).toHaveProperty("order");
 
       const stored = await prisma.emailTemplate.findUnique({
         where: { uuid: template.uuid },
@@ -335,6 +404,78 @@ describe("EmailTemplatesService (integration)", () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it("clears the schema when it is set to null", async () => {
+      const event = await createEvent();
+      const template = await prisma.emailTemplate.create({
+        data: {
+          name: "With schema",
+          content: "<p>Hi</p>",
+          trigger: EmailTrigger.MANUAL,
+          schema: { version: "1.0" },
+          eventUuid: event.uuid,
+        },
+      });
+
+      await service.update(event.uuid, template.uuid, { schema: null });
+
+      const stored = await prisma.emailTemplate.findUnique({
+        where: { uuid: template.uuid },
+      });
+      expect(stored?.schema).toBeNull();
+    });
+
+    it("keeps triggerConfig when it is omitted from the update", async () => {
+      const event = await createEvent();
+      const form = await createForm(event.uuid);
+      const template = await createEmailTemplate(event.uuid, {
+        trigger: EmailTrigger.FORM_FILLED,
+        triggerConfig: { formUuid: form.uuid },
+      });
+
+      await service.update(event.uuid, template.uuid, { name: "Renamed" });
+      await service.update(event.uuid, template.uuid, {
+        trigger: EmailTrigger.FORM_FILLED,
+      });
+
+      const stored = await prisma.emailTemplate.findUnique({
+        where: { uuid: template.uuid },
+      });
+      expect(stored?.triggerConfig).toEqual({ formUuid: form.uuid });
+    });
+
+    it("validates triggerConfig sent without a trigger against the stored trigger", async () => {
+      const event = await createEvent();
+      const form = await createForm(event.uuid);
+      const template = await createEmailTemplate(event.uuid, {
+        trigger: EmailTrigger.FORM_FILLED,
+        triggerConfig: { formUuid: form.uuid },
+      });
+
+      await expect(
+        service.update(event.uuid, template.uuid, {
+          triggerConfig: { formUuid: "00000000-0000-0000-0000-000000000006" },
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("clears triggerConfig when the trigger changes to one without config", async () => {
+      const event = await createEvent();
+      const form = await createForm(event.uuid);
+      const template = await createEmailTemplate(event.uuid, {
+        trigger: EmailTrigger.FORM_FILLED,
+        triggerConfig: { formUuid: form.uuid },
+      });
+
+      await service.update(event.uuid, template.uuid, {
+        trigger: EmailTrigger.MANUAL,
+      });
+
+      const stored = await prisma.emailTemplate.findUnique({
+        where: { uuid: template.uuid },
+      });
+      expect(stored?.triggerConfig).toEqual({});
+    });
+
     it("throws NotFoundException when the template does not exist in this event", async () => {
       const event = await createEvent();
       const otherEvent = await createEvent();
@@ -342,6 +483,58 @@ describe("EmailTemplatesService (integration)", () => {
 
       await expect(
         service.update(event.uuid, template.uuid, { name: "Nope" }),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // reorder
+  // ---------------------------------------------------------------------------
+
+  describe("reorder", () => {
+    it("sets each template's order to its position in the list", async () => {
+      const event = await createEvent();
+      const a = await createEmailTemplate(event.uuid, { name: "A", order: 5 });
+      const b = await createEmailTemplate(event.uuid, { name: "B" });
+      const c = await createEmailTemplate(event.uuid, { name: "C", order: 0 });
+
+      await service.reorder(event.uuid, [c.uuid, a.uuid, b.uuid]);
+
+      expect(await storedOrder(c.uuid)).toBe(0);
+      expect(await storedOrder(a.uuid)).toBe(1);
+      expect(await storedOrder(b.uuid)).toBe(2);
+    });
+
+    it("leaves templates that are not listed untouched", async () => {
+      const event = await createEvent();
+      const listed = await createEmailTemplate(event.uuid, { order: 7 });
+      const unlisted = await createEmailTemplate(event.uuid, { order: 9 });
+
+      await service.reorder(event.uuid, [listed.uuid]);
+
+      expect(await storedOrder(listed.uuid)).toBe(0);
+      expect(await storedOrder(unlisted.uuid)).toBe(9);
+    });
+
+    it("throws NotFoundException and changes nothing when a template belongs to another event", async () => {
+      const event = await createEvent();
+      const otherEvent = await createEvent();
+      const own = await createEmailTemplate(event.uuid, { order: 4 });
+      const foreign = await createEmailTemplate(otherEvent.uuid, { order: 6 });
+
+      await expect(
+        service.reorder(event.uuid, [own.uuid, foreign.uuid]),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(await storedOrder(own.uuid)).toBe(4);
+      expect(await storedOrder(foreign.uuid)).toBe(6);
+    });
+
+    it("throws NotFoundException for an unknown template", async () => {
+      const event = await createEvent();
+
+      await expect(
+        service.reorder(event.uuid, ["00000000-0000-4000-8000-000000000007"]),
       ).rejects.toThrow(NotFoundException);
     });
   });
