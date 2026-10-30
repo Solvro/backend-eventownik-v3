@@ -4,7 +4,7 @@ import { BlocksService } from "src/blocks/blocks.service";
 import { AttributeType } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, ConflictException } from "@nestjs/common";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
@@ -25,6 +25,10 @@ describe("AttributesService", () => {
     },
     block: {
       deleteMany: jest.fn(),
+      updateMany: jest.fn(),
+    },
+    ticket: {
+      findUnique: jest.fn(),
     },
     event: {
       findUnique: jest.fn(),
@@ -210,6 +214,81 @@ describe("AttributesService", () => {
           participantFields: ["550e8400-e29b-41d4-a716-446655440000", "email"],
         },
       },
+    });
+  });
+  describe("changing the type of a block attribute used by a ticket", () => {
+    const eventId = "event-uuid";
+    const attributeUuid = "attribute-uuid";
+
+    const blockAttribute = {
+      uuid: attributeUuid,
+      name: "Workshops",
+      order: 1,
+      showInList: true,
+      type: AttributeType.block,
+      eventUuid: eventId,
+      config: { maxSelections: 1 },
+    };
+
+    beforeEach(() => {
+      jest.resetAllMocks();
+      mockPrismaService.$transaction.mockImplementation(async (callback) => {
+        return await callback(mockPrismaService);
+      });
+      mockPrismaService.event.findUnique.mockResolvedValue({ uuid: eventId });
+      mockPrismaService.attribute.findFirst.mockResolvedValue(blockAttribute);
+    });
+
+    it("update throws ConflictException and changes nothing", async () => {
+      mockPrismaService.ticket.findUnique.mockResolvedValue({
+        uuid: "ticket-uuid",
+      });
+
+      await expect(
+        service.update(attributeUuid, eventId, { type: AttributeType.text }),
+      ).rejects.toThrow(ConflictException);
+
+      expect(mockPrismaService.attribute.update).not.toHaveBeenCalled();
+      expect(mockBlocksService.deleteRootBlocks).not.toHaveBeenCalled();
+    });
+
+    it("bulkUpdate throws ConflictException and changes nothing", async () => {
+      mockPrismaService.ticket.findUnique.mockResolvedValue({
+        uuid: "ticket-uuid",
+      });
+
+      await expect(
+        service.bulkUpdate(eventId, [
+          { uuid: attributeUuid, type: AttributeType.text },
+        ]),
+      ).rejects.toThrow(ConflictException);
+
+      expect(mockPrismaService.attribute.update).not.toHaveBeenCalled();
+    });
+
+    it("allows the type change when no ticket uses the attribute", async () => {
+      mockPrismaService.ticket.findUnique.mockResolvedValue(null);
+      mockPrismaService.attribute.update.mockResolvedValue({
+        ...blockAttribute,
+        type: AttributeType.text,
+      });
+
+      await service.update(attributeUuid, eventId, {
+        type: AttributeType.text,
+      });
+
+      expect(mockBlocksService.deleteRootBlocks).toHaveBeenCalledWith(
+        attributeUuid,
+        mockPrismaService,
+      );
+    });
+
+    it("does not look for a ticket when the type stays block", async () => {
+      mockPrismaService.attribute.update.mockResolvedValue(blockAttribute);
+
+      await service.update(attributeUuid, eventId, { name: "Renamed" });
+
+      expect(mockPrismaService.ticket.findUnique).not.toHaveBeenCalled();
     });
   });
 });

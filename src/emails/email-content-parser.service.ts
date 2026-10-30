@@ -20,6 +20,7 @@ export type EmailTemplateForParsing = Prisma.EmailTemplateGetPayload<{
 export interface ParticipantForParsing {
   uuid: string;
   email: string;
+  ticketToken?: string;
   createdAt: Date;
   updatedAt: Date;
   attributes: {
@@ -123,6 +124,14 @@ export class EmailContentParserService {
         }
         case "/participant_email": {
           return this.escapeHtml(participant.email);
+        }
+        case "/ticket_link": {
+          if (participant.ticketToken === undefined) {
+            return "";
+          }
+          const frontendUrl = this.config.getOrThrow<string>("FRONTEND_URL");
+          const ticketUrl = `${frontendUrl}/${emailTemplate.event.slug}/ticket/${participant.ticketToken}`;
+          return `<a href="${ticketUrl}">${ticketUrl}</a>`;
         }
         case "/participant_created_at": {
           return participant.createdAt.toISOString();
