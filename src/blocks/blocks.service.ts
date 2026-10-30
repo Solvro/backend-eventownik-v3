@@ -273,9 +273,12 @@ export class BlocksService {
     eventId: string,
     attributeId: string,
     blockId: string,
-    tx?: Prisma.TransactionClient,
+    tx: Prisma.TransactionClient,
   ) {
     const prisma = this.getClient(tx);
+
+    await prisma.$queryRaw`SELECT uuid FROM "Blocks" WHERE uuid = ${blockId} FOR UPDATE`;
+
     const block = await prisma.block.findFirst({
       where: {
         uuid: blockId,

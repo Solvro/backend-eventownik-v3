@@ -119,6 +119,7 @@ describe("BlocksService (integration)", () => {
         event.uuid,
         attribute.uuid,
         block.uuid,
+        prisma,
       );
 
       expect(result).toBe(true);
@@ -133,6 +134,7 @@ describe("BlocksService (integration)", () => {
         event.uuid,
         attribute.uuid,
         block.uuid,
+        prisma,
       );
 
       expect(result).toBe(true);
@@ -147,6 +149,7 @@ describe("BlocksService (integration)", () => {
         event.uuid,
         attribute.uuid,
         block.uuid,
+        prisma,
       );
 
       expect(result).toBe(false);
@@ -159,6 +162,7 @@ describe("BlocksService (integration)", () => {
         event.uuid,
         attribute.uuid,
         root.uuid,
+        prisma,
       );
 
       expect(result).toBe(false);
@@ -203,6 +207,67 @@ describe("BlocksService (integration)", () => {
       expect(tree.children.map((child) => child.uuid)).toEqual(
         expected.map((block) => block.uuid),
       );
+    });
+  });
+
+  describe("BlocksService - Concurrency / Race Condition", () => {
+    it("should allow only one sign-up when capacity is set to 1 and reject the concurrent request", async () => {
+      const { event, attribute, root } = await createBlockAttribute();
+      const block = await createBlock(attribute, root, 1);
+
+      const results = await Promise.allSettled([
+        prisma.$transaction(async (tx) => {
+          const canSign = await service.canSignInToBlock(
+            event.uuid,
+            attribute.uuid,
+            block.uuid,
+            tx,
+          );
+          if (!canSign) {
+            throw new Error("at full capacity");
+          }
+          return prisma.participant.create({
+            data: {
+              email: `user1@test.local`,
+              eventUuid: event.uuid,
+              attributes: {
+                create: { attributeUuid: attribute.uuid, value: [block.uuid] },
+              },
+            },
+          });
+        }),
+        prisma.$transaction(async (tx) => {
+          const canSign = await service.canSignInToBlock(
+            event.uuid,
+            attribute.uuid,
+            block.uuid,
+            tx,
+          );
+          if (!canSign) {
+            throw new Error("at full capacity");
+          }
+          return prisma.participant.create({
+            data: {
+              email: `user2@test.local`,
+              eventUuid: event.uuid,
+              attributes: {
+                create: { attributeUuid: attribute.uuid, value: [block.uuid] },
+              },
+            },
+          });
+        }),
+      ]);
+
+      const fulfilled = results.filter((r) => r.status === "fulfilled");
+      const rejected = results.filter((r) => {
+        if (r.status === "rejected") {
+          return (r.reason as Error).message.includes("at full capacity");
+        }
+        return false;
+      });
+
+      expect(fulfilled.length).toBe(1);
+      expect(rejected.length).toBe(1);
     });
   });
 });
