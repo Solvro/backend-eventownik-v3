@@ -13,6 +13,7 @@ import { JwtService } from "@nestjs/jwt";
 
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthEmailService } from "./auth-email.service";
+import { isLegacyScryptHash, verifyLegacyScrypt } from "./legacy-scrypt";
 
 @Injectable()
 export class AuthService {
@@ -55,10 +56,22 @@ export class AuthService {
 
   async validateUser(email: string, pass: string): Promise<Admin | null> {
     const user = await this.prisma.admin.findUnique({ where: { email } });
-    if (user !== null && (await bcrypt.compare(pass, user.password))) {
+    if (user === null) {
+      return null;
+    }
+
+    if (isLegacyScryptHash(user.password)) {
+      if (!(await verifyLegacyScrypt(user.password, pass))) {
+        return null;
+      }
+      await this.prisma.admin.update({
+        where: { uuid: user.uuid },
+        data: { password: await bcrypt.hash(pass, 12) },
+      });
       return user;
     }
-    return null;
+
+    return (await bcrypt.compare(pass, user.password)) ? user : null;
   }
 
   async login(user: Admin) {
