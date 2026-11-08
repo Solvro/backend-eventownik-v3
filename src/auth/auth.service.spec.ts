@@ -1,13 +1,19 @@
-import * as bcrypt from "bcrypt";
-import { createHash } from "node:crypto";
+import bcrypt from "bcrypt";
+import { createHash, randomBytes, scryptSync } from "node:crypto";
 import type { Admin } from "src/generated/prisma/client";
 
-import { ConflictException, UnauthorizedException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  UnauthorizedException,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
 import { PrismaService } from "../prisma/prisma.service";
+import { AuthEmailService } from "./auth-email.service";
 import { AuthService } from "./auth.service";
 
 describe("AuthService", () => {
@@ -29,12 +35,20 @@ describe("AuthService", () => {
     admin: {
       findUnique: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
     },
-    authAccessToken: {
+    refreshToken: {
       create: jest.fn(),
       findUnique: jest.fn(),
       delete: jest.fn(),
+      deleteMany: jest.fn(),
     },
+    passwordResetToken: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      deleteMany: jest.fn(),
+    },
+    $transaction: jest.fn(),
   };
 
   const mockJwtService = {
@@ -47,6 +61,14 @@ describe("AuthService", () => {
         AuthService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: JwtService, useValue: mockJwtService },
+        {
+          provide: ConfigService,
+          useValue: { getOrThrow: jest.fn().mockReturnValue(7) },
+        },
+        {
+          provide: AuthEmailService,
+          useValue: { enqueuePasswordResetEmail: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -131,6 +153,48 @@ describe("AuthService", () => {
       expect(result).toBeNull();
     });
 
+    it("should accept a legacy scrypt hash and rehash it to bcrypt", async () => {
+      const salt = randomBytes(16);
+      const key = scryptSync("password123", salt, 64, {
+        N: 16_384,
+        r: 8,
+        p: 1,
+      });
+      const legacyPassword = `$scrypt$n=16384,r=8,p=1$${salt.toString("base64")}$${key.toString("base64")}`;
+      const legacyAdmin = { ...mockAdmin, password: legacyPassword };
+      mockPrisma.admin.findUnique.mockResolvedValue(legacyAdmin);
+      jest.spyOn(bcrypt, "hash").mockImplementation(() => "new-bcrypt-hash");
+
+      const result = await service.validateUser(
+        "test@example.com",
+        "password123",
+      );
+
+      expect(result).toEqual(legacyAdmin);
+      expect(mockPrisma.admin.update).toHaveBeenCalledWith({
+        where: { uuid: legacyAdmin.uuid },
+        data: { password: "new-bcrypt-hash" },
+      });
+    });
+
+    it("should reject a wrong password against a legacy scrypt hash", async () => {
+      const salt = randomBytes(16);
+      const key = scryptSync("password123", salt, 64, {
+        N: 16_384,
+        r: 8,
+        p: 1,
+      });
+      mockPrisma.admin.findUnique.mockResolvedValue({
+        ...mockAdmin,
+        password: `$scrypt$n=16384,r=8,p=1$${salt.toString("base64")}$${key.toString("base64")}`,
+      });
+
+      const result = await service.validateUser("test@example.com", "nope");
+
+      expect(result).toBeNull();
+      expect(mockPrisma.admin.update).not.toHaveBeenCalled();
+    });
+
     it("should return null if user not found", async () => {
       mockPrisma.admin.findUnique.mockResolvedValue(null);
 
@@ -142,18 +206,17 @@ describe("AuthService", () => {
 
   describe("login", () => {
     it("should return access and refresh tokens (securely)", async () => {
-      mockPrisma.authAccessToken.create.mockResolvedValue({ id: 1 });
+      mockPrisma.refreshToken.create.mockResolvedValue({ id: 1 });
 
       const result = await service.login(mockAdmin);
 
       expect(mockJwtService.sign).toHaveBeenCalled();
 
-      expect(mockPrisma.authAccessToken.create).toHaveBeenCalledWith({
+      expect(mockPrisma.refreshToken.create).toHaveBeenCalledWith({
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data: expect.objectContaining({
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           token: expect.any(String),
-          type: "refresh_token",
         }),
       });
       expect(result).toHaveProperty("access_token");
@@ -162,7 +225,7 @@ describe("AuthService", () => {
 
       const storedToken =
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        mockPrisma.authAccessToken.create.mock.calls[0][0].data.token as string;
+        mockPrisma.refreshToken.create.mock.calls[0][0].data.token as string;
       const expectedHash = createHash("sha256")
         .update(result.refresh_token)
         .digest("hex");
@@ -175,13 +238,13 @@ describe("AuthService", () => {
       const plainToken = "valid-token";
       const hashedToken = createHash("sha256").update(plainToken).digest("hex");
       const storedToken = {
-        id: 1,
+        uuid: "3e19d992-2ea5-4ed3-9245-6691c41f4f06",
         token: hashedToken,
         expiresAt: new Date(Date.now() + 10_000),
         admin: mockAdmin,
       };
-      mockPrisma.authAccessToken.findUnique.mockResolvedValue(storedToken);
-      mockPrisma.authAccessToken.delete.mockResolvedValue(storedToken);
+      mockPrisma.refreshToken.findUnique.mockResolvedValue(storedToken);
+      mockPrisma.refreshToken.deleteMany.mockResolvedValue({ count: 1 });
       const loginSpy = jest.spyOn(service, "login").mockResolvedValue({
         access_token: "new",
         refresh_token: "new-refresh",
@@ -189,12 +252,12 @@ describe("AuthService", () => {
 
       const result = await service.refreshTokens(plainToken);
 
-      expect(mockPrisma.authAccessToken.findUnique).toHaveBeenCalledWith({
+      expect(mockPrisma.refreshToken.findUnique).toHaveBeenCalledWith({
         where: { token: hashedToken },
         include: { admin: true },
       });
-      expect(mockPrisma.authAccessToken.delete).toHaveBeenCalledWith({
-        where: { id: 1 },
+      expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
+        where: { uuid: "3e19d992-2ea5-4ed3-9245-6691c41f4f06" },
       });
       expect(loginSpy).toHaveBeenCalledWith(mockAdmin);
       expect(result).toEqual({
@@ -204,7 +267,7 @@ describe("AuthService", () => {
     });
 
     it("should throw UnauthorizedException if token not found", async () => {
-      mockPrisma.authAccessToken.findUnique.mockResolvedValue(null);
+      mockPrisma.refreshToken.findUnique.mockResolvedValue(null);
 
       await expect(service.refreshTokens("invalid")).rejects.toThrow(
         UnauthorizedException,
@@ -213,18 +276,101 @@ describe("AuthService", () => {
 
     it("should throw and delete if token expired", async () => {
       const storedToken = {
-        id: 1,
+        uuid: "3e19d992-2ea5-4ed3-9245-6691c41f4f06",
         token: "expired-token",
         expiresAt: new Date(Date.now() - 10_000),
       };
-      mockPrisma.authAccessToken.findUnique.mockResolvedValue(storedToken);
+      mockPrisma.refreshToken.findUnique.mockResolvedValue(storedToken);
 
       await expect(service.refreshTokens("expired-token")).rejects.toThrow(
         UnauthorizedException,
       );
-      expect(mockPrisma.authAccessToken.delete).toHaveBeenCalledWith({
-        where: { id: 1 },
+      expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
+        where: { uuid: "3e19d992-2ea5-4ed3-9245-6691c41f4f06" },
       });
+    });
+  });
+  describe("forgotPassword", () => {
+    it("Should create a token if admin exists", async () => {
+      mockPrisma.admin.findUnique.mockResolvedValue({
+        uuid: "admin-uuid-123",
+      });
+
+      await service.forgotPassword("abc@example.com");
+
+      expect(mockPrisma.passwordResetToken.create).toHaveBeenCalledWith({
+        data: {
+          adminUuid: "admin-uuid-123",
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          token: expect.any(String),
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          expiresAt: expect.any(Date),
+        },
+      });
+    });
+
+    it("Shouldn't create a token if admin does not exist", async () => {
+      mockPrisma.admin.findUnique.mockResolvedValue(null);
+
+      await service.forgotPassword("abc@example.com");
+
+      expect(mockPrisma.passwordResetToken.create).toHaveBeenCalledTimes(0);
+    });
+  });
+  describe("resetPassword", () => {
+    it("Should reset password", async () => {
+      mockPrisma.passwordResetToken.findUnique.mockResolvedValue({
+        uuid: "token-uuid",
+        adminUuid: "admin-uuid",
+        expiresAt: new Date(Date.now() + 100_000_000),
+      });
+
+      jest
+        .spyOn(bcrypt, "hash")
+        .mockImplementation(() => "hashed-password-123");
+
+      mockPrisma.$transaction.mockImplementation((callback) =>
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+        callback(mockPrisma),
+      );
+      mockPrisma.passwordResetToken.deleteMany.mockResolvedValue({ count: 1 });
+
+      await service.resetPassword("token-123", "Password123!?");
+
+      expect(bcrypt.hash).toHaveBeenCalledWith("Password123!?", 12);
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+      );
+      expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
+        where: { adminUuid: "admin-uuid" },
+      });
+      expect(mockPrisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({
+        where: { uuid: "token-uuid" },
+      });
+      expect(mockPrisma.admin.update).toHaveBeenCalledWith({
+        where: { uuid: "admin-uuid" },
+        data: { password: "hashed-password-123" },
+      });
+    });
+    it("Should throw BadRequestException if token doesn't exist", async () => {
+      mockPrisma.passwordResetToken.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.resetPassword("bad-token-123", "newPassword22"),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(0);
+    });
+    it("Should throw BadRequestException if token expired", async () => {
+      mockPrisma.passwordResetToken.findUnique.mockResolvedValue({
+        adminUuid: "admin-uuid",
+        expiresAt: new Date(Date.now() - 100_000_000),
+      });
+
+      await expect(
+        service.resetPassword("token-123", "new-pass-123"),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(0);
     });
   });
 });

@@ -44,6 +44,7 @@ jobs:
 
       - name: Generate Prisma Client
         run: npx prisma generate
+        if: always()
         env:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/eventownik_test_db"
 
@@ -57,6 +58,7 @@ jobs:
 
       - name: Apply Prisma migrations
         run: npx prisma migrate deploy
+        if: always()
         env:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/eventownik_test_db"
 
@@ -66,7 +68,15 @@ jobs:
         env:
           NODE_ENV: test
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/eventownik_test_db"
+          S3_ENDPOINT: http://localhost:9000
+          S3_ACCESS_KEY: somekey
+          S3_SECRET_KEY: somesecret
+          S3_BUCKET_EVENTS: events
+          S3_BUCKET_FORMS: forms
+          S3_PUBLIC_URL: http://localhost:9000
 
       - name: Build
         run: npm run build
         if: always()
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/eventownik_test_db"

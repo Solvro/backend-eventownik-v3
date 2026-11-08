@@ -1,19 +1,16 @@
+import { FormWithDefinitions } from "src/forms/entities/form-with-definitions.entity";
+
 import { ApiProperty } from "@nestjs/swagger";
 
 import { Event as PrismaEvent } from "../../generated/prisma/client";
+import { EventLink } from "./event-link";
 
-export class Event implements PrismaEvent {
+export class Event implements Omit<PrismaEvent, "photoKey"> {
   @ApiProperty()
   name: string;
 
   @ApiProperty()
   uuid: string;
-
-  @ApiProperty({ isArray: true, type: String })
-  links: string[];
-
-  @ApiProperty({ isArray: true, type: String })
-  policyLinks: string[];
 
   @ApiProperty()
   startDate: Date;
@@ -26,6 +23,18 @@ export class Event implements PrismaEvent {
 
   @ApiProperty()
   updatedAt: Date;
+
+  @ApiProperty()
+  slug: string;
+
+  @ApiProperty()
+  isPublic: boolean;
+
+  @ApiProperty()
+  isVerified: boolean;
+
+  @ApiProperty()
+  isFeatured: boolean;
 
   @ApiProperty({ nullable: true, required: false })
   participantsLimit: number | null;
@@ -42,7 +51,11 @@ export class Event implements PrismaEvent {
   @ApiProperty({ nullable: true, required: false })
   organizerName: string | null;
 
-  @ApiProperty({ nullable: true, required: false })
+  @ApiProperty({
+    nullable: true,
+    required: false,
+    description: "Public URL of the event photo",
+  })
   photoUrl: string | null;
 
   @ApiProperty({ nullable: true, required: false })
@@ -52,11 +65,27 @@ export class Event implements PrismaEvent {
   contactEmail: string | null;
 
   @ApiProperty({ nullable: true, required: false })
-  slug: string | null;
-
-  @ApiProperty({ nullable: true, required: false })
   organizerUuid: string | null;
 
   @ApiProperty({ nullable: true, required: false })
   registerFormUuid: string | null;
+
+  @ApiProperty({ nullable: true, required: false })
+  sentToBbiAt: Date | null;
+
+  @ApiProperty({
+    type: () => [EventLink],
+    required: false,
+    description: "Present when the endpoint includes the event links",
+  })
+  links?: EventLink[];
+
+  @ApiProperty({
+    type: () => FormWithDefinitions,
+    nullable: true,
+    required: false,
+    description:
+      "Registration form with its definitions and attributes. Present on the public event endpoint",
+  })
+  registerForm?: FormWithDefinitions | null;
 }

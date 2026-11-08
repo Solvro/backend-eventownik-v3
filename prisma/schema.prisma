@@ -18,6 +18,15 @@ enum PermissionType {
   MANAGE_FORM
   MANAGE_PARTICIPANT
   MANAGE_EMAIL
+  MANAGE_SETTINGS
+  MANAGE_TICKET
+  SCAN_TICKET
+}
+
+enum LogTrigger {
+  ADMIN
+  PARTICIPANT
+  SYSTEM
 }
 
 model Admin {
@@ -31,71 +40,49 @@ model Admin {
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
-  events          Event[]           @relation("Organizer")
-  permissions     EventPermission[]
-  adminPermissions AdminPermission[]
-  authAccessTokens AuthAccessToken[]
+  events             Event[]              @relation("Organizer")
+  permissions        EventPermission[]
+  refreshToken       RefreshToken[]
+  passwordResetToken PasswordResetToken[]
+  ticketCheckIns     TicketCheckIn[]
 
   @@map("Admins")
 }
 
 model EventPermission {
-  uuid           String         @id @default(uuid()) @db.Uuid
-  eventUuid      String         @db.Uuid
-  adminUuid      String         @db.Uuid
-  
-  permission     PermissionType 
+  uuid      String @id @default(uuid()) @db.Uuid
+  eventUuid String @db.Uuid
+  adminUuid String @db.Uuid
 
-  admin          Admin          @relation(fields: [adminUuid], references: [uuid])
-  event          Event          @relation(fields: [eventUuid], references: [uuid])
+  permission PermissionType
+
+  admin Admin @relation(fields: [adminUuid], references: [uuid], onDelete: Cascade)
+  event Event @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
 
   @@unique([eventUuid, adminUuid, permission])
   @@map("EventPermissions")
 }
 
-model AdminPermission {
-  uuid           String   @id @default(uuid()) @db.Uuid
-  eventUuid      String   @db.Uuid
-  permissionUuid String   @db.Uuid
-  adminUuid      String   @db.Uuid
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  admin      Admin      @relation(fields: [adminUuid], references: [uuid], onDelete: Cascade)
-  event      Event      @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
-  permission Permission @relation(fields: [permissionUuid], references: [uuid], onDelete: Cascade)
-
-  @@map("AdminsPermissions")
-}
-
-model Permission {
-  uuid    String @id @default(uuid()) @db.Uuid
-  action  String
-  subject String
-
-  adminPermissions AdminPermission[]
-
-  @@map("Permissions")
-}
-
 model Event {
   uuid              String    @id @default(uuid()) @db.Uuid
   name              String
-  links             String[]  @default([])
-  policyLinks       String[]  @default([])
   startDate         DateTime
   endDate           DateTime
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+  slug              String    @unique
+  isPublic          Boolean   @default(false)
+  isVerified        Boolean   @default(false)
+  isFeatured        Boolean   @default(false)
   participantsLimit Int?
   verifiedAt        DateTime?
+  sentToBbiAt       DateTime?
   description       String?
   primaryColor      String?
   organizerName     String?
-  photoUrl          String?
+  photoKey          String?
   location          String?
   contactEmail      String?
-  slug              String?   @unique
   organizerUuid     String?   @db.Uuid
   registerFormUuid  String?   @db.Uuid
 
@@ -105,10 +92,30 @@ model Event {
   emails           EmailTemplate[]
   forms            Form[]            @relation("EventForms")
   adminPermissions EventPermission[]
-  oldAdminPermissions AdminPermission[]
   participants     Participant[]
+  links            EventLink[]
+  tickets          Ticket[]
 
   @@map("Events")
+}
+
+enum EventLinkType {
+  general
+  policy
+}
+
+model EventLink {
+  uuid      String        @id @default(uuid()) @db.Uuid
+  eventUuid String        @db.Uuid
+  url       String
+  type      EventLinkType
+  label     String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  event Event @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("EventsLinks")
 }
 
 enum AttributeType {
@@ -116,6 +123,7 @@ enum AttributeType {
   textArea
   number
   file
+  drawing
   select
   block
   date
@@ -132,17 +140,21 @@ model Attribute {
   uuid       String        @id @default(uuid()) @db.Uuid
   eventUuid  String        @db.Uuid
   type       AttributeType
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
-  showInList Boolean       @default(true)
+  name       String
   order      Int
-  options    String[]      @default([])
-  name       String?
+  showInList Boolean       @default(true)
+  config     Json?         @default("{}")
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  sentToBbiAt DateTime?
 
   event                 Event                  @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
   blocks                Block[]
   formDefinitions       FormDefinition[]
   participantAttributes ParticipantAttribute[]
+  ticket                Ticket?
+  ticketAttributes      TicketAttribute[]
 
   @@map("Attributes")
 }
@@ -153,14 +165,16 @@ model Block {
   updatedAt     DateTime @updatedAt
   capacity      Int?
   order         Int?
-  name          String?
+  name          String
   description   String?
   parentUuid    String?  @db.Uuid
   attributeUuid String?  @db.Uuid
+  isRootBlock   Boolean  @default(false)
 
-  parent    Block?     @relation("BlockToBlock", fields: [parentUuid], references: [uuid], onDelete: Cascade)
-  children  Block[]    @relation("BlockToBlock")
-  attribute Attribute? @relation(fields: [attributeUuid], references: [uuid], onDelete: Cascade)
+  parent         Block?          @relation("BlockToBlock", fields: [parentUuid], references: [uuid], onDelete: Cascade)
+  children       Block[]         @relation("BlockToBlock")
+  attribute      Attribute?      @relation(fields: [attributeUuid], references: [uuid], onDelete: Cascade)
+  ticketCheckIns TicketCheckIn[]
 
   @@map("Blocks")
 }
@@ -177,40 +191,65 @@ model EmailTemplate {
   uuid          String       @id @default(uuid()) @db.Uuid
   name          String
   content       String
+  schema        Json?
   trigger       EmailTrigger
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
-  triggerValue  String?
-  triggerValue2 String?
-  eventUuid     String?      @db.Uuid
-  formUuid      String?      @db.Uuid
+  triggerConfig Json?
+  order         Int?
+  eventUuid     String       @db.Uuid
 
-  event             Event?             @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
-  form              Form?              @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
+  event             Event                    @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
   participantEmails ParticipantEmailStatus[]
   participantForms  ParticipantFormLog[]
 
   @@map("EmailTemplates")
 }
 
-model Form {
-  uuid        String    @id @default(uuid()) @db.Uuid
-  name        String
-  isEditable  Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  openDate    DateTime?
-  closeDate   DateTime?
-  description String?
-  eventUuid   String?   @db.Uuid
+enum OpenCondition {
+  ON_DATE
+  MANUAL
+}
 
-  event            Event?            @relation("EventForms", fields: [eventUuid], references: [uuid], onDelete: Cascade)
+model Form {
+  uuid          String        @id @default(uuid()) @db.Uuid
+  name          String
+  isEditable    Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  openDate      DateTime?
+  closeDate     DateTime?
+  description   String?
+  eventUuid     String?       @db.Uuid
+  isOpen        Boolean       @default(false)
+  openCondition OpenCondition @default(MANUAL)
+  order         Int?
+
+  event            Event?               @relation("EventForms", fields: [eventUuid], references: [uuid], onDelete: Cascade)
   formDefinitions  FormDefinition[]
-  emails           EmailTemplate[]
   participantForms ParticipantFormLog[]
-  registerEvent    Event[]           @relation("RegisterForm")
+  registerEvent    Event[]              @relation("RegisterForm")
+
+  uploadedFiles UploadedFile[]
 
   @@map("Forms")
+}
+
+model UploadedFile {
+  uuid         String    @id @default(uuid()) @db.Uuid
+  fileKey      String
+  originalName String
+  mimeType     String
+  size         Int
+  formUuid     String    @db.Uuid
+  sourceIp     String
+  createdAt    DateTime  @default(now())
+  claimedAt    DateTime?
+
+  form Form @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
+
+  @@index([claimedAt, createdAt])
+  @@map("UploadedFiles")
 }
 
 model FormDefinition {
@@ -229,33 +268,37 @@ model FormDefinition {
 }
 
 model Participant {
-  uuid      String   @id @default(uuid()) @db.Uuid
-  email     String
-  eventUuid String   @db.Uuid
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  uuid        String   @id @default(uuid()) @db.Uuid
+  email       String
+  eventUuid   String   @db.Uuid
+  ticketToken String   @unique @default(dbgenerated("replace((gen_random_uuid())::text || (gen_random_uuid())::text, '-', '')"))
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  event         Event                     @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
-  attributes    ParticipantAttribute[]
-  emails        ParticipantEmailStatus[]
-  forms         ParticipantFormLog[]
-  attributeLogs ParticipantAttributeLog[]
+  event               Event                     @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+  attributes          ParticipantAttribute[]
+  emails              ParticipantEmailStatus[]
+  attributeLogs       ParticipantAttributeLog[]
+  participantFormLogs ParticipantFormLog[]
+  ticketCheckIns      TicketCheckIn[]
 
   @@unique([email, eventUuid])
   @@map("Participants")
 }
 
 model ParticipantAttribute {
-  uuid            String   @id @default(uuid()) @db.Uuid
-  participantUuid String   @db.Uuid
-  attributeUuid   String   @db.Uuid
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  value           String?
+  uuid            String @id @default(uuid()) @db.Uuid
+  participantUuid String @db.Uuid
+  attributeUuid   String @db.Uuid
+  value           Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
   attribute   Attribute   @relation(fields: [attributeUuid], references: [uuid], onDelete: Cascade)
 
+  @@unique([participantUuid, attributeUuid])
   @@map("ParticipantsAttributes")
 }
 
@@ -275,8 +318,8 @@ model ParticipantEmailStatus {
   participantUuid String?     @db.Uuid
   emailUuid       String?     @db.Uuid
 
-  participant Participant? @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
-  email       EmailTemplate?       @relation(fields: [emailUuid], references: [uuid], onDelete: Cascade)
+  participant Participant?   @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
+  email       EmailTemplate? @relation(fields: [emailUuid], references: [uuid], onDelete: Cascade)
 
   @@map("ParticipantsEmailStatuses")
 }
@@ -291,41 +334,114 @@ model ParticipantFormLog {
   lastSubmittedAt DateTime?
   emailUuid       String?   @db.Uuid
 
-  participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
-  form        Form        @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
-  email       EmailTemplate?      @relation(fields: [emailUuid], references: [uuid], onDelete: SetNull)
+  participant Participant    @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
+  form        Form           @relation(fields: [formUuid], references: [uuid], onDelete: Cascade)
+  email       EmailTemplate? @relation(fields: [emailUuid], references: [uuid], onDelete: SetNull)
 
+  @@unique([participantUuid, formUuid])
   @@map("ParticipantsFormLogs")
 }
 
 model ParticipantAttributeLog {
-  uuid            String   @id @default(uuid()) @db.Uuid
-  participantUuid String   @db.Uuid
-  triggeredBy     String
-  createdAt       DateTime @default(now())
-  triggeredUuid   String?  @db.Uuid
-  attributeUuid   String?  @db.Uuid
-  before          String?
-  after           String?
+  uuid            String     @id @default(uuid()) @db.Uuid
+  participantUuid String     @db.Uuid
+  triggeredBy     LogTrigger
+  createdAt       DateTime   @default(now())
+  triggeredUuid   String?    @db.Uuid
+  attributeUuid   String?    @db.Uuid
+  before          Json?
+  after           Json?
 
   participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
 
   @@map("ParticipantsAttributesLogs")
 }
 
-model AuthAccessToken {
-  id          Int      @id @default(autoincrement())
-  tokenableId String   @map("tokenable_id") @db.Uuid
-  type        String
-  name        String?
-  token       String   @unique
-  abilities   String
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @map("updated_at")
-  lastUsedAt  DateTime? @map("last_used_at")
-  expiresAt   DateTime @map("expires_at")
+enum TicketMode {
+  EVENT
+  BLOCK
+}
 
-  admin Admin @relation(fields: [tokenableId], references: [uuid], onDelete: Cascade)
+model Ticket {
+  uuid          String     @id @default(uuid()) @db.Uuid
+  eventUuid     String     @db.Uuid
+  attributeUuid String?    @unique @db.Uuid
+  mode          TicketMode
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
-  @@map("AuthAccessTokens")
+  event      Event             @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+  attribute  Attribute?        @relation(fields: [attributeUuid], references: [uuid], onDelete: Cascade)
+  attributes TicketAttribute[]
+  checkIns   TicketCheckIn[]
+
+  @@index([eventUuid])
+  @@map("Tickets")
+}
+
+model TicketAttribute {
+  uuid          String @id @default(uuid()) @db.Uuid
+  ticketUuid    String @db.Uuid
+  attributeUuid String @db.Uuid
+
+  ticket    Ticket    @relation(fields: [ticketUuid], references: [uuid], onDelete: Cascade)
+  attribute Attribute @relation(fields: [attributeUuid], references: [uuid], onDelete: Cascade)
+
+  @@unique([ticketUuid, attributeUuid])
+  @@map("TicketAttributes")
+}
+
+model TicketCheckIn {
+  uuid                 String   @id @default(uuid()) @db.Uuid
+  ticketUuid           String   @db.Uuid
+  participantUuid      String   @db.Uuid
+  blockUuid            String?  @db.Uuid
+  confirmedAt          DateTime @default(now())
+  confirmedByAdminUuid String?  @db.Uuid
+
+  ticket      Ticket      @relation(fields: [ticketUuid], references: [uuid], onDelete: Cascade)
+  participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
+  block       Block?      @relation(fields: [blockUuid], references: [uuid], onDelete: Cascade)
+  confirmedBy Admin?      @relation(fields: [confirmedByAdminUuid], references: [uuid], onDelete: SetNull)
+
+  @@index([participantUuid])
+  @@map("TicketCheckIns")
+}
+
+model RefreshToken {
+  uuid      String   @id @default(uuid()) @db.Uuid
+  adminUuid String   @db.Uuid
+  token     String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  expiresAt DateTime @map("expires_at")
+
+  admin Admin @relation(fields: [adminUuid], references: [uuid], onDelete: Cascade)
+
+  @@index(fields: [adminUuid])
+  @@map("RefreshTokens")
+}
+
+model PasswordResetToken {
+  uuid      String   @id @default(uuid()) @db.Uuid
+  adminUuid String   @db.Uuid
+  token     String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  expiresAt DateTime @map("expires_at")
+
+  admin Admin @relation(fields: [adminUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("PasswordResetTokens")
+}
+
+model AuditLog {
+  uuid        String   @id @default(uuid()) @db.Uuid
+  action      String
+  entityType  String
+  entityUuid  String?  @db.Uuid
+  triggeredBy String?
+  before      Json?
+  after       Json?
+  createdAt   DateTime @default(now())
+
+  @@map("AuditLogs")
 }

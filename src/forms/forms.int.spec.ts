@@ -1,11 +1,24 @@
+import { BlocksService } from "src/blocks/blocks.service";
+import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
+import { StorageService } from "src/storage/storage.service";
 
+import { ConfigService } from "@nestjs/config";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
 import { FormListingDto } from "./dto/form-listing.dto";
 import { FormsController } from "./forms.controller";
 import { FormsService } from "./forms.service";
+
+const mockStorageService: Pick<StorageService, "upload" | "delete"> = {
+  upload: jest.fn(),
+  delete: jest.fn(),
+};
+const mockConfigService: Pick<ConfigService, "getOrThrow"> = {
+  getOrThrow: jest.fn().mockReturnValue("test-bucket") as never,
+};
 
 describe("Forms Integration", () => {
   let formsController: FormsController;
@@ -45,6 +58,11 @@ describe("Forms Integration", () => {
           provide: PrismaService,
           useValue: mockPrismaService,
         },
+        ParticipantsService,
+        BlocksService,
+        { provide: StorageService, useValue: mockStorageService },
+        { provide: ConfigService, useValue: mockConfigService },
+        EventEmitter2,
       ],
     }).compile();
     formsController = module.get<FormsController>(FormsController);
@@ -121,12 +139,12 @@ describe("Forms Integration", () => {
     ).rejects.toThrow();
   });
 
-  it("should not create a form for second first form", async () => {
+  it("should make a new first form replace the event's current one", async () => {
     const dto = {
       name: "Integration Test Form",
       isEditable: true,
       openDate: new Date(),
-      closeDate: new Date(),
+      closeDate: new Date(Date.now() + 1000),
       description: "An integration test form",
       isFirstForm: true,
       attributes: [
@@ -141,9 +159,16 @@ describe("Forms Integration", () => {
       uuid: "event-uuid-123",
       registerFormUuid: "some-existing-form-uuid",
     });
-    await expect(
-      formsController.create("event-uuid-123", dto),
-    ).rejects.toThrow();
+    mockPrismaService.form.create.mockResolvedValue({ uuid: "new-form-uuid" });
+    mockPrismaService.attribute.count.mockResolvedValue(1);
+    mockPrismaService.formDefinition.createMany.mockResolvedValue({});
+
+    await formsController.create("event-uuid-123", dto);
+
+    expect(mockPrismaService.event.update).toHaveBeenCalledWith({
+      where: { uuid: "event-uuid-123" },
+      data: { registerFormUuid: "new-form-uuid" },
+    });
   });
 
   it("should get all forms for an event", async () => {
@@ -230,6 +255,10 @@ describe("Forms Integration", () => {
       description: dto.description,
     });
     mockPrismaService.attribute.count.mockResolvedValue(2);
+    mockPrismaService.form.findFirst.mockResolvedValue({
+      uuid: "form-uuid-1",
+      name: "Updated Form Name",
+    });
     mockPrismaService.formDefinition.deleteMany.mockResolvedValue({ count: 2 });
     mockPrismaService.formDefinition.createMany.mockResolvedValue({});
     const result = await formsController.update(
@@ -283,6 +312,112 @@ describe("Forms Integration", () => {
     ).rejects.toThrow();
     expect(mockPrismaService.form.deleteMany).toHaveBeenCalledWith({
       where: { uuid: "non-existent-form-uuid", eventUuid: "event-uuid-123" },
+    });
+  });
+
+  describe("duplicate", () => {
+    const eventUuid = "event-uuid-123";
+    const formUuid = "form-uuid-1";
+    const sourceForm = {
+      uuid: formUuid,
+      name: "Registration",
+      isEditable: true,
+      openDate: null,
+      closeDate: null,
+      description: "Register for event",
+      eventUuid,
+      isOpen: false,
+      openCondition: "MANUAL",
+      formDefinitions: [
+        {
+          uuid: "definition-1",
+          attributeUuid: "attr-uuid-1",
+          isRequired: true,
+          order: 1,
+        },
+      ],
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockPrismaService.$transaction.mockImplementation((callback) =>
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+        callback(mockPrismaService),
+      );
+    });
+
+    it("should duplicate a form and copy its definitions, defaulting the name", async () => {
+      mockPrismaService.form.findFirst.mockResolvedValue(sourceForm);
+      mockPrismaService.form.create.mockResolvedValue({
+        uuid: "new-form-uuid",
+        name: "Registration - copy",
+        eventUuid,
+      });
+      mockPrismaService.formDefinition.createMany.mockResolvedValue({
+        count: 1,
+      });
+      mockPrismaService.form.findUnique.mockResolvedValue({
+        uuid: "new-form-uuid",
+        name: "Registration - copy",
+        formDefinitions: [],
+      });
+
+      const result = await formsController.duplicate(eventUuid, formUuid, {});
+
+      expect(mockPrismaService.form.findFirst).toHaveBeenCalledWith({
+        where: { uuid: formUuid, eventUuid },
+        include: { formDefinitions: true },
+      });
+      expect(mockPrismaService.form.create).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        data: expect.objectContaining({
+          name: "Registration - copy",
+          eventUuid,
+        }),
+      });
+      expect(mockPrismaService.formDefinition.createMany).toHaveBeenCalledWith({
+        data: [
+          {
+            formUuid: "new-form-uuid",
+            attributeUuid: "attr-uuid-1",
+            isRequired: true,
+            order: 1,
+          },
+        ],
+      });
+      expect(result).toHaveProperty("uuid", "new-form-uuid");
+    });
+
+    it("should use the provided name when duplicating", async () => {
+      mockPrismaService.form.findFirst.mockResolvedValue(sourceForm);
+      mockPrismaService.form.create.mockResolvedValue({
+        uuid: "new-form-uuid",
+        name: "Custom name",
+      });
+      mockPrismaService.formDefinition.createMany.mockResolvedValue({
+        count: 1,
+      });
+      mockPrismaService.form.findUnique.mockResolvedValue({
+        uuid: "new-form-uuid",
+      });
+
+      await formsController.duplicate(eventUuid, formUuid, {
+        name: "Custom name",
+      });
+
+      expect(mockPrismaService.form.create).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        data: expect.objectContaining({ name: "Custom name" }),
+      });
+    });
+
+    it("should throw NotFoundException when the source form is not in the event (IDOR)", async () => {
+      mockPrismaService.form.findFirst.mockResolvedValue(null);
+
+      await expect(
+        formsController.duplicate(eventUuid, "foreign-form-uuid", {}),
+      ).rejects.toThrow();
+      expect(mockPrismaService.form.create).not.toHaveBeenCalled();
     });
   });
 });

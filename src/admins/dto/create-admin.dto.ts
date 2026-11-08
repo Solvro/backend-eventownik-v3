@@ -1,0 +1,65 @@
+import {
+  IsBoolean,
+  IsEmail,
+  IsEnum,
+  IsNotEmpty,
+  IsString,
+  MaxLength,
+  MinLength,
+} from "class-validator";
+import { OrganizerType } from "src/generated/prisma/enums";
+
+import { ApiProperty } from "@nestjs/swagger";
+
+export class CreateAdminDto {
+  @ApiProperty({
+    description: "First name of the admin",
+    example: "John",
+    type: String,
+  })
+  @IsString()
+  firstName!: string;
+
+  @ApiProperty({
+    description: "Last name of the admin",
+    example: "Doe",
+    type: String,
+  })
+  @IsString()
+  lastName!: string;
+
+  @ApiProperty({
+    description: "Email of the admin",
+    example: "john.doe@example.com",
+    type: String,
+  })
+  @IsEmail()
+  email!: string;
+
+  @ApiProperty({
+    description: "Password of the admin",
+    example: "strongpassword123",
+    type: String,
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(8)
+  @MaxLength(72)
+  password!: string;
+
+  @ApiProperty({
+    description: "Type of the admin",
+    example: "organizer",
+    enum: OrganizerType,
+  })
+  @IsEnum(OrganizerType)
+  type!: OrganizerType;
+
+  @ApiProperty({
+    description: "Whether the admin is active",
+    example: true,
+    type: Boolean,
+  })
+  @IsBoolean()
+  active!: boolean;
+}

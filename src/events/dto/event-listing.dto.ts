@@ -1,4 +1,5 @@
-import { IsOptional, IsString } from "class-validator";
+import { Type } from "class-transformer";
+import { IsDate, IsOptional, IsString } from "class-validator";
 import { PageOptionsDto } from "src/common/dto/page-options.dto";
 
 import { ApiPropertyOptional } from "@nestjs/swagger";
@@ -14,5 +15,19 @@ export class EventListingDto extends PageOptionsDto {
   @IsString()
   readonly location?: string;
 
-  // TODO: add moer filtering options
+  @Type(() => Date)
+  @IsDate()
+  @ApiPropertyOptional({
+    description: "Events that are happening before this date",
+  })
+  @IsOptional()
+  readonly before?: Date;
+
+  @Type(() => Date)
+  @IsDate()
+  @ApiPropertyOptional({
+    description: "Events that are happening after this date",
+  })
+  @IsOptional()
+  readonly after?: Date;
 }
