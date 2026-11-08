@@ -195,7 +195,7 @@ export async function buildPlan(
   for (const event of v2.events) {
     const eventTarget = registry.require("Event", String(event.id));
     const links = [
-      ...(event.social_media_links ?? []).map((url) => ({
+      ...[...new Set(event.social_media_links)].map((url) => ({
         key: `${String(event.id)}:social:${url}`,
         url,
         type: EventLinkType.general,

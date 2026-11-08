@@ -41,3 +41,18 @@ describe("collectV2Values", () => {
     ).toEqual(["2", "3", "4"]);
   });
 });
+
+describe("collectV2Values legacy formats", () => {
+  it("parses brace-delimited multiselect values", () => {
+    expect(
+      collectV2Values(AttributeType.multiSelect, [
+        '{"15:00","Później niż 15:00"}',
+      ]),
+    ).toEqual(["15:00", "Później niż 15:00"]);
+  });
+
+  it("maps affirmative checkbox labels to true", () => {
+    expect(collectV2Values(AttributeType.checkbox, ["Tak/Yes"])).toBe("true");
+    expect(collectV2Values(AttributeType.checkbox, ["Tak"])).toBe("true");
+  });
+});

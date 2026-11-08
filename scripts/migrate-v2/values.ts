@@ -4,8 +4,20 @@ function unique<T>(items: T[]): T[] {
   return [...new Set(items)];
 }
 
+const AFFIRMATIVE = new Set(["tak", "tak/yes", "yes"]);
+
+function parseBraceList(trimmed: string): string[] {
+  return trimmed
+    .slice(1, -1)
+    .split(",")
+    .map((item) => item.trim().replace(/^"(.*)"$/, "$1"));
+}
+
 function parseListValue(raw: string): string[] {
   const trimmed = raw.trim();
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    return parseBraceList(trimmed);
+  }
   if (trimmed.startsWith("[")) {
     try {
       const parsed: unknown = JSON.parse(trimmed);
@@ -41,7 +53,13 @@ export function collectV2Values(
     return items.length === 0 ? null : items;
   }
 
-  const distinct = unique(present);
+  const distinct = unique(
+    type === AttributeType.checkbox
+      ? present.map((value) =>
+          AFFIRMATIVE.has(value.trim().toLowerCase()) ? "true" : value,
+        )
+      : present,
+  );
   if (distinct.length > 1) {
     throw new Error("multiple values stored for a single-valued attribute");
   }
