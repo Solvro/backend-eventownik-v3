@@ -32,6 +32,10 @@ docker run --rm --env-file migrate.env \
 
 Add `--apply` once the dry run report looks right. The container only needs network access to both databases and S3.
 
+### As a Coolify app
+
+Deploy the main `Dockerfile` with build target `migrate`. The container idles, so open its terminal and run `npm run migrate:v2 -- --v2-storage-dir /v2-storage [--apply]`. Set `V2_DATABASE_URL` and bind mount the v2 `public/` and `uploads/` host directories under `/v2-storage`.
+
 ## How reruns work
 
 Progress is kept in the `v2_migration.ledger` table inside the v3 database. The script creates it on the first `--apply`. It is not part of the Prisma schema, so removing it after cutover is `DROP SCHEMA v2_migration CASCADE`.

@@ -9,6 +9,9 @@ RUN npm ci --include=dev
 COPY . .
 RUN DATABASE_URL=postgresql://build:build@localhost:5432/build npm run build
 
+FROM build AS migrate
+CMD ["sleep", "infinity"]
+
 FROM base AS prod-deps
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts
