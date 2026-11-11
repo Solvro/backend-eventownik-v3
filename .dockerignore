@@ -1,0 +1,16 @@
+.git
+.github
+.husky
+.env*
+!.env.example
+node_modules
+dist
+coverage
+tmp
+docs
+test
+*.md
+docker-compose.yml
+Dockerfile
+.dockerignore
+garage
