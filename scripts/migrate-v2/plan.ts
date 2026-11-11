@@ -9,6 +9,8 @@ import {
 } from "src/generated/prisma/client";
 import type { PrismaService } from "src/prisma/prisma.service";
 
+import { LEGACY_TAG_CUTOFF, rewriteContent, rewriteSchema } from "./email-tags";
+import type { TagContext, TagReport } from "./email-tags";
 import { IdRegistry } from "./id-registry";
 import {
   StructuralError,
@@ -445,6 +447,43 @@ export async function buildPlan(
     });
   }
 
+  const slugMapsByEvent = (
+    items: { event_id: number | null; slug: string | null; uuid: string }[],
+  ) => {
+    const maps = new Map<number, Map<string, string>>();
+    for (const { event_id: eventId, slug, uuid } of items) {
+      if (eventId === null || slug === null || slug === "") {
+        continue;
+      }
+      const map = maps.get(eventId) ?? new Map<string, string>();
+      map.set(slug, uuid);
+      maps.set(eventId, map);
+    }
+    return maps;
+  };
+  const attributeUuidsByEvent = slugMapsByEvent(
+    v2.attributes.flatMap((attribute) => {
+      const info = attributeInfo.get(attribute.id);
+      return info === undefined
+        ? []
+        : [
+            {
+              event_id: attribute.event_id,
+              slug: attribute.slug,
+              uuid: info.targetId,
+            },
+          ];
+    }),
+  );
+  const formUuidsByEvent = slugMapsByEvent(
+    v2.forms.flatMap((form) => {
+      const uuid = registry.get("Form", String(form.id));
+      return uuid === undefined
+        ? []
+        : [{ event_id: form.event_id, slug: form.slug, uuid }];
+    }),
+  );
+
   const emailTemplates = entityOf("EmailTemplate");
   for (const email of v2.emails) {
     const key = String(email.id);
@@ -474,20 +513,49 @@ export async function buildPlan(
         triggerConfig = { attributeUuid: attribute.targetId, expectedValue };
       }
 
+      const tagContext: TagContext = {
+        attributes:
+          attributeUuidsByEvent.get(email.event_id ?? -1) ?? new Map(),
+        forms: formUuidsByEvent.get(email.event_id ?? -1) ?? new Map(),
+        legacyFormUuid:
+          email.form_id === null
+            ? null
+            : (registry.get("Form", String(email.form_id)) ?? null),
+        legacy:
+          email.created_at !== null && email.created_at < LEGACY_TAG_CUTOFF,
+      };
+      const tagReport: TagReport = { unresolved: new Set(), converted: 0 };
+
       let schema: unknown = null;
       if (email.schema !== null && email.schema !== "") {
         try {
-          schema = JSON.parse(email.schema);
+          schema = rewriteSchema(
+            JSON.parse(email.schema),
+            tagContext,
+            tagReport,
+          );
         } catch {
           warn("EmailTemplate", key, "schema is not valid JSON, dropped");
         }
+      }
+      const content = rewriteContent(email.content, tagContext, tagReport);
+
+      if (tagReport.converted > 0) {
+        warn(
+          "EmailTemplate",
+          key,
+          `${String(tagReport.converted)} plain-text tags converted`,
+        );
+      }
+      for (const tag of tagReport.unresolved) {
+        warn("EmailTemplate", key, `unresolved tag ${tag} left unchanged`);
       }
 
       return {
         refs: [eventUuid],
         payload: {
           name: email.name,
-          content: email.content,
+          content,
           schema,
           trigger,
           triggerConfig,
