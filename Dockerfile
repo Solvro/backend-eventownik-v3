@@ -5,7 +5,7 @@ WORKDIR /app
 
 FROM base AS build
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --include=dev
 COPY . .
 RUN DATABASE_URL=postgresql://build:build@localhost:5432/build npm run build
 
