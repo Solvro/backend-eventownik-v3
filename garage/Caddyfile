@@ -1,0 +1,13 @@
+:9002 {
+	handle_path /events/* {
+		reverse_proxy garage:3902 {
+			header_up Host events.web.garage.localhost
+		}
+	}
+
+	handle_path /forms/* {
+		reverse_proxy garage:3902 {
+			header_up Host forms.web.garage.localhost
+		}
+	}
+}
