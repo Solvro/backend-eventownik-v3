@@ -19,12 +19,19 @@ npm ci
 docker compose up -d
 ```
 
-| Service         | Port        | Purpose                                                          |
-| --------------- | ----------- | ---------------------------------------------------------------- |
-| `postgres`      | 5432        | Dev database                                                     |
-| `postgres-test` | 5433        | Test database. Tests write real rows, keep it separate from dev. |
-| `redis`         | 6379        | BullMQ queues                                                    |
-| `minio`         | 9000 / 9001 | S3 storage (API / console). Creates `events` and `forms` buckets |
+| Service         | Port | Purpose                                                          |
+| --------------- | ---- | ---------------------------------------------------------------- |
+| `postgres`      | 5432 | Dev database                                                     |
+| `postgres-test` | 5433 | Test database. Tests write real rows, keep it separate from dev. |
+| `redis`         | 6379 | BullMQ queues                                                    |
+| `garage`        | 9000 | S3 storage (Garage, S3 API)                                      |
+| `garage-public` | 9002 | Anonymous read access to the `events` and `forms` buckets        |
+
+Garage needs a one-time setup (layout, access key, buckets). Run it once after the first start:
+
+```bash
+./garage/init.sh
+```
 
 You can start only what you need, e.g. `docker compose up -d postgres-test` if you only run tests.
 

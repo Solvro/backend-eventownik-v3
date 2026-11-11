@@ -31,29 +31,29 @@ services:
     volumes:
       - redis_data:/data
 
-  minio:
-    image: minio/minio:latest
+  garage:
+    image: dxflrs/garage:v2.1.0
     restart: unless-stopped
     ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: localdev
-      MINIO_ROOT_PASSWORD: password
+      - "9000:3900"
     volumes:
-      - minio_data:/data
-    entrypoint: >
-      /bin/sh -c "
-      minio server /data --console-address ':9001' &
-      until mc alias set local http://localhost:9000 localdev password; do sleep 1; done;
-      mc mb --ignore-existing local/events local/forms;
-      mc anonymous set download local/events;
-      mc anonymous set download local/forms;
-      wait
-      "
+      - ./garage/garage.toml:/etc/garage.toml:ro
+      - garage_meta:/var/lib/garage/meta
+      - garage_data:/var/lib/garage/data
+
+  garage-public:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - garage
+    ports:
+      - "9002:9002"
+    volumes:
+      - ./garage/Caddyfile:/etc/caddy/Caddyfile:ro
 
 volumes:
   postgres_data:
   postgres_test_data:
   redis_data:
-  minio_data:
+  garage_meta:
+  garage_data:
