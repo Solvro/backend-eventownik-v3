@@ -18,6 +18,7 @@ import {
   mapEmailStatus,
   mapEmailTrigger,
   mapPermission,
+  parseLink,
 } from "./mapping";
 import type {
   BlobRef,
@@ -197,7 +198,7 @@ export async function buildPlan(
     const links = [
       ...[...new Set(event.social_media_links)].map((url) => ({
         key: `${String(event.id)}:social:${url}`,
-        url,
+        raw: url,
         type: EventLinkType.general,
       })),
       ...(event.terms_link === null
@@ -205,21 +206,22 @@ export async function buildPlan(
         : [
             {
               key: `${String(event.id)}:terms`,
-              url: event.terms_link,
+              raw: event.terms_link,
               type: EventLinkType.policy,
             },
           ]),
-    ].filter((link) => link.url.trim() !== "");
+    ].filter((link) => link.raw.trim() !== "");
 
     for (const link of links) {
+      const { url, label } = parseLink(link.raw);
       const targetId = registry.assign("EventLink", link.key);
       await eventLinks.add(link.key, targetId, () => ({
         refs: [eventTarget],
         payload: {
           eventUuid: eventTarget,
-          url: link.url,
+          url,
           type: link.type,
-          label: null,
+          label,
           ...stamps(event),
         },
       }));

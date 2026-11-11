@@ -118,3 +118,15 @@ export function buildAttributeConfig(
   }
   return {};
 }
+
+const MARKDOWN_LINK = /^\[([^\]]*)\]\((\S+)\)$/;
+
+export function parseLink(raw: string): { url: string; label: string | null } {
+  const trimmed = raw.trim();
+  const match = MARKDOWN_LINK.exec(trimmed);
+  if (match === null) {
+    return { url: trimmed, label: null };
+  }
+  const label = match[1].trim();
+  return { url: match[2], label: label === "" ? null : label };
+}
