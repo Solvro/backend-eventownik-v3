@@ -22,6 +22,7 @@ import { EventsModule } from "./events/events.module";
 import { FormsModule } from "./forms/forms.module";
 import { ImportExportModule } from "./import-export/import-export.module";
 import { OrganizersModule } from "./organizers/organizers.module";
+import { ParticipantsAuthModule } from "./participants-auth/participants-auth.module";
 import { ParticipantsModule } from "./participants/participants.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { ReportsModule } from "./reports/reports.module";
@@ -133,6 +134,7 @@ import { TicketsModule } from "./tickets/tickets.module";
     ReportsModule,
     StorageModule,
     TicketsModule,
+    ParticipantsAuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
