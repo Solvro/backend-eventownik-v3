@@ -9,6 +9,7 @@ import {
 } from "src/common/events/event-names.constants";
 import { ParticipantDeletedEvent } from "src/common/events/participant-deleted.event";
 import { ParticipantRegisteredEvent } from "src/common/events/participant-registered.event";
+import { normalizeEmail } from "src/common/utils/noramlize-email";
 import {
   Attribute,
   AttributeType,
@@ -879,5 +880,14 @@ export class ParticipantsService {
 
       return row;
     });
+  }
+
+  async existsByEmail(email: string): Promise<boolean> {
+    const participant = await this.prisma.participant.findFirst({
+      where: { email: normalizeEmail(email) },
+      select: { uuid: true },
+    });
+
+    return participant != null;
   }
 }

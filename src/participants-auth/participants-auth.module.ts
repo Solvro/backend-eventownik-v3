@@ -1,3 +1,4 @@
+import { ParticipantsModule } from "src/participants/participants.module";
 import { PrismaModule } from "src/prisma/prisma.module";
 
 import { Module } from "@nestjs/common";
@@ -6,7 +7,7 @@ import { ParticipantsAuthController } from "./participants-auth.controller";
 import { ParticipantsAuthService } from "./participants-auth.service";
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, ParticipantsModule],
   controllers: [ParticipantsAuthController],
   providers: [ParticipantsAuthService],
 })

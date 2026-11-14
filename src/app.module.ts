@@ -49,6 +49,7 @@ import { TicketsModule } from "./tickets/tickets.module";
         JWT_SECRET: Joi.string().required(),
         JWT_EXPIRES_IN: Joi.string().default("60m"),
         REFRESH_TOKEN_TTL_DAYS: Joi.number().required().default(3),
+        OTP_SECRET: Joi.string().required(),
         PORT: Joi.number().default(3000),
         REDIS_HOST: Joi.string().required(),
         REDIS_PORT: Joi.number().required(),
