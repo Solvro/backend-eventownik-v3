@@ -20,6 +20,14 @@ export class FormWithDefinitions {
   isEditable: boolean;
   isOpen: boolean;
 
+  @ApiProperty({
+    description:
+      "Whether the form currently accepts submissions, taking the open condition, dates and participants limit into account.",
+  })
+  isCurrentlyOpen: boolean;
+
+  closeOnParticipantsLimit: boolean;
+
   @ApiProperty({ enum: OpenCondition })
   openCondition: OpenCondition;
 

@@ -56,7 +56,7 @@ export class FormsPublicController {
     @Param("eventSlug") eventSlug: string,
     @Param("id", ParseUUIDPipe) formId: string,
   ) {
-    return this.formsService.findOneBySlug(formId, eventSlug);
+    return this.formsService.findOnePublic(formId, eventSlug);
   }
 
   @Post(":id/files")
