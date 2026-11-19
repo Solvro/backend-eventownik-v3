@@ -83,6 +83,7 @@ model Event {
   photoKey          String?
   location          String?
   contactEmail      String?
+  dataRecipients    String?
   organizerUuid     String?   @db.Uuid
   registerFormUuid  String?   @db.Uuid
 
@@ -281,10 +282,26 @@ model Participant {
   emails              ParticipantEmailStatus[]
   attributeLogs       ParticipantAttributeLog[]
   participantFormLogs ParticipantFormLog[]
+  consent             ParticipantConsent?
   ticketCheckIns      TicketCheckIn[]
 
   @@unique([email, eventUuid])
   @@map("Participants")
+}
+
+model ParticipantConsent {
+  uuid                   String   @id @default(uuid()) @db.Uuid
+  participantUuid        String   @unique @db.Uuid
+  gdprConsentedAt        DateTime
+  termsAcceptedAt        DateTime?
+  ip                     String
+  userAgent              String?
+  dataRecipientsSnapshot String?
+  createdAt              DateTime @default(now())
+
+  participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("ParticipantsConsents")
 }
 
 model ParticipantAttribute {

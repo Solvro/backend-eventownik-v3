@@ -8,6 +8,7 @@ import { parseSortInput } from "src/common/utils/prisma.utility";
 import {
   Attribute,
   AttributeType,
+  EventLinkType,
   OpenCondition,
   Prisma,
 } from "src/generated/prisma/client";
@@ -33,6 +34,8 @@ import { UpdateFormDto } from "./dto/update-form.dto";
 import { isFormCurrentlyOpen } from "./utils/is-form-currently-open";
 
 const IMAGE_MIME_PREFIX = "image/";
+
+const MAX_USER_AGENT_LENGTH = 512;
 
 @Injectable()
 export class FormsService {
@@ -548,12 +551,19 @@ export class FormsService {
     eventSlug: string,
     formUuid: string,
     submissionData: FormSubmitionDto,
+    requestMetadata: { ip?: string; userAgent?: string } = {},
   ) {
     let eventUuid = "";
     const participant = await this.prisma.$transaction(async (prisma) => {
       const event = await prisma.event.findUnique({
         where: { slug: eventSlug },
-        include: { participants: true },
+        include: {
+          participants: true,
+          links: {
+            where: { type: EventLinkType.policy },
+            select: { uuid: true },
+          },
+        },
       });
       if (event == null) {
         throw new NotFoundException(`Event with slug: ${eventSlug} not found`);
@@ -592,6 +602,28 @@ export class FormsService {
       ) {
         throw new BadRequestException(
           `Participant UUID is required for non-registration forms`,
+        );
+      }
+
+      const isRegistrationForm = event.registerFormUuid === formUuid;
+      const hasTerms = event.links.length > 0;
+      if (isRegistrationForm && submissionData.gdprConsent !== true) {
+        throw new BadRequestException(
+          `GDPR consent is required for the registration form`,
+        );
+      }
+      if (
+        isRegistrationForm &&
+        hasTerms &&
+        submissionData.termsAccepted !== true
+      ) {
+        throw new BadRequestException(
+          `Terms must be accepted on the registration form`,
+        );
+      }
+      if (isRegistrationForm && requestMetadata.ip === undefined) {
+        throw new InternalServerErrorException(
+          `Could not resolve the client IP address`,
         );
       }
 
@@ -791,7 +823,17 @@ export class FormsService {
             attributeUuid,
             value,
           })),
-          { trustedFileValues: true },
+          {
+            trustedFileValues: true,
+            consent: {
+              givenAt: new Date(),
+              termsAccepted: hasTerms,
+              ip: requestMetadata.ip ?? "",
+              userAgent:
+                requestMetadata.userAgent?.slice(0, MAX_USER_AGENT_LENGTH) ??
+                null,
+            },
+          },
         );
       }
 

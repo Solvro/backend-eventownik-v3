@@ -26,4 +26,27 @@ describe("FormSubmitionDto", () => {
       "cf-turnstile-response",
     );
   });
+
+  it("accepts a payload with consent fields and a turnstile token", async () => {
+    const errors = await validate(
+      plainToInstance(FormSubmitionDto, {
+        ...validPayload,
+        gdprConsent: true,
+        termsAccepted: true,
+      }),
+    );
+
+    expect(errors).toHaveLength(0);
+  });
+
+  it("rejects a non-boolean gdprConsent", async () => {
+    const errors = await validate(
+      plainToInstance(FormSubmitionDto, {
+        ...validPayload,
+        gdprConsent: "yes",
+      }),
+    );
+
+    expect(errors.map((error) => error.property)).toContain("gdprConsent");
+  });
 });
