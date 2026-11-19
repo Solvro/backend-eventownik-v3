@@ -62,6 +62,7 @@ function isFileLikeAttributeType(
 
 export interface ParticipantConsentInput {
   givenAt: Date;
+  termsAccepted: boolean;
   ip: string;
   userAgent: string | null;
 }
@@ -300,7 +301,9 @@ export class ParticipantsService {
                   consent: {
                     create: {
                       gdprConsentedAt: options.consent.givenAt,
-                      termsAcceptedAt: options.consent.givenAt,
+                      termsAcceptedAt: options.consent.termsAccepted
+                        ? options.consent.givenAt
+                        : null,
                       ip: options.consent.ip,
                       userAgent: options.consent.userAgent,
                       dataRecipientsSnapshot: event.dataRecipients,

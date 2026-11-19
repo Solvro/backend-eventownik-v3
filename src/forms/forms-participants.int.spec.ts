@@ -1,6 +1,6 @@
 import { BlocksService } from "src/blocks/blocks.service";
 import type { Attribute, Event, Form } from "src/generated/prisma/client";
-import { AttributeType } from "src/generated/prisma/enums";
+import { AttributeType, EventLinkType } from "src/generated/prisma/enums";
 import { ParticipantListingDto } from "src/participants/dto/participant-listing.dto";
 import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
@@ -93,12 +93,25 @@ describe("Forms -> Participants Integration", () => {
     return event;
   }
 
-  async function createRegistrationForm(dataRecipients?: string) {
+  async function createRegistrationForm(
+    options: { dataRecipients?: string; hasPolicyLink?: boolean } = {},
+  ) {
     const event = await createEvent();
     const form = await createForm(event.uuid);
     await prisma.event.update({
       where: { uuid: event.uuid },
-      data: { registerFormUuid: form.uuid, dataRecipients },
+      data: {
+        registerFormUuid: form.uuid,
+        dataRecipients: options.dataRecipients,
+        ...(options.hasPolicyLink === true && {
+          links: {
+            create: {
+              type: EventLinkType.policy,
+              url: "https://example.com/terms",
+            },
+          },
+        }),
+      },
     });
     return { event, form };
   }
@@ -221,9 +234,10 @@ describe("Forms -> Participants Integration", () => {
 
   describe("registration consent", () => {
     it("stores the consent evidence together with the participant", async () => {
-      const { event, form } = await createRegistrationForm(
-        "Shared with Example Sp. z o.o.",
-      );
+      const { event, form } = await createRegistrationForm({
+        dataRecipients: "Shared with Example Sp. z o.o.",
+        hasPolicyLink: true,
+      });
       const before = new Date();
 
       const participant = await formsService.formSubmit(
@@ -252,7 +266,9 @@ describe("Forms -> Participants Integration", () => {
     });
 
     it("keeps the original dataRecipients text after the admin edits it", async () => {
-      const { event, form } = await createRegistrationForm("Old recipients");
+      const { event, form } = await createRegistrationForm({
+        dataRecipients: "Old recipients",
+      });
 
       const participant = await formsService.formSubmit(
         event.slug,
@@ -291,6 +307,50 @@ describe("Forms -> Participants Integration", () => {
       expect(
         await prisma.participant.count({ where: { eventUuid: event.uuid } }),
       ).toBe(0);
+    });
+
+    it("rejects the registration without terms when the event has a policy link", async () => {
+      const { event, form } = await createRegistrationForm({
+        hasPolicyLink: true,
+      });
+
+      await expect(
+        formsService.formSubmit(
+          event.slug,
+          form.uuid,
+          {
+            email: `no-terms-${String(Date.now())}@example.com`,
+            gdprConsent: true,
+            attributes: [],
+          } as unknown as FormSubmitionDto,
+          requestMetadata,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(
+        await prisma.participant.count({ where: { eventUuid: event.uuid } }),
+      ).toBe(0);
+    });
+
+    it("registers without terms and stores no terms acceptance when the event has no policy link", async () => {
+      const { event, form } = await createRegistrationForm();
+
+      const participant = await formsService.formSubmit(
+        event.slug,
+        form.uuid,
+        {
+          email: `without-terms-${String(Date.now())}@example.com`,
+          gdprConsent: true,
+          attributes: [],
+        } as unknown as FormSubmitionDto,
+        requestMetadata,
+      );
+
+      const consent = await prisma.participantConsent.findUnique({
+        where: { participantUuid: participant.uuid },
+      });
+      expect(consent?.gdprConsentedAt).toBeInstanceOf(Date);
+      expect(consent?.termsAcceptedAt).toBeNull();
     });
 
     it("removes the consent row when the participant is deleted", async () => {

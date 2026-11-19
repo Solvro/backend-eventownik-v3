@@ -8,6 +8,7 @@ import { parseSortInput } from "src/common/utils/prisma.utility";
 import {
   Attribute,
   AttributeType,
+  EventLinkType,
   OpenCondition,
   Prisma,
 } from "src/generated/prisma/client";
@@ -556,7 +557,13 @@ export class FormsService {
     const participant = await this.prisma.$transaction(async (prisma) => {
       const event = await prisma.event.findUnique({
         where: { slug: eventSlug },
-        include: { participants: true },
+        include: {
+          participants: true,
+          links: {
+            where: { type: EventLinkType.policy },
+            select: { uuid: true },
+          },
+        },
       });
       if (event == null) {
         throw new NotFoundException(`Event with slug: ${eventSlug} not found`);
@@ -599,12 +606,17 @@ export class FormsService {
       }
 
       const isRegistrationForm = event.registerFormUuid === formUuid;
+      const hasTerms = event.links.length > 0;
       if (isRegistrationForm && submissionData.gdprConsent !== true) {
         throw new BadRequestException(
           `GDPR consent is required for the registration form`,
         );
       }
-      if (isRegistrationForm && submissionData.termsAccepted !== true) {
+      if (
+        isRegistrationForm &&
+        hasTerms &&
+        submissionData.termsAccepted !== true
+      ) {
         throw new BadRequestException(
           `Terms must be accepted on the registration form`,
         );
@@ -815,6 +827,7 @@ export class FormsService {
             trustedFileValues: true,
             consent: {
               givenAt: new Date(),
+              termsAccepted: hasTerms,
               ip: requestMetadata.ip ?? "",
               userAgent:
                 requestMetadata.userAgent?.slice(0, MAX_USER_AGENT_LENGTH) ??

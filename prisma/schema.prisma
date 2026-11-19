@@ -293,7 +293,7 @@ model ParticipantConsent {
   uuid                   String   @id @default(uuid()) @db.Uuid
   participantUuid        String   @unique @db.Uuid
   gdprConsentedAt        DateTime
-  termsAcceptedAt        DateTime
+  termsAcceptedAt        DateTime?
   ip                     String
   userAgent              String?
   dataRecipientsSnapshot String?

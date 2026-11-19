@@ -424,6 +424,7 @@ describe("FormsService", () => {
     it("should throw BadRequestException if form is closed", async () => {
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
+        links: [],
         participants: [],
       });
       mockPrismaService.form.findUnique.mockResolvedValue({ uuid: formUuid });
@@ -454,6 +455,7 @@ describe("FormsService", () => {
 
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
+        links: [],
         registerFormUuid: formUuid,
         participants: [],
         participantsLimit: 10,
@@ -496,6 +498,7 @@ describe("FormsService", () => {
           trustedFileValues: true,
           consent: {
             givenAt: expect.any(Date) as Date,
+            termsAccepted: false,
             ip: requestMetadata.ip,
             userAgent: requestMetadata.userAgent,
           },
@@ -512,6 +515,7 @@ describe("FormsService", () => {
 
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
+        links: [],
         registerFormUuid: formUuid,
         participants: [],
         participantsLimit: 10,
@@ -554,6 +558,7 @@ describe("FormsService", () => {
           trustedFileValues: true,
           consent: {
             givenAt: expect.any(Date) as Date,
+            termsAccepted: false,
             ip: requestMetadata.ip,
             userAgent: requestMetadata.userAgent,
           },
@@ -577,6 +582,7 @@ describe("FormsService", () => {
 
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
+        links: [],
         registerFormUuid: formUuid,
         participants: [],
         participantsLimit: 10,
@@ -624,6 +630,7 @@ describe("FormsService", () => {
           trustedFileValues: true,
           consent: {
             givenAt: expect.any(Date) as Date,
+            termsAccepted: false,
             ip: requestMetadata.ip,
             userAgent: requestMetadata.userAgent,
           },
@@ -650,6 +657,7 @@ describe("FormsService", () => {
 
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
+        links: [],
         registerFormUuid: formUuid,
         participants: [],
         participantsLimit: 10,
@@ -700,6 +708,7 @@ describe("FormsService", () => {
           trustedFileValues: true,
           consent: {
             givenAt: expect.any(Date) as Date,
+            termsAccepted: false,
             ip: requestMetadata.ip,
             userAgent: requestMetadata.userAgent,
           },
@@ -728,6 +737,7 @@ describe("FormsService", () => {
 
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
+        links: [],
         registerFormUuid: formUuid,
         participants: [],
         participantsLimit: 10,
@@ -779,6 +789,7 @@ describe("FormsService", () => {
           trustedFileValues: true,
           consent: {
             givenAt: expect.any(Date) as Date,
+            termsAccepted: false,
             ip: requestMetadata.ip,
             userAgent: requestMetadata.userAgent,
           },
@@ -795,6 +806,7 @@ describe("FormsService", () => {
 
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
+        links: [],
         registerFormUuid: formUuid,
         participants: [],
         participantsLimit: 10,
@@ -832,6 +844,7 @@ describe("FormsService", () => {
           trustedFileValues: true,
           consent: {
             givenAt: expect.any(Date) as Date,
+            termsAccepted: false,
             ip: requestMetadata.ip,
             userAgent: requestMetadata.userAgent,
           },
@@ -846,14 +859,16 @@ describe("FormsService", () => {
         attributes: [],
         "cf-turnstile-response": "token",
       };
+      const eventWithTerms = {
+        uuid: eventUuid,
+        registerFormUuid: formUuid,
+        participants: [],
+        participantsLimit: 10,
+        links: [{ uuid: "policy-link-uuid" }],
+      };
 
       beforeEach(() => {
-        mockPrismaService.event.findUnique.mockResolvedValue({
-          uuid: eventUuid,
-          registerFormUuid: formUuid,
-          participants: [],
-          participantsLimit: 10,
-        });
+        mockPrismaService.event.findUnique.mockResolvedValue(eventWithTerms);
         mockPrismaService.form.findUnique.mockResolvedValue({
           uuid: formUuid,
           formDefinitions: [],
@@ -935,6 +950,62 @@ describe("FormsService", () => {
         );
       });
 
+      it("should record terms acceptance when the event has a policy link", async () => {
+        await service.formSubmit(
+          eventSlug,
+          formUuid,
+          { ...baseSubmission, ...registrationConsent } as FormSubmitionDto,
+          requestMetadata,
+        );
+
+        expect(mockParticipantsService.register).toHaveBeenCalledWith(
+          eventUuid,
+          baseSubmission.email,
+          [],
+          expect.objectContaining({
+            consent: expect.objectContaining({
+              termsAccepted: true,
+            }) as unknown,
+          }),
+        );
+      });
+
+      it.each([
+        ["termsAccepted is missing", {}],
+        ["termsAccepted is false", { termsAccepted: false }],
+        ["termsAccepted is true", { termsAccepted: true }],
+      ])(
+        "should register without terms when the event has no policy link and %s",
+        async (_name, termsFields) => {
+          mockPrismaService.event.findUnique.mockResolvedValue({
+            ...eventWithTerms,
+            links: [],
+          });
+
+          await service.formSubmit(
+            eventSlug,
+            formUuid,
+            {
+              ...baseSubmission,
+              gdprConsent: true,
+              ...termsFields,
+            } as FormSubmitionDto,
+            requestMetadata,
+          );
+
+          expect(mockParticipantsService.register).toHaveBeenCalledWith(
+            eventUuid,
+            baseSubmission.email,
+            [],
+            expect.objectContaining({
+              consent: expect.objectContaining({
+                termsAccepted: false,
+              }) as unknown,
+            }),
+          );
+        },
+      );
+
       it("should not require consent on non-registration forms", async () => {
         const otherFormUuid = "form-other";
         mockPrismaService.form.findUnique.mockResolvedValue({
@@ -968,6 +1039,7 @@ describe("FormsService", () => {
 
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
+        links: [],
         registerFormUuid: "other-form-uuid",
         participants: [],
       });
@@ -1018,6 +1090,7 @@ describe("FormsService", () => {
 
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
+        links: [],
         registerFormUuid: formUuid,
         participants: [],
         participantsLimit: 10,
@@ -1060,6 +1133,7 @@ describe("FormsService", () => {
           trustedFileValues: true,
           consent: {
             givenAt: expect.any(Date) as Date,
+            termsAccepted: false,
             ip: requestMetadata.ip,
             userAgent: requestMetadata.userAgent,
           },
@@ -1077,6 +1151,7 @@ describe("FormsService", () => {
 
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
+        links: [],
         registerFormUuid: formUuid,
         participants: [],
         participantsLimit: 10,
@@ -1121,6 +1196,7 @@ describe("FormsService", () => {
 
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
+        links: [],
         registerFormUuid: formUuid,
         participants: [],
         participantsLimit: 10,
@@ -1156,6 +1232,7 @@ describe("FormsService", () => {
 
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
+        links: [],
         registerFormUuid: "other-form-uuid",
         participants: [],
       });
@@ -1202,6 +1279,7 @@ describe("FormsService", () => {
 
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
+        links: [],
         registerFormUuid: formUuid,
         participants: [],
         participantsLimit: 10,

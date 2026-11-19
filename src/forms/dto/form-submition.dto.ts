@@ -82,7 +82,7 @@ export class FormSubmitionDto {
 
   @ApiPropertyOptional({
     description:
-      "Acceptance of the platform terms. Must be true on the registration form, ignored on other forms",
+      "Acceptance of the event terms. Must be true on the registration form when the event has a policy link, ignored otherwise",
   })
   @IsOptional()
   @IsBoolean()
