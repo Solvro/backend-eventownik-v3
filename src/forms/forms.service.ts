@@ -30,6 +30,7 @@ import { DuplicateFormDto } from "./dto/duplicate-form.dto";
 import { FormListingDto } from "./dto/form-listing.dto";
 import { FormSubmitionDto } from "./dto/form-submition.dto";
 import { UpdateFormDto } from "./dto/update-form.dto";
+import { isFormCurrentlyOpen } from "./utils/is-form-currently-open";
 
 const IMAGE_MIME_PREFIX = "image/";
 
@@ -200,6 +201,7 @@ export class FormsService {
           eventUuid: event.uuid,
           openCondition: createFormDto.openCondition,
           isOpen: createFormDto.isOpen,
+          closeOnParticipantsLimit: createFormDto.closeOnParticipantsLimit,
           order: createFormDto.order,
         },
       });
@@ -321,6 +323,7 @@ export class FormsService {
           eventUuid: sourceForm.eventUuid,
           openCondition: sourceForm.openCondition,
           isOpen: sourceForm.isOpen,
+          closeOnParticipantsLimit: sourceForm.closeOnParticipantsLimit,
           order: sourceForm.order,
         },
       });
@@ -353,6 +356,41 @@ export class FormsService {
       include: {
         formDefinitions: {
           include: { attribute: true },
+        },
+      },
+    });
+
+    if (form == null) {
+      throw new NotFoundException(`Form with id: ${formUuid} not found`);
+    }
+    return form;
+  }
+
+  async findOnePublic(formUuid: string, eventSlug: string) {
+    const { event, ...form } = await this.findOneWithEvent(formUuid, eventSlug);
+    return {
+      ...form,
+      isCurrentlyOpen: isFormCurrentlyOpen(form, {
+        registerFormUuid: event?.registerFormUuid ?? null,
+        participantsLimit: event?.participantsLimit ?? null,
+        participantsCount: event?._count.participants ?? 0,
+      }),
+    };
+  }
+
+  private async findOneWithEvent(formUuid: string, eventSlug: string) {
+    const form = await this.prisma.form.findUnique({
+      where: { uuid: formUuid, event: { slug: eventSlug } },
+      include: {
+        formDefinitions: {
+          include: { attribute: true },
+        },
+        event: {
+          select: {
+            registerFormUuid: true,
+            participantsLimit: true,
+            _count: { select: { participants: true } },
+          },
         },
       },
     });
@@ -467,6 +505,7 @@ export class FormsService {
           description: updateFormDto.description,
           openCondition: updateFormDto.openCondition,
           isOpen: updateFormDto.isOpen,
+          closeOnParticipantsLimit: updateFormDto.closeOnParticipantsLimit,
           order: updateFormDto.order,
         },
         include: {
@@ -505,27 +544,6 @@ export class FormsService {
     });
   }
 
-  async isOpen(formUuid: string, eventSlug: string) {
-    const form = await this.findOneBySlug(formUuid, eventSlug);
-    switch (form.openCondition) {
-      case OpenCondition.MANUAL: {
-        return form.isOpen;
-      }
-      case OpenCondition.ON_DATE: {
-        const now = new Date();
-        if (form.closeDate == null) {
-          throw new InternalServerErrorException(
-            "Form with ON_DATE open condition must have a close date",
-          );
-        }
-        return (
-          (form.openDate == null ? true : form.openDate <= now) &&
-          form.closeDate >= now
-        );
-      }
-    }
-  }
-
   async formSubmit(
     eventSlug: string,
     formUuid: string,
@@ -552,7 +570,11 @@ export class FormsService {
       if (form == null) {
         throw new NotFoundException(`Form with id: ${formUuid} not found`);
       }
-      const isFormOpen = await this.isOpen(formUuid, eventSlug);
+      const isFormOpen = isFormCurrentlyOpen(form, {
+        registerFormUuid: event.registerFormUuid,
+        participantsLimit: event.participantsLimit,
+        participantsCount: event.participants.length,
+      });
       if (!isFormOpen) {
         throw new BadRequestException(`Form with id: ${formUuid} is closed`);
       }
@@ -762,14 +784,6 @@ export class FormsService {
         event.registerFormUuid === formUuid &&
         submissionData.email !== undefined
       ) {
-        if (
-          event.participantsLimit !== null &&
-          event.participantsLimit <= event.participants.length
-        ) {
-          throw new BadRequestException(
-            `Event with a slug: ${eventSlug} has reached the participants limit`,
-          );
-        }
         return await this.participantService.register(
           event.uuid,
           submissionData.email,
