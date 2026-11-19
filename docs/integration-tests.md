@@ -20,7 +20,7 @@ Integration tests fix this by running every Prisma call against a real PostgreSQ
 
 ## Local setup
 
-Set up the test database (compose service, `.env.test`, migrations) by following [local-setup.md](local-setup.md). Run `npm run migrate:test` again whenever new migrations are added, then run the suite with `npm test`.
+Set up the test database (compose service, `.env.test`, migrations) by following [local-setup.md](local-setup.md). Run `npm run migrate:test` again after switching branches or adding migrations (it resets the test database), then run the suite with `npm test`.
 
 `DATABASE_URL` from `.env.test` is picked up automatically by the test runner (configured in `jest.setup.ts`). CI injects `DATABASE_URL` as an environment variable, so nothing changes there.
 

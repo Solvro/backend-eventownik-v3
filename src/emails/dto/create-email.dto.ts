@@ -56,5 +56,5 @@ export class CreateEmailDto {
   @MaxJsonSize(EMAIL_SCHEMA_MAX_BYTES, {
     message: `schema must not exceed ${String(EMAIL_SCHEMA_MAX_BYTES / 1_000_000)}MB when serialized as JSON`,
   })
-  schema?: Prisma.JsonObject;
+  schema?: Prisma.JsonObject | null;
 }

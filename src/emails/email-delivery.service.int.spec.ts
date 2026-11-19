@@ -297,8 +297,8 @@ describe("EmailDeliveryService (integration)", () => {
       const template = await createEmailTemplate(event.uuid, {
         content: `<p>Event: <span data-id="/event_name"></span></p>
 <p>Email: <span data-id="/participant_email"></span></p>
-<p>Size: <span data-id="/participant_${attribute.uuid}"></span></p>
-<p><span data-id="/form_${form.uuid}"></span></p>`,
+<p>Size: <span class="mention" data-id="/participant_${attribute.uuid}">T-shirt size</span></p>
+<p><span class="mention" data-id="/form_${form.uuid}">Give feedback</span></p>`,
       });
 
       const statusUuid = await createPendingStatus(
@@ -323,6 +323,7 @@ describe("EmailDeliveryService (integration)", () => {
       expect(sendMailArguments.html).toContain(
         `http://localhost:3000/${event.slug}/${form.uuid}/${participant.uuid}`,
       );
+      expect(sendMailArguments.html).not.toContain("mention");
       expect(sendMailArguments.replyTo).toBe("organizer@example.com");
 
       const status = await prisma.participantEmailStatus.findUnique({

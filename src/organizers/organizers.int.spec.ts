@@ -266,6 +266,7 @@ describe("OrganizersService (integration)", () => {
       const types = result.permissions.map((p) => p.permission);
       expect(types).toContain(PermissionType.MANAGE_PARTICIPANT);
       expect(types).toContain(PermissionType.MANAGE_FORM);
+      expect(result).not.toHaveProperty("password");
     });
 
     it("throws NotFoundException when no admin has that email", async () => {

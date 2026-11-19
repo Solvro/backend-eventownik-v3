@@ -1,5 +1,5 @@
 import bcrypt from "bcrypt";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes, scryptSync } from "node:crypto";
 import type { Admin } from "src/generated/prisma/client";
 
 import {
@@ -151,6 +151,48 @@ describe("AuthService", () => {
       );
 
       expect(result).toBeNull();
+    });
+
+    it("should accept a legacy scrypt hash and rehash it to bcrypt", async () => {
+      const salt = randomBytes(16);
+      const key = scryptSync("password123", salt, 64, {
+        N: 16_384,
+        r: 8,
+        p: 1,
+      });
+      const legacyPassword = `$scrypt$n=16384,r=8,p=1$${salt.toString("base64")}$${key.toString("base64")}`;
+      const legacyAdmin = { ...mockAdmin, password: legacyPassword };
+      mockPrisma.admin.findUnique.mockResolvedValue(legacyAdmin);
+      jest.spyOn(bcrypt, "hash").mockImplementation(() => "new-bcrypt-hash");
+
+      const result = await service.validateUser(
+        "test@example.com",
+        "password123",
+      );
+
+      expect(result).toEqual(legacyAdmin);
+      expect(mockPrisma.admin.update).toHaveBeenCalledWith({
+        where: { uuid: legacyAdmin.uuid },
+        data: { password: "new-bcrypt-hash" },
+      });
+    });
+
+    it("should reject a wrong password against a legacy scrypt hash", async () => {
+      const salt = randomBytes(16);
+      const key = scryptSync("password123", salt, 64, {
+        N: 16_384,
+        r: 8,
+        p: 1,
+      });
+      mockPrisma.admin.findUnique.mockResolvedValue({
+        ...mockAdmin,
+        password: `$scrypt$n=16384,r=8,p=1$${salt.toString("base64")}$${key.toString("base64")}`,
+      });
+
+      const result = await service.validateUser("test@example.com", "nope");
+
+      expect(result).toBeNull();
+      expect(mockPrisma.admin.update).not.toHaveBeenCalled();
     });
 
     it("should return null if user not found", async () => {

@@ -62,6 +62,7 @@ export class OrganizersService {
 
       return tx.admin.findUnique({
         where: { uuid: admin.uuid },
+        omit: { password: true },
         include: {
           permissions: {
             where: { eventUuid },

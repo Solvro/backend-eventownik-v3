@@ -362,6 +362,8 @@ describe("EventsService", () => {
         isVerified: true,
         slug: "elo-zelo",
         photoKey: null,
+        registerForm: null,
+        _count: { participants: 0 },
       };
 
       (prisma.event.findUnique as jest.Mock).mockResolvedValue(mockEvent);
@@ -373,6 +375,7 @@ describe("EventsService", () => {
         isPublic: true,
         isVerified: true,
         slug: "elo-zelo",
+        registerForm: null,
         photoUrl: null,
       });
 
@@ -385,9 +388,10 @@ describe("EventsService", () => {
           links: true,
           registerForm: {
             include: {
-              formDefinitions: true,
+              formDefinitions: { include: { attribute: true } },
             },
           },
+          _count: { select: { participants: true } },
         },
       });
     });
@@ -410,9 +414,10 @@ describe("EventsService", () => {
           links: true,
           registerForm: {
             include: {
-              formDefinitions: true,
+              formDefinitions: { include: { attribute: true } },
             },
           },
+          _count: { select: { participants: true } },
         },
       });
     });

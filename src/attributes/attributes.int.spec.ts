@@ -30,6 +30,9 @@ describe("Attributes Integration", () => {
     block: {
       deleteMany: jest.fn(),
     },
+    ticket: {
+      findUnique: jest.fn(),
+    },
     event: {
       findUnique: jest.fn(),
     },

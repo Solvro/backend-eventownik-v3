@@ -1,6 +1,7 @@
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { parseSortInput } from "src/common/utils/prisma.utility";
+import { isFormCurrentlyOpen } from "src/forms/utils/is-form-currently-open";
 import type { Event as EventModel } from "src/generated/prisma/client";
 import { Prisma } from "src/generated/prisma/client";
 import { OrganizerType } from "src/generated/prisma/enums";
@@ -213,9 +214,10 @@ export class EventsService {
         links: true,
         registerForm: {
           include: {
-            formDefinitions: true,
+            formDefinitions: { include: { attribute: true } },
           },
         },
+        _count: { select: { participants: true } },
       },
     });
 
@@ -223,7 +225,21 @@ export class EventsService {
       throw new NotFoundException(`Event with slug ${slug} not found`);
     }
 
-    return this.resolvePhotoUrl(event);
+    const { _count, registerForm, ...rest } = event;
+    return this.resolvePhotoUrl({
+      ...rest,
+      registerForm:
+        registerForm === null
+          ? null
+          : {
+              ...registerForm,
+              isCurrentlyOpen: isFormCurrentlyOpen(registerForm, {
+                registerFormUuid: event.registerFormUuid,
+                participantsLimit: event.participantsLimit,
+                participantsCount: _count.participants,
+              }),
+            },
+    });
   }
 
   async update(

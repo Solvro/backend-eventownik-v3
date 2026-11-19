@@ -8,6 +8,7 @@ export class EmailElementDto {
   trigger: EmailTrigger;
   triggerConfig: Prisma.JsonValue | null;
   schema?: Prisma.JsonValue | null;
+  order: number | null;
   createdAt: string;
   updatedAt: string;
 }

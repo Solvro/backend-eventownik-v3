@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsEmail,
+  IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
@@ -87,10 +88,8 @@ export class FormSubmitionDto {
   @IsBoolean()
   termsAccepted?: boolean;
 
-  // @ApiProperty({
-  //   description: "Cloudflare Turnstile response token",
-  // })
-  // @IsString()
-  // @IsNotEmpty()
-  // "cf-turnstile-response": string;
+  @ApiProperty({ description: "Cloudflare Turnstile response token" })
+  @IsString()
+  @IsNotEmpty()
+  "cf-turnstile-response": string;
 }

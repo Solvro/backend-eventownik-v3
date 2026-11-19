@@ -1,5 +1,6 @@
 import type { Request } from "express";
 import { TurnstileGuard } from "src/common/guards/turnstile.guard";
+import { FormWithDefinitions } from "src/forms/entities/form-with-definitions.entity";
 
 import {
   Body,
@@ -46,13 +47,16 @@ export class FormsPublicController {
   @ApiOperation({ summary: "Get a form by id for an event" })
   @ApiParam({ name: "eventSlug", description: "Event slug of the event" })
   @ApiParam({ name: "id", description: "UUID of the form" })
-  @ApiOkResponse({ description: "Form retrieved successfully." })
+  @ApiOkResponse({
+    description: "Form retrieved successfully.",
+    type: FormWithDefinitions,
+  })
   @ApiNotFoundResponse({ description: "Event or Form not found." })
   async findOne(
     @Param("eventSlug") eventSlug: string,
     @Param("id", ParseUUIDPipe) formId: string,
   ) {
-    return this.formsService.findOneBySlug(formId, eventSlug);
+    return this.formsService.findOnePublic(formId, eventSlug);
   }
 
   @Post(":id/files")

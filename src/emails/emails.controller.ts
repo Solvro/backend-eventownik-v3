@@ -39,7 +39,9 @@ import { DuplicateEmailDto } from "./dto/duplicate-email.dto";
 import { EmailCompleteElementDto } from "./dto/email-complete-element.dto";
 import { EmailListElementDto } from "./dto/email-list-element.dto";
 import { EmailListingDto } from "./dto/email-listing.dto";
+import { EmailParticipantDto } from "./dto/email-participant.dto";
 import { EmailResponseDto } from "./dto/email-response.dto";
+import { ReorderEmailsDto } from "./dto/reorder-emails.dto";
 import { SendEmailDto } from "./dto/send-email.dto";
 import { SendTestEmailDto } from "./dto/send-test-email.dto";
 import { UpdateEmailDto } from "./dto/update-email.dto";
@@ -115,7 +117,7 @@ export class EmailsController {
   })
   @ApiParam({ name: "eventId", description: "UUID of the event" })
   @ApiParam({ name: "emailId", description: "UUID of the email" })
-  @ApiOkResponse({ description: "Paginated participants list" })
+  @ApiPaginatedResponse(EmailParticipantDto)
   async findParticipants(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("emailId", ParseUUIDPipe) emailId: string,
@@ -147,6 +149,29 @@ export class EmailsController {
     @Body() query: DuplicateEmailDto,
   ) {
     return this.emailTemplatesService.duplicate(eventId, emailId, query);
+  }
+
+  @Patch("reorder")
+  @RequirePermission(PermissionType.MANAGE_EMAIL)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: "Reorder email templates",
+    description:
+      "Sets the order of the given templates to their position in the list, in one transaction.",
+  })
+  @ApiParam({ name: "eventId", description: "UUID of the event" })
+  @ApiNoContentResponse({ description: "Email templates reordered" })
+  @ApiBadRequestResponse({
+    description: "Empty list, duplicate ids or ids that are not UUIDs",
+  })
+  @ApiNotFoundResponse({
+    description: "One or more email templates do not belong to the event",
+  })
+  async reorder(
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @Body() query: ReorderEmailsDto,
+  ) {
+    return this.emailTemplatesService.reorder(eventId, query.emailIds);
   }
 
   @Patch(":emailId")

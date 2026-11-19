@@ -76,6 +76,14 @@ export class CreateFormDto {
   isOpen?: boolean;
 
   @ApiPropertyOptional({
+    description:
+      "Only applies to the registration form. When true, the form is closed once the event participants limit is reached. Defaults to true.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  closeOnParticipantsLimit?: boolean;
+
+  @ApiPropertyOptional({
     description: "Custom order of the form within the event.",
   })
   @IsOptional()

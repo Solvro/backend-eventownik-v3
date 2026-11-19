@@ -152,6 +152,7 @@ describe("EmailTemplatesService", () => {
           trigger: EmailTrigger.PARTICIPANT_REGISTERED,
           triggerConfig: undefined,
           schema: undefined,
+          order: undefined,
           createdAt: "2025-02-22T19:13:10.471Z",
           updatedAt: "2025-02-22T19:13:10.471Z",
           meta: {
@@ -167,6 +168,7 @@ describe("EmailTemplatesService", () => {
           trigger: EmailTrigger.MANUAL,
           triggerConfig: undefined,
           schema: undefined,
+          order: undefined,
           createdAt: "2025-02-22T19:13:10.471Z",
           updatedAt: "2025-02-22T19:13:10.471Z",
           meta: {
@@ -209,6 +211,7 @@ describe("EmailTemplatesService", () => {
           trigger: true,
           triggerConfig: true,
           schema: true,
+          order: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -261,7 +264,6 @@ describe("EmailTemplatesService", () => {
         order: 0,
         createdAt: "2025-02-22T19:13:10.471Z",
         updatedAt: "2025-02-22T19:13:10.471Z",
-        participants: [],
       };
 
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue(
@@ -308,6 +310,7 @@ describe("EmailTemplatesService", () => {
       mockTransaction(mockPrismaService);
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue({
         uuid: mockEmailId,
+        trigger: EmailTrigger.MANUAL,
       });
       mockPrismaService.emailTemplate.update.mockResolvedValue(
         mockPrismaOutput,
@@ -326,7 +329,7 @@ describe("EmailTemplatesService", () => {
           name: "test2",
           content: "<p>test2</p>",
           trigger: undefined,
-          triggerConfig: {},
+          triggerConfig: undefined,
           order: undefined,
         },
       });
@@ -335,6 +338,7 @@ describe("EmailTemplatesService", () => {
         name: "test",
         content: "<p>test2</p>",
         trigger: EmailTrigger.MANUAL,
+        order: 0,
         eventId: mockEventId,
         createdAt: "2025-02-22T19:13:10.471Z",
         updatedAt: "2025-02-22T19:13:10.471Z",

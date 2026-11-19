@@ -17,6 +17,10 @@ import type { CreateFormDto } from "./dto/create-form.dto";
 import { FormListingDto } from "./dto/form-listing.dto";
 import type { FormSubmitionDto } from "./dto/form-submition.dto";
 import { FormsService } from "./forms.service";
+import { isFormCurrentlyOpen } from "./utils/is-form-currently-open";
+
+jest.mock("./utils/is-form-currently-open");
+const mockedIsFormCurrentlyOpen = jest.mocked(isFormCurrentlyOpen);
 
 describe("FormsService", () => {
   let service: FormsService;
@@ -418,14 +422,18 @@ describe("FormsService", () => {
     });
 
     it("should throw BadRequestException if form is closed", async () => {
-      mockPrismaService.event.findUnique.mockResolvedValue({ uuid: eventUuid });
+      mockPrismaService.event.findUnique.mockResolvedValue({
+        uuid: eventUuid,
+        participants: [],
+      });
       mockPrismaService.form.findUnique.mockResolvedValue({ uuid: formUuid });
 
-      jest.spyOn(service, "isOpen").mockResolvedValue(false);
+      mockedIsFormCurrentlyOpen.mockReturnValue(false);
 
       await expect(
         service.formSubmit(eventSlug, formUuid, {
           attributes: [],
+          "cf-turnstile-response": "token",
         }),
       ).rejects.toThrow(BadRequestException);
     });
@@ -467,7 +475,7 @@ describe("FormsService", () => {
           },
         ],
       });
-      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockedIsFormCurrentlyOpen.mockReturnValue(true);
       mockParticipantsService.register.mockResolvedValue({
         id: 1,
         email: submissionData.email,
@@ -525,7 +533,7 @@ describe("FormsService", () => {
           },
         ],
       });
-      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockedIsFormCurrentlyOpen.mockReturnValue(true);
       mockParticipantsService.register.mockResolvedValue({
         id: 1,
         email: submissionData.email,
@@ -590,7 +598,7 @@ describe("FormsService", () => {
           },
         ],
       });
-      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockedIsFormCurrentlyOpen.mockReturnValue(true);
       mockParticipantsService.register.mockResolvedValue({
         id: 1,
         email: submissionData.email,
@@ -663,7 +671,7 @@ describe("FormsService", () => {
         ],
       });
       mockBlocksService.canSignInToBlock.mockResolvedValue(true);
-      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockedIsFormCurrentlyOpen.mockReturnValue(true);
       mockParticipantsService.register.mockResolvedValue({
         id: 1,
         email: submissionData.email,
@@ -740,7 +748,7 @@ describe("FormsService", () => {
           },
         ],
       });
-      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockedIsFormCurrentlyOpen.mockReturnValue(true);
       mockBlocksService.canSignInToBlock.mockResolvedValue(true);
       mockParticipantsService.register.mockResolvedValue({
         id: 1,
@@ -803,7 +811,7 @@ describe("FormsService", () => {
         ],
       });
 
-      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockedIsFormCurrentlyOpen.mockReturnValue(true);
       mockParticipantsService.register.mockResolvedValue({
         id: 1,
         email: submissionData.email,
@@ -836,6 +844,7 @@ describe("FormsService", () => {
       const baseSubmission = {
         email: "test@example.com",
         attributes: [],
+        "cf-turnstile-response": "token",
       };
 
       beforeEach(() => {
@@ -849,7 +858,7 @@ describe("FormsService", () => {
           uuid: formUuid,
           formDefinitions: [],
         });
-        jest.spyOn(service, "isOpen").mockResolvedValue(true);
+        mockedIsFormCurrentlyOpen.mockReturnValue(true);
         mockParticipantsService.register.mockResolvedValue({ id: 1 });
       });
 
@@ -960,6 +969,7 @@ describe("FormsService", () => {
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
         registerFormUuid: "other-form-uuid",
+        participants: [],
       });
 
       mockPrismaService.form.findUnique.mockResolvedValue({
@@ -973,7 +983,7 @@ describe("FormsService", () => {
         ],
       });
 
-      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockedIsFormCurrentlyOpen.mockReturnValue(true);
       mockParticipantsService.update.mockResolvedValue({
         id: participantId,
         status: "updated",
@@ -995,38 +1005,6 @@ describe("FormsService", () => {
           ],
         }),
         { trustedFileValues: true },
-      );
-    });
-
-    it("should throw BadRequestException if registration limit is reached", async () => {
-      mockPrismaService.event.findUnique.mockResolvedValue({
-        uuid: eventUuid,
-        registerFormUuid: formUuid,
-        participants: Array.from({ length: 5 }),
-        participantsLimit: 5,
-      });
-
-      mockPrismaService.form.findUnique.mockResolvedValue({
-        uuid: formUuid,
-        formDefinitions: [],
-      });
-      jest.spyOn(service, "isOpen").mockResolvedValue(true);
-
-      const submissionData = {
-        email: "full@test.com",
-        ...registrationConsent,
-        attributes: [],
-      } as unknown as FormSubmitionDto;
-
-      await expect(
-        service.formSubmit(
-          eventSlug,
-          formUuid,
-          submissionData,
-          requestMetadata,
-        ),
-      ).rejects.toThrow(
-        `Event with a slug: ${eventSlug} has reached the participants limit`,
       );
     });
 
@@ -1061,7 +1039,7 @@ describe("FormsService", () => {
         fileKey: "drawing-key.png",
         mimeType: "image/png",
       });
-      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockedIsFormCurrentlyOpen.mockReturnValue(true);
       mockParticipantsService.register.mockResolvedValue({
         id: 1,
         email: submissionData.email,
@@ -1120,7 +1098,7 @@ describe("FormsService", () => {
         fileKey: "not-an-image.pdf",
         mimeType: "application/pdf",
       });
-      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockedIsFormCurrentlyOpen.mockReturnValue(true);
 
       await expect(
         service.formSubmit(
@@ -1157,7 +1135,7 @@ describe("FormsService", () => {
           },
         ],
       });
-      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockedIsFormCurrentlyOpen.mockReturnValue(true);
 
       await expect(
         service.formSubmit(
@@ -1179,6 +1157,7 @@ describe("FormsService", () => {
       mockPrismaService.event.findUnique.mockResolvedValue({
         uuid: eventUuid,
         registerFormUuid: "other-form-uuid",
+        participants: [],
       });
       mockPrismaService.form.findUnique.mockResolvedValue({
         uuid: formUuid,
@@ -1193,7 +1172,7 @@ describe("FormsService", () => {
       mockPrismaService.participantAttribute.findMany.mockResolvedValueOnce([
         { attributeUuid: "attr-file", value: "existing-key.png" },
       ]);
-      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockedIsFormCurrentlyOpen.mockReturnValue(true);
       mockParticipantsService.update.mockResolvedValue({
         id: participantId,
         status: "updated",
@@ -1237,7 +1216,7 @@ describe("FormsService", () => {
           },
         ],
       });
-      jest.spyOn(service, "isOpen").mockResolvedValue(true);
+      mockedIsFormCurrentlyOpen.mockReturnValue(true);
 
       await expect(
         service.formSubmit(

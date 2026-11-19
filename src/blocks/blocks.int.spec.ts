@@ -221,6 +221,38 @@ describe("Blocks Integration", () => {
       expect(result).toHaveProperty("uuid", blockId);
       expect(result).toHaveProperty("name", "Updated Block");
     });
+
+    it("should update a block without a parentUuid and leave its parent alone", async () => {
+      const dto: UpdateBlockDto = { name: "Renamed Block" };
+      mockPrismaService.block.findFirst.mockResolvedValue({
+        uuid: blockId,
+        isRootBlock: false,
+      });
+      mockPrismaService.block.update.mockResolvedValue({
+        uuid: blockId,
+        name: dto.name,
+      });
+
+      await blocksController.update(eventId, attributeId, blockId, dto);
+
+      expect(mockPrismaService.block.update).toHaveBeenCalledWith({
+        where: { uuid: blockId },
+        data: { name: "Renamed Block" },
+      });
+    });
+
+    it("should reject making a block its own parent", async () => {
+      mockPrismaService.block.findFirst.mockResolvedValue({
+        uuid: blockId,
+        isRootBlock: false,
+      });
+
+      await expect(
+        blocksController.update(eventId, attributeId, blockId, {
+          parentUuid: blockId,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   describe("duplicate", () => {

@@ -15,6 +15,7 @@ import { PrismaService } from "src/prisma/prisma.service";
 
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -260,6 +261,18 @@ export class AttributesService {
 
     const nextType = updateAttributeDto.type ?? foundAttribute.type;
 
+    if (foundAttribute.type === "block" && nextType !== "block") {
+      const ticket = await prisma.ticket.findUnique({
+        where: { attributeUuid: id },
+        select: { uuid: true },
+      });
+      if (ticket != null) {
+        throw new ConflictException(
+          `Attribute with uuid ${id} is used by a ticket, delete the ticket before changing the attribute type`,
+        );
+      }
+    }
+
     const updated = await prisma.attribute.update({
       where: { uuid: id, eventUuid: eventId },
       data: {
@@ -267,7 +280,11 @@ export class AttributesService {
         order: updateAttributeDto.order,
         showInList: updateAttributeDto.showInList,
         type: updateAttributeDto.type,
-        config: this.normalizeConfig(nextType, updateAttributeDto.config),
+        config:
+          updateAttributeDto.config === undefined &&
+          nextType === foundAttribute.type
+            ? undefined
+            : this.normalizeConfig(nextType, updateAttributeDto.config),
       },
     });
 

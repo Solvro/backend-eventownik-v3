@@ -26,6 +26,7 @@ import { ParticipantsModule } from "./participants/participants.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { ReportsModule } from "./reports/reports.module";
 import { StorageModule } from "./storage/storage.module";
+import { TicketsModule } from "./tickets/tickets.module";
 
 @Module({
   imports: [
@@ -131,6 +132,7 @@ import { StorageModule } from "./storage/storage.module";
     EmailsModule,
     ReportsModule,
     StorageModule,
+    TicketsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
