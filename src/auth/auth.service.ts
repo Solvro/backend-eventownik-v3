@@ -151,7 +151,7 @@ export class AuthService {
       });
 
       const frontendUrl = this.configService.getOrThrow<string>("FRONTEND_URL");
-      const resetUrl = `${frontendUrl}/password-reset/?token=${resetToken}`;
+      const resetUrl = `${frontendUrl}/auth/password-reset?token=${resetToken}`;
       const name = `${admin.firstName} ${admin.lastName}`;
       await this.authEmailService.enqueuePasswordResetEmail(
         admin.email,
