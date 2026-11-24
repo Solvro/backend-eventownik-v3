@@ -2,6 +2,8 @@ import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 
+import { EmailAttachmentsReaperService } from "./email-attachments-reaper.service";
+import { EmailAttachmentsService } from "./email-attachments.service";
 import { EmailContentParserService } from "./email-content-parser.service";
 import { EmailDeliveryService } from "./email-delivery.service";
 import { EmailTemplatesService } from "./email-templates.service";
@@ -29,6 +31,8 @@ import { EmailsListeners } from "./emails.listeners";
   controllers: [EmailsController],
   providers: [
     EmailTemplatesService,
+    EmailAttachmentsService,
+    EmailAttachmentsReaperService,
     EmailContentParserService,
     EmailDeliveryService,
     EmailsConsumer,

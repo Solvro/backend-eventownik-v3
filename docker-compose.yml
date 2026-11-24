@@ -46,7 +46,7 @@ services:
       /bin/sh -c "
       minio server /data --console-address ':9001' &
       until mc alias set local http://localhost:9000 localdev password; do sleep 1; done;
-      mc mb --ignore-existing local/events local/forms;
+      mc mb --ignore-existing local/events local/forms local/email-attachments;
       mc anonymous set download local/events;
       mc anonymous set download local/forms;
       wait

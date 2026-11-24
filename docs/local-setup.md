@@ -19,12 +19,12 @@ npm ci
 docker compose up -d
 ```
 
-| Service         | Port        | Purpose                                                          |
-| --------------- | ----------- | ---------------------------------------------------------------- |
-| `postgres`      | 5432        | Dev database                                                     |
-| `postgres-test` | 5433        | Test database. Tests write real rows, keep it separate from dev. |
-| `redis`         | 6379        | BullMQ queues                                                    |
-| `minio`         | 9000 / 9001 | S3 storage (API / console). Creates `events` and `forms` buckets |
+| Service         | Port        | Purpose                                                                                |
+| --------------- | ----------- | -------------------------------------------------------------------------------------- |
+| `postgres`      | 5432        | Dev database                                                                           |
+| `postgres-test` | 5433        | Test database. Tests write real rows, keep it separate from dev.                       |
+| `redis`         | 6379        | BullMQ queues                                                                          |
+| `minio`         | 9000 / 9001 | S3 storage (API / console). Creates `events`, `forms`, and `email-attachments` buckets |
 
 You can start only what you need, e.g. `docker compose up -d postgres-test` if you only run tests.
 

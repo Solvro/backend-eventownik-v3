@@ -16,6 +16,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
+import { EmailAttachmentsService } from "./email-attachments.service";
 import type { ParticipantForParsing } from "./email-content-parser.service";
 import { EmailContentParserService } from "./email-content-parser.service";
 import { EMAIL_QUEUE_NAME, EMAIL_SEND_JOB_NAME } from "./emails.constants";
@@ -37,6 +38,7 @@ export class EmailDeliveryService {
     @InjectQueue(EMAIL_QUEUE_NAME) private readonly emailQueue: Queue,
     private readonly config: ConfigService,
     private readonly contentParser: EmailContentParserService,
+    private readonly emailAttachmentsService: EmailAttachmentsService,
   ) {}
 
   private participantStatusUuid(
@@ -147,11 +149,15 @@ export class EmailDeliveryService {
         participant,
       );
 
+      // Fetch from S3 per job — do not put buffers in BullMQ/Redis payload.
+      const fileAttachments =
+        await this.emailAttachmentsService.getNodemailerAttachments(emailUuid);
+
       await this.mailerService.sendMail({
         to: participant.email,
         subject: emailTemplate.name,
         html: parsedContent.html,
-        attachments: parsedContent.attachments,
+        attachments: [...parsedContent.attachments, ...fileAttachments],
         from: this.config.get<string>("SMTP_FROM") ?? undefined,
         replyTo:
           emailTemplate.event.contactEmail ??
@@ -244,11 +250,14 @@ export class EmailDeliveryService {
       participant,
     );
 
+    const fileAttachments =
+      await this.emailAttachmentsService.getNodemailerAttachments(emailUuid);
+
     await this.mailerService.sendMail({
       to: targetEmail,
       subject: `[TEST] ${emailTemplate.name}`,
       html: parsedContent.html,
-      attachments: parsedContent.attachments,
+      attachments: [...parsedContent.attachments, ...fileAttachments],
       from: this.config.get<string>("SMTP_FROM") ?? undefined,
       replyTo:
         emailTemplate.event.contactEmail ??

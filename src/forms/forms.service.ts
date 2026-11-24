@@ -4,6 +4,7 @@ import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { FORM_FILLED_EVENT } from "src/common/events/event-names.constants";
 import { FormFilledEvent } from "src/common/events/form-filled.event";
+import { assertAllowedMimeWithMagicBytes } from "src/common/utils/detect-file-mime";
 import { parseSortInput } from "src/common/utils/prisma.utility";
 import {
   Attribute,
@@ -124,11 +125,7 @@ export class FormsService {
       );
     }
 
-    if (!allowedMimes.includes(file.mimetype)) {
-      throw new BadRequestException(
-        `File type not allowed. Allowed types: ${allowedMimes.join(", ")}`,
-      );
-    }
+    await assertAllowedMimeWithMagicBytes(file, allowedMimes);
 
     const fileKey = await this.storageService.upload(this.bucket, file);
 

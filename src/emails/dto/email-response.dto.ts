@@ -1,5 +1,7 @@
 import type { Prisma } from "src/generated/prisma/client";
 
+import type { EmailAttachmentDto } from "./email-attachment.dto";
+
 export class EmailResponseDto {
   id: string;
   name: string;
@@ -11,4 +13,5 @@ export class EmailResponseDto {
   schema?: Prisma.JsonValue | null;
   createdAt: string;
   updatedAt: string;
+  attachments: EmailAttachmentDto[];
 }

@@ -9,6 +9,7 @@ import { ConfigService } from "@nestjs/config";
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
+import { EmailAttachmentsService } from "./email-attachments.service";
 import { EmailContentParserService } from "./email-content-parser.service";
 import { EmailDeliveryService } from "./email-delivery.service";
 import { EMAIL_QUEUE_NAME } from "./emails.constants";
@@ -51,6 +52,10 @@ describe("EmailDeliveryService", () => {
     parseEmailContent: jest.fn(),
   };
 
+  const mockEmailAttachmentsService = {
+    getNodemailerAttachments: jest.fn().mockResolvedValue([]),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -60,6 +65,10 @@ describe("EmailDeliveryService", () => {
         { provide: getQueueToken(EMAIL_QUEUE_NAME), useValue: mockQueue },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: EmailContentParserService, useValue: mockContentParser },
+        {
+          provide: EmailAttachmentsService,
+          useValue: mockEmailAttachmentsService,
+        },
       ],
     }).compile();
 
@@ -69,6 +78,7 @@ describe("EmailDeliveryService", () => {
   afterEach(() => {
     jest.clearAllMocks();
     jest.resetAllMocks();
+    mockEmailAttachmentsService.getNodemailerAttachments.mockResolvedValue([]);
   });
 
   it("should be defined", () => {
