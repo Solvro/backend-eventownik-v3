@@ -1,3 +1,7 @@
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { LogTrigger } from "src/generated/prisma/client";
+
 import { ConflictException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { TestingModule } from "@nestjs/testing";
@@ -56,6 +60,12 @@ function dataArgument(mockFunction: unknown): Record<string, unknown> {
   return calls[0][0].data;
 }
 
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
+
 describe("EventsService", () => {
   let service: EventsService;
   let prisma: PrismaService;
@@ -94,6 +104,14 @@ describe("EventsService", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EventsService,
+        {
+          provide: AuditLogService,
+          useValue: {
+            record: jest.fn(),
+            fieldChanges: () => [],
+            listChange: () => [],
+          },
+        },
         {
           provide: PrismaService,
           useValue: mockPrismaService,
@@ -446,6 +464,7 @@ describe("EventsService", () => {
         undefined,
         "admin-uuid",
         OrganizerType.superadmin,
+        ACTOR,
       );
 
       const createData = dataArgument(mockPrismaService.event.create);
@@ -476,6 +495,7 @@ describe("EventsService", () => {
         undefined,
         "admin-uuid",
         OrganizerType.organizer,
+        ACTOR,
       );
 
       const createData = dataArgument(mockPrismaService.event.create);
@@ -500,6 +520,7 @@ describe("EventsService", () => {
         photo,
         "admin-uuid",
         OrganizerType.superadmin,
+        ACTOR,
       );
 
       expect(mockStorageService.upload).toHaveBeenCalledWith(BUCKET, photo);
@@ -521,7 +542,13 @@ describe("EventsService", () => {
       );
 
       await expect(
-        service.create(eventDto, photo, "admin-uuid", OrganizerType.superadmin),
+        service.create(
+          eventDto,
+          photo,
+          "admin-uuid",
+          OrganizerType.superadmin,
+          ACTOR,
+        ),
       ).rejects.toThrow("db down");
 
       expect(mockStorageService.delete).toHaveBeenCalledWith(
@@ -544,6 +571,7 @@ describe("EventsService", () => {
           undefined,
           "admin-uuid",
           OrganizerType.superadmin,
+          ACTOR,
         ),
       ).rejects.toThrow(ConflictException);
     });
@@ -559,6 +587,10 @@ describe("EventsService", () => {
         photoKey: null,
       });
 
+      (prisma.event.findUnique as jest.Mock).mockResolvedValue({
+        uuid: eventUuid,
+        photoKey: null,
+      });
       (prisma.event.update as jest.Mock).mockResolvedValue(updatedEvent);
 
       const result = await service.update(
@@ -566,6 +598,7 @@ describe("EventsService", () => {
         eventDto,
         undefined,
         OrganizerType.superadmin,
+        ACTOR,
       );
 
       const { photoKey: _photoKey, ...updatedWithoutKey } = updatedEvent;
@@ -593,6 +626,7 @@ describe("EventsService", () => {
         eventDto,
         photo,
         OrganizerType.superadmin,
+        ACTOR,
       );
 
       expect(dataArgument(mockPrismaService.event.update).photoKey).toBe(
@@ -620,6 +654,7 @@ describe("EventsService", () => {
         eventDto,
         undefined,
         OrganizerType.superadmin,
+        ACTOR,
       );
 
       expect(dataArgument(mockPrismaService.event.update).photoKey).toBeNull();
@@ -642,6 +677,7 @@ describe("EventsService", () => {
         eventDto,
         undefined,
         OrganizerType.organizer,
+        ACTOR,
       );
 
       const updateData = dataArgument(mockPrismaService.event.update);
@@ -663,6 +699,7 @@ describe("EventsService", () => {
           eventDto,
           undefined,
           OrganizerType.superadmin,
+          ACTOR,
         ),
       ).rejects.toThrow(`Event with UUID ${eventUuid} not found`);
     });

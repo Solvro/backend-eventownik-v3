@@ -1,5 +1,11 @@
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import {
+  LogTrigger,
+  OrganizerType,
+  PermissionType,
+} from "src/generated/prisma/client";
 import type { Admin, Event } from "src/generated/prisma/client";
-import { OrganizerType, PermissionType } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 import { StorageService } from "src/storage/storage.service";
 
@@ -12,6 +18,12 @@ import { EventCreateDto } from "./dto/event-create.dto";
 import { EventListingDto } from "./dto/event-listing.dto";
 import { EventUpdateDto } from "./dto/event-update.dto";
 import { EventsService } from "./events.service";
+
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
 
 describe("EventsService (integration)", () => {
   let service: EventsService;
@@ -37,6 +49,7 @@ describe("EventsService (integration)", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EventsService,
+        AuditLogService,
         PrismaService,
         {
           provide: StorageService,
@@ -159,6 +172,7 @@ describe("EventsService (integration)", () => {
         undefined,
         admin.uuid,
         OrganizerType.superadmin,
+        ACTOR,
       );
 
       expect(event.name).toBe("Verified Event");
@@ -190,6 +204,7 @@ describe("EventsService (integration)", () => {
         undefined,
         admin.uuid,
         OrganizerType.organizer,
+        ACTOR,
       );
 
       expect(event.isVerified).toBe(false);
@@ -220,6 +235,7 @@ describe("EventsService (integration)", () => {
         photo,
         admin.uuid,
         OrganizerType.organizer,
+        ACTOR,
       );
 
       expect(mockStorageService.upload).toHaveBeenCalledWith("events", photo);
@@ -253,11 +269,17 @@ describe("EventsService (integration)", () => {
         endDate: new Date("2025-07-02"),
       });
 
-      await service.create(dto, undefined, admin.uuid, OrganizerType.organizer);
+      await service.create(
+        dto,
+        undefined,
+        admin.uuid,
+        OrganizerType.organizer,
+        ACTOR,
+      );
 
       mockStorageService.upload.mockResolvedValue("key-to-delete.jpg");
       await expect(
-        service.create(dto, photo, admin.uuid, OrganizerType.organizer),
+        service.create(dto, photo, admin.uuid, OrganizerType.organizer, ACTOR),
       ).rejects.toThrow(ConflictException);
 
       expect(mockStorageService.delete).toHaveBeenCalledWith(
@@ -287,6 +309,7 @@ describe("EventsService (integration)", () => {
         undefined,
         admin.uuid,
         OrganizerType.organizer,
+        ACTOR,
       );
 
       const perm = await prisma.eventPermission.findUnique({
@@ -319,6 +342,7 @@ describe("EventsService (integration)", () => {
         dto,
         undefined,
         OrganizerType.organizer,
+        ACTOR,
       );
 
       expect(result.name).toBe("Updated Name");
@@ -350,6 +374,7 @@ describe("EventsService (integration)", () => {
         dto,
         newPhoto,
         OrganizerType.organizer,
+        ACTOR,
       );
 
       expect(mockStorageService.upload).toHaveBeenCalledWith(
@@ -377,6 +402,7 @@ describe("EventsService (integration)", () => {
         dto,
         undefined,
         OrganizerType.organizer,
+        ACTOR,
       );
 
       expect(mockStorageService.delete).toHaveBeenCalledWith(
@@ -407,6 +433,7 @@ describe("EventsService (integration)", () => {
         dto,
         undefined,
         OrganizerType.organizer,
+        ACTOR,
       );
 
       expect(result.isVerified).toBe(false);
@@ -435,6 +462,7 @@ describe("EventsService (integration)", () => {
         dto,
         undefined,
         OrganizerType.superadmin,
+        ACTOR,
       );
 
       expect(result.isVerified).toBe(true);
@@ -450,6 +478,7 @@ describe("EventsService (integration)", () => {
           dto,
           undefined,
           OrganizerType.organizer,
+          ACTOR,
         ),
       ).rejects.toThrow(NotFoundException);
     });
@@ -732,6 +761,74 @@ describe("EventsService (integration)", () => {
 
       expect(result.photoUrl).toBe(
         "https://cdn.test/events/public-event-photo.jpg",
+      );
+    });
+  });
+  describe("audit log", () => {
+    it("records creation and only changed settings and links on update", async () => {
+      const admin = await createAdmin({ type: OrganizerType.organizer });
+      const dto = Object.assign(new EventCreateDto(), {
+        name: "Audited Event",
+        slug: `audited-${String(Date.now())}`,
+        startDate: new Date("2025-07-01"),
+        endDate: new Date("2025-07-02"),
+        links: [{ type: "general", url: "https://example.com/a" }],
+      });
+      const event = await service.create(
+        dto,
+        undefined,
+        admin.uuid,
+        OrganizerType.organizer,
+        ACTOR,
+      );
+      createdEventUuids.push(event.uuid);
+
+      await service.update(
+        event.uuid,
+        Object.assign(new EventUpdateDto(), {
+          name: "Renamed Event",
+          links: [{ type: "general", url: "https://example.com/b" }],
+        }),
+        undefined,
+        OrganizerType.organizer,
+        ACTOR,
+      );
+      await service.update(
+        event.uuid,
+        Object.assign(new EventUpdateDto(), { name: "Renamed Event" }),
+        undefined,
+        OrganizerType.organizer,
+        ACTOR,
+      );
+
+      const entries = await prisma.auditLog.findMany({
+        where: { eventUuid: event.uuid },
+        orderBy: { createdAt: "asc" },
+      });
+
+      expect(entries.map((entry) => entry.action)).toEqual([
+        "event.created",
+        "event.updated",
+      ]);
+      expect(entries[0]).toMatchObject({
+        actorUuid: ACTOR.uuid,
+        entityLabel: "Audited Event",
+      });
+      expect(entries[1].changes).toEqual(
+        expect.arrayContaining([
+          {
+            kind: "value",
+            field: "name",
+            from: "Audited Event",
+            to: "Renamed Event",
+          },
+          {
+            kind: "list",
+            field: "links",
+            added: [{ type: "general", url: "https://example.com/b" }],
+            removed: [{ type: "general", url: "https://example.com/a" }],
+          },
+        ]),
       );
     });
   });

@@ -1,3 +1,5 @@
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { CurrentAuditActor } from "src/audit-log/current-audit-actor.decorator";
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { AuthUser } from "src/auth/jwt.strategy";
 import { RequirePermission } from "src/auth/permissions.decorator";
@@ -69,12 +71,14 @@ export class EventsController {
     @UploadedFile() photo: Express.Multer.File | undefined,
     @Body() eventDto: EventCreateDto,
     @Request() request: { user: AuthUser },
+    @CurrentAuditActor() actor: AuditActor,
   ): Promise<Event> {
     return this.eventsService.create(
       eventDto,
       photo,
       request.user.uuid,
       request.user.type,
+      actor,
     );
   }
 
@@ -104,12 +108,14 @@ export class EventsController {
     @UploadedFile() photo: Express.Multer.File | undefined,
     @Body() eventDto: EventUpdateDto,
     @Request() request: { user: AuthUser },
+    @CurrentAuditActor() actor: AuditActor,
   ): Promise<Event> {
     return this.eventsService.update(
       eventUUID,
       eventDto,
       photo,
       request.user.type,
+      actor,
     );
   }
 
