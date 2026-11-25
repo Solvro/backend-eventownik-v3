@@ -1,3 +1,4 @@
+import { AuditLogService } from "src/audit-log/audit-log.service";
 import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -13,6 +14,7 @@ describe("BlocksService", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BlocksService,
+        { provide: AuditLogService, useValue: {} },
         {
           provide: ParticipantsService,
           useValue: {},

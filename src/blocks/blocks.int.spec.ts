@@ -1,3 +1,6 @@
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { LogTrigger } from "src/generated/prisma/client";
 import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -11,6 +14,12 @@ import { BlocksService } from "./blocks.service";
 import type { CreateBlockDto } from "./dto/create-block.dto";
 import type { UpdateBlockDto } from "./dto/update-block.dto";
 import type { Block } from "./entities/block.entity";
+
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
 
 describe("Blocks Integration", () => {
   let blocksController: BlocksController;
@@ -39,6 +48,11 @@ describe("Blocks Integration", () => {
     $transaction: jest.fn(),
   };
 
+  const mockAuditLogService = {
+    record: jest.fn(),
+    fieldChanges: () => [],
+  };
+
   const mockParticipantService = {
     findAll: jest.fn(),
     getPublicBlockAttributes: jest.fn(),
@@ -57,6 +71,7 @@ describe("Blocks Integration", () => {
           provide: ParticipantsService,
           useValue: mockParticipantService,
         },
+        { provide: AuditLogService, useValue: mockAuditLogService },
         {
           provide: PrismaService,
           useValue: mockPrismaService,
@@ -71,6 +86,10 @@ describe("Blocks Integration", () => {
     );
 
     jest.clearAllMocks();
+    mockPrismaService.$transaction.mockImplementation(
+      (callback: (tx: typeof mockPrismaService) => unknown) =>
+        callback(mockPrismaService),
+    );
   });
 
   describe("create", () => {
@@ -92,7 +111,12 @@ describe("Blocks Integration", () => {
         attributeUuid: attributeId,
       });
 
-      const result = await blocksController.create(eventId, attributeId, dto);
+      const result = await blocksController.create(
+        eventId,
+        attributeId,
+        dto,
+        ACTOR,
+      );
 
       expect(mockPrismaService.attribute.findFirst).toHaveBeenCalledWith({
         where: { uuid: attributeId, eventUuid: eventId },
@@ -119,7 +143,7 @@ describe("Blocks Integration", () => {
       };
 
       await expect(
-        blocksController.create(eventId, attributeId, dto),
+        blocksController.create(eventId, attributeId, dto, ACTOR),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -216,6 +240,7 @@ describe("Blocks Integration", () => {
         attributeId,
         blockId,
         dto,
+        ACTOR,
       );
 
       expect(result).toHaveProperty("uuid", blockId);
@@ -233,7 +258,7 @@ describe("Blocks Integration", () => {
         name: dto.name,
       });
 
-      await blocksController.update(eventId, attributeId, blockId, dto);
+      await blocksController.update(eventId, attributeId, blockId, dto, ACTOR);
 
       expect(mockPrismaService.block.update).toHaveBeenCalledWith({
         where: { uuid: blockId },
@@ -248,9 +273,15 @@ describe("Blocks Integration", () => {
       });
 
       await expect(
-        blocksController.update(eventId, attributeId, blockId, {
-          parentUuid: blockId,
-        }),
+        blocksController.update(
+          eventId,
+          attributeId,
+          blockId,
+          {
+            parentUuid: blockId,
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -277,6 +308,7 @@ describe("Blocks Integration", () => {
         attributeId,
         blockId,
         {},
+        ACTOR,
       );
 
       expect(mockPrismaService.block.create).toHaveBeenCalledWith({
@@ -305,9 +337,15 @@ describe("Blocks Integration", () => {
       });
       mockPrismaService.block.create.mockResolvedValue({ uuid: "new-uuid" });
 
-      await blocksController.duplicate(eventId, attributeId, blockId, {
-        name: "Custom block",
-      });
+      await blocksController.duplicate(
+        eventId,
+        attributeId,
+        blockId,
+        {
+          name: "Custom block",
+        },
+        ACTOR,
+      );
 
       expect(mockPrismaService.block.create).toHaveBeenCalledWith({
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -323,7 +361,7 @@ describe("Blocks Integration", () => {
       });
 
       await expect(
-        blocksController.duplicate(eventId, attributeId, blockId, {}),
+        blocksController.duplicate(eventId, attributeId, blockId, {}, ACTOR),
       ).rejects.toThrow(BadRequestException);
       expect(mockPrismaService.block.create).not.toHaveBeenCalled();
     });
@@ -332,7 +370,7 @@ describe("Blocks Integration", () => {
       mockPrismaService.block.findFirst.mockResolvedValue(null);
 
       await expect(
-        blocksController.duplicate(eventId, attributeId, blockId, {}),
+        blocksController.duplicate(eventId, attributeId, blockId, {}, ACTOR),
       ).rejects.toThrow(NotFoundException);
       expect(mockPrismaService.block.create).not.toHaveBeenCalled();
     });
@@ -346,7 +384,7 @@ describe("Blocks Integration", () => {
       });
       mockPrismaService.block.delete.mockResolvedValue({ uuid: blockId });
 
-      await blocksController.remove(eventId, attributeId, blockId);
+      await blocksController.remove(eventId, attributeId, blockId, ACTOR);
 
       expect(mockPrismaService.block.delete).toHaveBeenCalledWith({
         where: { uuid: blockId },
