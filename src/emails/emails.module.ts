@@ -1,3 +1,5 @@
+import { AuditLogModule } from "src/audit-log/audit-log.module";
+
 import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
@@ -13,6 +15,7 @@ import { EmailsListeners } from "./emails.listeners";
 @Module({
   imports: [
     ConfigModule,
+    AuditLogModule,
     BullModule.registerQueue({
       name: EMAIL_QUEUE_NAME,
       defaultJobOptions: {

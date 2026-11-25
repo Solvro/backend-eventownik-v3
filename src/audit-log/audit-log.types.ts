@@ -59,8 +59,16 @@ export interface AuditFileChange extends AuditChangeBase {
   to: AuditFileRef | null;
 }
 
+export interface AuditOpaqueChange extends AuditChangeBase {
+  kind: "changed";
+}
+
 export type AuditChange =
-  AuditValueChange | AuditListChange | AuditBlocksChange | AuditFileChange;
+  | AuditValueChange
+  | AuditListChange
+  | AuditBlocksChange
+  | AuditFileChange
+  | AuditOpaqueChange;
 
 export interface AuditEntry {
   eventUuid: string;

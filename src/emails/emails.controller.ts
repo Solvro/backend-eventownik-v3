@@ -1,3 +1,5 @@
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { CurrentAuditActor } from "src/audit-log/current-audit-actor.decorator";
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
@@ -73,8 +75,9 @@ export class EmailsController {
   async create(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Body() query: CreateEmailDto,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
-    return this.emailTemplatesService.create(eventId, query);
+    return this.emailTemplatesService.create(eventId, query, actor);
   }
 
   @Get()
@@ -147,8 +150,9 @@ export class EmailsController {
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("emailId", ParseUUIDPipe) emailId: string,
     @Body() query: DuplicateEmailDto,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
-    return this.emailTemplatesService.duplicate(eventId, emailId, query);
+    return this.emailTemplatesService.duplicate(eventId, emailId, query, actor);
   }
 
   @Patch("reorder")
@@ -170,8 +174,9 @@ export class EmailsController {
   async reorder(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Body() query: ReorderEmailsDto,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
-    return this.emailTemplatesService.reorder(eventId, query.emailIds);
+    return this.emailTemplatesService.reorder(eventId, query.emailIds, actor);
   }
 
   @Patch(":emailId")
@@ -191,8 +196,9 @@ export class EmailsController {
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("emailId", ParseUUIDPipe) emailId: string,
     @Body() query: UpdateEmailDto,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
-    return this.emailTemplatesService.update(eventId, emailId, query);
+    return this.emailTemplatesService.update(eventId, emailId, query, actor);
   }
 
   @Delete(":emailId")
@@ -208,8 +214,9 @@ export class EmailsController {
   async remove(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("emailId", ParseUUIDPipe) emailId: string,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
-    return this.emailTemplatesService.remove(eventId, emailId);
+    return this.emailTemplatesService.remove(eventId, emailId, actor);
   }
 
   @Post(":emailId/send")
@@ -231,11 +238,13 @@ export class EmailsController {
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("emailId", ParseUUIDPipe) emailId: string,
     @Body() query: SendEmailDto,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
     return this.emailDeliveryService.sendManualEmail(
       eventId,
       emailId,
       query.participantUuids,
+      actor,
     );
   }
 

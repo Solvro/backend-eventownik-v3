@@ -1,3 +1,6 @@
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { LogTrigger } from "src/generated/prisma/client";
 import { EmailStatus, EmailTrigger } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -9,6 +12,12 @@ import type { CreateEmailDto } from "./dto/create-email.dto";
 import type { EmailListingDto } from "./dto/email-listing.dto";
 import type { UpdateEmailDto } from "./dto/update-email.dto";
 import { EmailTemplatesService } from "./email-templates.service";
+
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
 
 describe("EmailTemplatesService", () => {
   let service: EmailTemplatesService;
@@ -42,6 +51,10 @@ describe("EmailTemplatesService", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EmailTemplatesService,
+        {
+          provide: AuditLogService,
+          useValue: { record: jest.fn(), fieldChanges: () => [] },
+        },
         {
           provide: PrismaService,
           useValue: mockPrismaService,
@@ -86,7 +99,7 @@ describe("EmailTemplatesService", () => {
         updatedAt: new Date("2025-02-22T19:13:10.471Z"),
       });
 
-      const result = await service.create(mockEventId, dto);
+      const result = await service.create(mockEventId, dto, ACTOR);
 
       expect(mockPrismaService.emailTemplate.create).toHaveBeenCalledWith({
         data: {
@@ -110,7 +123,7 @@ describe("EmailTemplatesService", () => {
       mockPrismaService.event.findUnique.mockResolvedValue(null);
       mockTransaction(mockPrismaService);
       await expect(
-        service.create(mockEventId, dto as CreateEmailDto),
+        service.create(mockEventId, dto as CreateEmailDto, ACTOR),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -319,6 +332,7 @@ describe("EmailTemplatesService", () => {
         mockEventId,
         mockEmailId,
         updateEmailDto,
+        ACTOR,
       );
 
       expect(mockPrismaService.emailTemplate.update).toHaveBeenCalledWith({
@@ -348,7 +362,7 @@ describe("EmailTemplatesService", () => {
       mockTransaction(mockPrismaService);
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue(null);
       await expect(
-        service.update(mockEventId, mockEmailId, {}),
+        service.update(mockEventId, mockEmailId, {}, ACTOR),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -365,14 +379,13 @@ describe("EmailTemplatesService", () => {
 
       // Check whether delete() returns undefined.
       // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
-      const result = await service.remove(mockEventId, mockEmailId);
+      const result = await service.remove(mockEventId, mockEmailId, ACTOR);
 
       expect(mockPrismaService.emailTemplate.findFirst).toHaveBeenCalledWith({
         where: {
           uuid: mockEmailId,
           eventUuid: mockEventId,
         },
-        select: { uuid: true },
       });
 
       expect(mockPrismaService.emailTemplate.delete).toHaveBeenCalledWith({
@@ -386,9 +399,9 @@ describe("EmailTemplatesService", () => {
       mockTransaction(mockPrismaService);
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue(null);
 
-      await expect(service.remove(mockEventId, mockEmailId)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.remove(mockEventId, mockEmailId, ACTOR),
+      ).rejects.toThrow(NotFoundException);
       expect(mockPrismaService.emailTemplate.delete).not.toHaveBeenCalled();
     });
   });

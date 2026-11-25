@@ -48,6 +48,7 @@ export function diffFields(
   before: JsonRecord | null,
   after: JsonRecord | null,
   fields: readonly string[],
+  opaqueFields: readonly string[] = [],
 ): AuditChange[] {
   const changes: AuditChange[] = [];
 
@@ -56,6 +57,12 @@ export function diffFields(
     const to = toJson(after?.[field]);
     if (!isSame(from, to)) {
       changes.push({ kind: "value", field, from, to });
+    }
+  }
+
+  for (const field of opaqueFields) {
+    if (!isSame(before?.[field], after?.[field])) {
+      changes.push({ kind: "changed", field });
     }
   }
 

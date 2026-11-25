@@ -1,3 +1,6 @@
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { LogTrigger } from "src/generated/prisma/client";
 import type { Event, Form } from "src/generated/prisma/client";
 import { EmailStatus, EmailTrigger } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
@@ -8,6 +11,12 @@ import type { TestingModule } from "@nestjs/testing";
 
 import { EmailListingDto } from "./dto/email-listing.dto";
 import { EmailTemplatesService } from "./email-templates.service";
+
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
 
 describe("EmailTemplatesService (integration)", () => {
   let service: EmailTemplatesService;
@@ -25,7 +34,7 @@ describe("EmailTemplatesService (integration)", () => {
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [EmailTemplatesService, PrismaService],
+      providers: [EmailTemplatesService, AuditLogService, PrismaService],
     }).compile();
 
     service = module.get<EmailTemplatesService>(EmailTemplatesService);
@@ -121,11 +130,15 @@ describe("EmailTemplatesService (integration)", () => {
     it("creates an email template for an existing event", async () => {
       const event = await createEvent();
 
-      const result = await service.create(event.uuid, {
-        name: "Welcome email",
-        content: "<p>Welcome</p>",
-        trigger: EmailTrigger.MANUAL,
-      });
+      const result = await service.create(
+        event.uuid,
+        {
+          name: "Welcome email",
+          content: "<p>Welcome</p>",
+          trigger: EmailTrigger.MANUAL,
+        },
+        ACTOR,
+      );
 
       expect(result.id).toBeDefined();
       expect(result.name).toBe("Welcome email");
@@ -143,11 +156,15 @@ describe("EmailTemplatesService (integration)", () => {
       const fakeEventUuid = "00000000-0000-0000-0000-000000000001";
 
       await expect(
-        service.create(fakeEventUuid, {
-          name: "Welcome email",
-          content: "<p>Welcome</p>",
-          trigger: EmailTrigger.MANUAL,
-        }),
+        service.create(
+          fakeEventUuid,
+          {
+            name: "Welcome email",
+            content: "<p>Welcome</p>",
+            trigger: EmailTrigger.MANUAL,
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -157,12 +174,16 @@ describe("EmailTemplatesService (integration)", () => {
       const formInOtherEvent = await createForm(otherEvent.uuid);
 
       await expect(
-        service.create(event.uuid, {
-          name: "Form filled email",
-          content: "<p>Thanks</p>",
-          trigger: EmailTrigger.FORM_FILLED,
-          triggerConfig: { formUuid: formInOtherEvent.uuid },
-        }),
+        service.create(
+          event.uuid,
+          {
+            name: "Form filled email",
+            content: "<p>Thanks</p>",
+            trigger: EmailTrigger.FORM_FILLED,
+            triggerConfig: { formUuid: formInOtherEvent.uuid },
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -170,12 +191,16 @@ describe("EmailTemplatesService (integration)", () => {
       const event = await createEvent();
       const form = await createForm(event.uuid);
 
-      const result = await service.create(event.uuid, {
-        name: "Form filled email",
-        content: "<p>Thanks</p>",
-        trigger: EmailTrigger.FORM_FILLED,
-        triggerConfig: { formUuid: form.uuid },
-      });
+      const result = await service.create(
+        event.uuid,
+        {
+          name: "Form filled email",
+          content: "<p>Thanks</p>",
+          trigger: EmailTrigger.FORM_FILLED,
+          triggerConfig: { formUuid: form.uuid },
+        },
+        ACTOR,
+      );
 
       expect(result.id).toBeDefined();
     });
@@ -183,12 +208,16 @@ describe("EmailTemplatesService (integration)", () => {
     it("creates a template without a schema when schema is null", async () => {
       const event = await createEvent();
 
-      const result = await service.create(event.uuid, {
-        name: "No schema",
-        content: "<p>Hi</p>",
-        trigger: EmailTrigger.MANUAL,
-        schema: null,
-      });
+      const result = await service.create(
+        event.uuid,
+        {
+          name: "No schema",
+          content: "<p>Hi</p>",
+          trigger: EmailTrigger.MANUAL,
+          schema: null,
+        },
+        ACTOR,
+      );
 
       expect(result.schema).toBeNull();
     });
@@ -197,11 +226,15 @@ describe("EmailTemplatesService (integration)", () => {
       const event = await createEvent();
 
       await expect(
-        service.create(event.uuid, {
-          name: "Attribute changed email",
-          content: "<p>Changed</p>",
-          trigger: EmailTrigger.ATTRIBUTE_CHANGED,
-        }),
+        service.create(
+          event.uuid,
+          {
+            name: "Attribute changed email",
+            content: "<p>Changed</p>",
+            trigger: EmailTrigger.ATTRIBUTE_CHANGED,
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -374,10 +407,15 @@ describe("EmailTemplatesService (integration)", () => {
       const event = await createEvent();
       const template = await createEmailTemplate(event.uuid);
 
-      const result = await service.update(event.uuid, template.uuid, {
-        name: "Renamed",
-        content: "<p>Updated</p>",
-      });
+      const result = await service.update(
+        event.uuid,
+        template.uuid,
+        {
+          name: "Renamed",
+          content: "<p>Updated</p>",
+        },
+        ACTOR,
+      );
 
       expect(result.name).toBe("Renamed");
       expect(result.content).toBe("<p>Updated</p>");
@@ -397,10 +435,15 @@ describe("EmailTemplatesService (integration)", () => {
       });
 
       await expect(
-        service.update(event.uuid, template.uuid, {
-          trigger: EmailTrigger.FORM_FILLED,
-          triggerConfig: { formUuid: "00000000-0000-0000-0000-000000000004" },
-        }),
+        service.update(
+          event.uuid,
+          template.uuid,
+          {
+            trigger: EmailTrigger.FORM_FILLED,
+            triggerConfig: { formUuid: "00000000-0000-0000-0000-000000000004" },
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -416,7 +459,7 @@ describe("EmailTemplatesService (integration)", () => {
         },
       });
 
-      await service.update(event.uuid, template.uuid, { schema: null });
+      await service.update(event.uuid, template.uuid, { schema: null }, ACTOR);
 
       const stored = await prisma.emailTemplate.findUnique({
         where: { uuid: template.uuid },
@@ -432,10 +475,20 @@ describe("EmailTemplatesService (integration)", () => {
         triggerConfig: { formUuid: form.uuid },
       });
 
-      await service.update(event.uuid, template.uuid, { name: "Renamed" });
-      await service.update(event.uuid, template.uuid, {
-        trigger: EmailTrigger.FORM_FILLED,
-      });
+      await service.update(
+        event.uuid,
+        template.uuid,
+        { name: "Renamed" },
+        ACTOR,
+      );
+      await service.update(
+        event.uuid,
+        template.uuid,
+        {
+          trigger: EmailTrigger.FORM_FILLED,
+        },
+        ACTOR,
+      );
 
       const stored = await prisma.emailTemplate.findUnique({
         where: { uuid: template.uuid },
@@ -452,9 +505,14 @@ describe("EmailTemplatesService (integration)", () => {
       });
 
       await expect(
-        service.update(event.uuid, template.uuid, {
-          triggerConfig: { formUuid: "00000000-0000-0000-0000-000000000006" },
-        }),
+        service.update(
+          event.uuid,
+          template.uuid,
+          {
+            triggerConfig: { formUuid: "00000000-0000-0000-0000-000000000006" },
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -466,9 +524,14 @@ describe("EmailTemplatesService (integration)", () => {
         triggerConfig: { formUuid: form.uuid },
       });
 
-      await service.update(event.uuid, template.uuid, {
-        trigger: EmailTrigger.MANUAL,
-      });
+      await service.update(
+        event.uuid,
+        template.uuid,
+        {
+          trigger: EmailTrigger.MANUAL,
+        },
+        ACTOR,
+      );
 
       const stored = await prisma.emailTemplate.findUnique({
         where: { uuid: template.uuid },
@@ -482,7 +545,7 @@ describe("EmailTemplatesService (integration)", () => {
       const template = await createEmailTemplate(otherEvent.uuid);
 
       await expect(
-        service.update(event.uuid, template.uuid, { name: "Nope" }),
+        service.update(event.uuid, template.uuid, { name: "Nope" }, ACTOR),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -498,7 +561,7 @@ describe("EmailTemplatesService (integration)", () => {
       const b = await createEmailTemplate(event.uuid, { name: "B" });
       const c = await createEmailTemplate(event.uuid, { name: "C", order: 0 });
 
-      await service.reorder(event.uuid, [c.uuid, a.uuid, b.uuid]);
+      await service.reorder(event.uuid, [c.uuid, a.uuid, b.uuid], ACTOR);
 
       expect(await storedOrder(c.uuid)).toBe(0);
       expect(await storedOrder(a.uuid)).toBe(1);
@@ -510,7 +573,7 @@ describe("EmailTemplatesService (integration)", () => {
       const listed = await createEmailTemplate(event.uuid, { order: 7 });
       const unlisted = await createEmailTemplate(event.uuid, { order: 9 });
 
-      await service.reorder(event.uuid, [listed.uuid]);
+      await service.reorder(event.uuid, [listed.uuid], ACTOR);
 
       expect(await storedOrder(listed.uuid)).toBe(0);
       expect(await storedOrder(unlisted.uuid)).toBe(9);
@@ -523,7 +586,7 @@ describe("EmailTemplatesService (integration)", () => {
       const foreign = await createEmailTemplate(otherEvent.uuid, { order: 6 });
 
       await expect(
-        service.reorder(event.uuid, [own.uuid, foreign.uuid]),
+        service.reorder(event.uuid, [own.uuid, foreign.uuid], ACTOR),
       ).rejects.toThrow(NotFoundException);
 
       expect(await storedOrder(own.uuid)).toBe(4);
@@ -534,7 +597,11 @@ describe("EmailTemplatesService (integration)", () => {
       const event = await createEvent();
 
       await expect(
-        service.reorder(event.uuid, ["00000000-0000-4000-8000-000000000007"]),
+        service.reorder(
+          event.uuid,
+          ["00000000-0000-4000-8000-000000000007"],
+          ACTOR,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -548,7 +615,7 @@ describe("EmailTemplatesService (integration)", () => {
       const event = await createEvent();
       const template = await createEmailTemplate(event.uuid);
 
-      await service.remove(event.uuid, template.uuid);
+      await service.remove(event.uuid, template.uuid, ACTOR);
 
       const stored = await prisma.emailTemplate.findUnique({
         where: { uuid: template.uuid },
@@ -560,9 +627,55 @@ describe("EmailTemplatesService (integration)", () => {
       const event = await createEvent();
       const fakeEmailUuid = "00000000-0000-0000-0000-000000000005";
 
-      await expect(service.remove(event.uuid, fakeEmailUuid)).rejects.toThrow(
-        NotFoundException,
+      await expect(
+        service.remove(event.uuid, fakeEmailUuid, ACTOR),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+  describe("audit log", () => {
+    it("records create, update, reorder, duplicate and remove", async () => {
+      const event = await createEvent();
+
+      const created = await service.create(
+        event.uuid,
+        {
+          name: "Welcome",
+          content: "<p>Hi</p>",
+          trigger: EmailTrigger.MANUAL,
+        },
+        ACTOR,
       );
+      await service.update(
+        event.uuid,
+        created.id,
+        { name: "Hello", content: "<p>Hello</p>" },
+        ACTOR,
+      );
+      const other = await createEmailTemplate(event.uuid, { order: 5 });
+      await service.reorder(event.uuid, [other.uuid, created.id], ACTOR);
+      await service.remove(event.uuid, created.id, ACTOR);
+
+      const entries = await prisma.auditLog.findMany({
+        where: { eventUuid: event.uuid },
+        orderBy: { createdAt: "asc" },
+      });
+
+      expect(entries.map((entry) => entry.action)).toEqual([
+        "email_template.created",
+        "email_template.updated",
+        "email_template.updated",
+        "email_template.updated",
+        "email_template.deleted",
+      ]);
+      expect(entries[1].changes).toEqual(
+        expect.arrayContaining([
+          { kind: "value", field: "name", from: "Welcome", to: "Hello" },
+          { kind: "changed", field: "content" },
+        ]),
+      );
+      expect(JSON.stringify(entries[1].changes)).not.toContain("<p>Hello</p>");
+      expect(entries[2].correlationId).not.toBeNull();
+      expect(entries[2].correlationId).toBe(entries[3].correlationId);
     });
   });
 });

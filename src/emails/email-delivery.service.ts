@@ -1,6 +1,12 @@
 import { MailerService } from "@nestjs-modules/mailer";
 import { Queue } from "bullmq";
 import { randomUUID } from "node:crypto";
+import {
+  AuditAction,
+  AuditEntityType,
+} from "src/audit-log/audit-log.constants";
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import type { PageOptionsDto } from "src/common/dto/page-options.dto";
 import { PageDto } from "src/common/dto/page.dto";
@@ -37,6 +43,7 @@ export class EmailDeliveryService {
     @InjectQueue(EMAIL_QUEUE_NAME) private readonly emailQueue: Queue,
     private readonly config: ConfigService,
     private readonly contentParser: EmailContentParserService,
+    private readonly auditLog: AuditLogService,
   ) {}
 
   private participantStatusUuid(
@@ -174,10 +181,11 @@ export class EmailDeliveryService {
     eventUuid: string,
     emailUuid: string,
     participantUuids: string[],
+    actor: AuditActor,
   ): Promise<void> {
     const emailTemplate = await this.prisma.emailTemplate.findFirst({
       where: { uuid: emailUuid, eventUuid },
-      select: { uuid: true },
+      select: { uuid: true, name: true },
     });
     if (emailTemplate == null) {
       throw new NotFoundException("Email template not found");
@@ -192,6 +200,23 @@ export class EmailDeliveryService {
         "One or more participants were not found in this event",
       );
     }
+
+    await this.auditLog.record(this.prisma, {
+      eventUuid,
+      action: AuditAction.EmailsSentManually,
+      actor,
+      entityType: AuditEntityType.EmailTemplate,
+      entityUuid: emailTemplate.uuid,
+      entityLabel: emailTemplate.name,
+      changes: [
+        {
+          kind: "value",
+          field: "recipients",
+          from: null,
+          to: uniqueParticipantUuids.length,
+        },
+      ],
+    });
 
     await this.sendEmailToParticipants(emailUuid, uniqueParticipantUuids);
   }

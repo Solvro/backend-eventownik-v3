@@ -1,7 +1,14 @@
+import { randomUUID } from "node:crypto";
+import {
+  AuditAction,
+  AuditEntityType,
+} from "src/audit-log/audit-log.constants";
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { parseSortInput } from "src/common/utils/prisma.utility";
-import { Prisma } from "src/generated/prisma/client";
+import { EmailTemplate, Prisma } from "src/generated/prisma/client";
 import { EmailStatus, EmailTrigger } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -25,13 +32,57 @@ interface StatusCounts {
   sentCount: number;
 }
 
+const AUDITED_EMAIL_FIELDS = ["name", "trigger", "triggerConfig", "order"];
+const OPAQUE_EMAIL_FIELDS = ["content", "schema"];
+
 @Injectable()
 export class EmailTemplatesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLog: AuditLogService,
+  ) {}
+
+  private async recordEmailAudit(
+    tx: Prisma.TransactionClient,
+    eventUuid: string,
+    actor: AuditActor,
+    change: {
+      action:
+        | typeof AuditAction.EmailTemplateCreated
+        | typeof AuditAction.EmailTemplateUpdated
+        | typeof AuditAction.EmailTemplateDeleted;
+      before: EmailTemplate | null;
+      after: EmailTemplate | null;
+      correlationId?: string;
+    },
+  ) {
+    const changes = this.auditLog.fieldChanges(
+      change.before,
+      change.after,
+      AUDITED_EMAIL_FIELDS,
+      OPAQUE_EMAIL_FIELDS,
+    );
+    if (changes.length === 0) {
+      return;
+    }
+
+    const template = change.after ?? change.before;
+    await this.auditLog.record(tx, {
+      eventUuid,
+      action: change.action,
+      actor,
+      entityType: AuditEntityType.EmailTemplate,
+      entityUuid: template?.uuid,
+      entityLabel: template?.name,
+      changes,
+      correlationId: change.correlationId,
+    });
+  }
 
   async create(
     eventUuid: string,
     query: CreateEmailDto,
+    actor: AuditActor,
   ): Promise<EmailResponseDto> {
     return this.prisma.$transaction(async (tx) => {
       const event = await tx.event.findUnique({
@@ -59,6 +110,12 @@ export class EmailTemplatesService {
           order: query.order,
           eventUuid,
         },
+      });
+
+      await this.recordEmailAudit(tx, eventUuid, actor, {
+        action: AuditAction.EmailTemplateCreated,
+        before: null,
+        after: emailTemplate,
       });
 
       return {
@@ -232,6 +289,7 @@ export class EmailTemplatesService {
     eventUuid: string,
     emailUuid: string,
     query: UpdateEmailDto,
+    actor: AuditActor,
   ): Promise<EmailResponseDto> {
     return this.prisma.$transaction(async (tx) => {
       const existingEmail = await tx.emailTemplate.findFirst({
@@ -239,7 +297,6 @@ export class EmailTemplatesService {
           uuid: emailUuid,
           eventUuid,
         },
-        select: { uuid: true, trigger: true },
       });
       if (existingEmail == null) {
         throw new NotFoundException("Email template or event does not exist");
@@ -270,6 +327,12 @@ export class EmailTemplatesService {
           schema: query.schema === null ? Prisma.DbNull : query.schema,
           order: query.order,
         },
+      });
+
+      await this.recordEmailAudit(tx, eventUuid, actor, {
+        action: AuditAction.EmailTemplateUpdated,
+        before: existingEmail,
+        after: emailTemplate,
       });
 
       return {
@@ -344,7 +407,11 @@ export class EmailTemplatesService {
     }
   }
 
-  async reorder(eventUuid: string, emailUuids: string[]): Promise<void> {
+  async reorder(
+    eventUuid: string,
+    emailUuids: string[],
+    actor: AuditActor,
+  ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const matching = await tx.emailTemplate.count({
         where: { eventUuid, uuid: { in: emailUuids } },
@@ -355,23 +422,40 @@ export class EmailTemplatesService {
         );
       }
 
+      const existing = await tx.emailTemplate.findMany({
+        where: { eventUuid, uuid: { in: emailUuids } },
+      });
+      const previous = new Map(
+        existing.map((template) => [template.uuid, template]),
+      );
+      const correlationId = randomUUID();
+
       for (const [index, uuid] of emailUuids.entries()) {
-        await tx.emailTemplate.update({
+        const updated = await tx.emailTemplate.update({
           where: { uuid },
           data: { order: index },
+        });
+        await this.recordEmailAudit(tx, eventUuid, actor, {
+          action: AuditAction.EmailTemplateUpdated,
+          before: previous.get(uuid) ?? null,
+          after: updated,
+          correlationId,
         });
       }
     });
   }
 
-  async remove(eventUuid: string, emailUuid: string): Promise<void> {
+  async remove(
+    eventUuid: string,
+    emailUuid: string,
+    actor: AuditActor,
+  ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const existingEmail = await tx.emailTemplate.findFirst({
         where: {
           uuid: emailUuid,
           eventUuid,
         },
-        select: { uuid: true },
       });
       if (existingEmail == null) {
         throw new NotFoundException("Email template or event does not exist");
@@ -382,6 +466,12 @@ export class EmailTemplatesService {
           uuid: emailUuid,
         },
       });
+
+      await this.recordEmailAudit(tx, eventUuid, actor, {
+        action: AuditAction.EmailTemplateDeleted,
+        before: existingEmail,
+        after: null,
+      });
     });
   }
 
@@ -389,6 +479,7 @@ export class EmailTemplatesService {
     eventUuid: string,
     emailUuid: string,
     query: DuplicateEmailDto,
+    actor: AuditActor,
   ): Promise<EmailResponseDto> {
     return this.prisma.$transaction(async (tx) => {
       const sourceEmail = await tx.emailTemplate.findFirst({
@@ -414,6 +505,12 @@ export class EmailTemplatesService {
           order: sourceEmail.order,
           eventUuid,
         },
+      });
+
+      await this.recordEmailAudit(tx, eventUuid, actor, {
+        action: AuditAction.EmailTemplateCreated,
+        before: null,
+        after: emailTemplate,
       });
 
       return {

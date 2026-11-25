@@ -28,8 +28,9 @@ export class AuditLogService {
     before: Record<string, unknown> | null,
     after: Record<string, unknown> | null,
     fields: readonly string[],
+    opaqueFields: readonly string[] = [],
   ): AuditChange[] {
-    return diffFields(before, after, fields);
+    return diffFields(before, after, fields, opaqueFields);
   }
 
   listChange(

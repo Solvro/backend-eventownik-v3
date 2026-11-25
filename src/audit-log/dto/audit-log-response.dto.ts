@@ -45,11 +45,11 @@ export class AuditLogAttributeDto {
 
 export class AuditLogChangeDto {
   @ApiProperty({
-    enum: ["value", "list", "blocks", "file"],
+    enum: ["value", "list", "blocks", "file", "changed"],
     description:
-      "value: from/to. list: added/removed values. blocks: added/removed blocks. file: from/to file names",
+      "value: from/to. list: added/removed values. blocks: added/removed blocks. file: from/to file names. changed: the field was modified, its value is not recorded",
   })
-  kind: "value" | "list" | "blocks" | "file";
+  kind: "value" | "list" | "blocks" | "file" | "changed";
 
   @ApiProperty({ description: "Field or attribute name" })
   field: string;
