@@ -1,3 +1,9 @@
+import {
+  AuditAction,
+  AuditEntityType,
+} from "src/audit-log/audit-log.constants";
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
 import { Prisma } from "src/generated/prisma/client";
 import { AttributeType, TicketMode } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
@@ -28,7 +34,78 @@ type TicketWithAttributes = Prisma.TicketGetPayload<{
 
 @Injectable()
 export class TicketsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLog: AuditLogService,
+  ) {}
+
+  private async recordTicketAudit(
+    tx: Prisma.TransactionClient,
+    actor: AuditActor,
+    change: {
+      action:
+        | typeof AuditAction.TicketConfigured
+        | typeof AuditAction.TicketUpdated
+        | typeof AuditAction.TicketDeleted;
+      before: Ticket | null;
+      after: Ticket | null;
+    },
+  ) {
+    const { before, after } = change;
+    const ticket = after ?? before;
+    if (ticket === null) {
+      return;
+    }
+
+    const attributeUuids = [
+      ...(before?.shownAttributeUuids ?? []),
+      ...(after?.shownAttributeUuids ?? []),
+      ...(ticket.attributeUuid === null ? [] : [ticket.attributeUuid]),
+    ];
+    const attributes = await tx.attribute.findMany({
+      where: { uuid: { in: attributeUuids } },
+      select: { uuid: true, name: true },
+    });
+    const names = new Map(
+      attributes.map((attribute) => [attribute.uuid, attribute.name]),
+    );
+    const nameOf = (uuid: string) => names.get(uuid) ?? uuid;
+    const shownNames = (value: Ticket | null) =>
+      (value?.shownAttributeUuids ?? []).map((uuid) => nameOf(uuid));
+    const targetName = (value: Ticket | null) =>
+      value?.attributeUuid == null ? null : nameOf(value.attributeUuid);
+
+    const changes = [
+      ...this.auditLog.fieldChanges(
+        before === null
+          ? null
+          : { mode: before.mode, attribute: targetName(before) },
+        after === null
+          ? null
+          : { mode: after.mode, attribute: targetName(after) },
+        ["mode", "attribute"],
+      ),
+      ...this.auditLog.listChange(
+        "shownAttributes",
+        shownNames(before),
+        shownNames(after),
+      ),
+    ];
+    if (changes.length === 0) {
+      return;
+    }
+
+    const target = targetName(ticket);
+    await this.auditLog.record(tx, {
+      eventUuid: ticket.eventUuid,
+      action: change.action,
+      actor,
+      entityType: AuditEntityType.Ticket,
+      entityUuid: ticket.uuid,
+      entityLabel: target === null ? "Event ticket" : `Ticket: ${target}`,
+      changes,
+    });
+  }
 
   private toEntity(ticket: TicketWithAttributes): Ticket {
     return {
@@ -105,7 +182,11 @@ export class TicketsService {
     }
   }
 
-  async create(eventUuid: string, dto: CreateTicketDto): Promise<Ticket> {
+  async create(
+    eventUuid: string,
+    dto: CreateTicketDto,
+    actor: AuditActor,
+  ): Promise<Ticket> {
     await this.checkEventExists(eventUuid);
 
     if (dto.mode === TicketMode.EVENT && dto.attributeUuid !== undefined) {
@@ -122,20 +203,29 @@ export class TicketsService {
     await this.validateShownAttributes(eventUuid, shownAttributeUuids);
 
     try {
-      const ticket = await this.prisma.ticket.create({
-        data: {
-          eventUuid,
-          mode: dto.mode,
-          attributeUuid: dto.attributeUuid ?? null,
-          attributes: {
-            create: shownAttributeUuids.map((attributeUuid) => ({
-              attributeUuid,
-            })),
-          },
-        },
-        include: ticketInclude,
+      return await this.prisma.$transaction(async (tx) => {
+        const ticket = this.toEntity(
+          await tx.ticket.create({
+            data: {
+              eventUuid,
+              mode: dto.mode,
+              attributeUuid: dto.attributeUuid ?? null,
+              attributes: {
+                create: shownAttributeUuids.map((attributeUuid) => ({
+                  attributeUuid,
+                })),
+              },
+            },
+            include: ticketInclude,
+          }),
+        );
+        await this.recordTicketAudit(tx, actor, {
+          action: AuditAction.TicketConfigured,
+          before: null,
+          after: ticket,
+        });
+        return ticket;
       });
-      return this.toEntity(ticket);
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -215,11 +305,12 @@ export class TicketsService {
     eventUuid: string,
     ticketUuid: string,
     dto: UpdateTicketDto,
+    actor: AuditActor,
   ): Promise<Ticket> {
-    await this.findOne(eventUuid, ticketUuid);
+    const previous = await this.findOne(eventUuid, ticketUuid);
     await this.validateShownAttributes(eventUuid, dto.shownAttributeUuids);
 
-    const ticket = await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       await tx.ticketAttribute.deleteMany({ where: { ticketUuid } });
       await tx.ticketAttribute.createMany({
         data: dto.shownAttributeUuids.map((attributeUuid) => ({
@@ -227,17 +318,35 @@ export class TicketsService {
           attributeUuid,
         })),
       });
-      return tx.ticket.update({
-        where: { uuid: ticketUuid },
-        data: { updatedAt: new Date() },
-        include: ticketInclude,
+      const ticket = this.toEntity(
+        await tx.ticket.update({
+          where: { uuid: ticketUuid },
+          data: { updatedAt: new Date() },
+          include: ticketInclude,
+        }),
+      );
+      await this.recordTicketAudit(tx, actor, {
+        action: AuditAction.TicketUpdated,
+        before: previous,
+        after: ticket,
       });
+      return ticket;
     });
-    return this.toEntity(ticket);
   }
 
-  async remove(eventUuid: string, ticketUuid: string): Promise<void> {
-    await this.findOne(eventUuid, ticketUuid);
-    await this.prisma.ticket.delete({ where: { uuid: ticketUuid } });
+  async remove(
+    eventUuid: string,
+    ticketUuid: string,
+    actor: AuditActor,
+  ): Promise<void> {
+    const ticket = await this.findOne(eventUuid, ticketUuid);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.ticket.delete({ where: { uuid: ticketUuid } });
+      await this.recordTicketAudit(tx, actor, {
+        action: AuditAction.TicketDeleted,
+        before: ticket,
+        after: null,
+      });
+    });
   }
 }

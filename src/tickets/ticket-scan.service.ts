@@ -1,3 +1,9 @@
+import {
+  AuditAction,
+  AuditEntityType,
+} from "src/audit-log/audit-log.constants";
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
 import { Prisma } from "src/generated/prisma/client";
 import { TicketMode } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
@@ -27,6 +33,7 @@ export class TicketScanService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ticketsService: TicketsService,
+    private readonly auditLog: AuditLogService,
   ) {}
 
   private async blockNamesFor(
@@ -155,6 +162,56 @@ export class TicketScanService {
     return formatShownAttributes(attributes, valueOf, blockNames);
   }
 
+  private async recordCheckInAudit(
+    tx: Prisma.TransactionClient,
+    eventUuid: string,
+    actor: AuditActor,
+    checkIn: {
+      ticketUuid: string;
+      participant: { uuid: string; email: string };
+      blockUuid: string | undefined;
+    },
+  ) {
+    const ticket = await tx.ticket.findUnique({
+      where: { uuid: checkIn.ticketUuid },
+      select: { attribute: { select: { name: true } } },
+    });
+    const block =
+      checkIn.blockUuid === undefined
+        ? null
+        : await tx.block.findUnique({
+            where: { uuid: checkIn.blockUuid },
+            select: { name: true },
+          });
+
+    await this.auditLog.record(tx, {
+      eventUuid,
+      action: AuditAction.TicketCheckedIn,
+      actor,
+      entityType: AuditEntityType.Participant,
+      entityUuid: checkIn.participant.uuid,
+      entityLabel: checkIn.participant.email,
+      changes: [
+        {
+          kind: "value",
+          field: "ticket",
+          from: null,
+          to: ticket?.attribute?.name ?? "Event ticket",
+        },
+        ...(block === null
+          ? []
+          : [
+              {
+                kind: "value" as const,
+                field: "block",
+                from: null,
+                to: block.name,
+              },
+            ]),
+      ],
+    });
+  }
+
   async scan(
     eventUuid: string,
     ticketUuid: string,
@@ -167,7 +224,7 @@ export class TicketScanService {
     eventUuid: string,
     ticketUuid: string,
     dto: TicketScanDto,
-    adminUuid: string,
+    actor: AuditActor,
   ): Promise<TicketCheckIn> {
     const result = await this.evaluate(eventUuid, ticketUuid, dto);
 
@@ -184,22 +241,31 @@ export class TicketScanService {
       });
     }
 
-    const participantUuid = result.participant?.uuid;
-    if (participantUuid === undefined) {
+    const participant = result.participant;
+    if (participant === undefined) {
       throw new UnprocessableEntityException({
         status: TicketScanStatus.INVALID_TICKET,
         message: "Ticket cannot be confirmed",
       });
     }
 
+    const participantUuid = participant.uuid;
     try {
-      const checkIn = await this.prisma.ticketCheckIn.create({
-        data: {
+      const checkIn = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.ticketCheckIn.create({
+          data: {
+            ticketUuid,
+            participantUuid,
+            blockUuid: dto.blockUuid ?? null,
+            confirmedByAdminUuid: actor.uuid,
+          },
+        });
+        await this.recordCheckInAudit(tx, eventUuid, actor, {
           ticketUuid,
-          participantUuid,
-          blockUuid: dto.blockUuid ?? null,
-          confirmedByAdminUuid: adminUuid,
-        },
+          participant,
+          blockUuid: dto.blockUuid,
+        });
+        return created;
       });
       return {
         uuid: checkIn.uuid,

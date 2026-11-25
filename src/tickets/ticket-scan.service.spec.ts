@@ -1,4 +1,6 @@
-import { Prisma } from "src/generated/prisma/client";
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { LogTrigger, Prisma } from "src/generated/prisma/client";
 import { AttributeType, TicketMode } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -15,6 +17,12 @@ import { TicketScanStatus } from "./entities/ticket-scan-result.entity";
 import { TicketScanService } from "./ticket-scan.service";
 import { TicketsService } from "./tickets.service";
 
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
+
 describe("TicketScanService", () => {
   let service: TicketScanService;
 
@@ -22,7 +30,6 @@ describe("TicketScanService", () => {
   const otherEventUuid = "3fa85f64-5717-4562-b3fc-2c963f66afff";
   const ticketUuid = "3fa85f64-5717-4562-b3fc-2c963f66afb0";
   const participantUuid = "3fa85f64-5717-4562-b3fc-2c963f66afc0";
-  const adminUuid = "3fa85f64-5717-4562-b3fc-2c963f66afd0";
   const blockAttributeUuid = "3fa85f64-5717-4562-b3fc-2c963f66afa7";
   const textAttributeUuid = "3fa85f64-5717-4562-b3fc-2c963f66afa8";
   const workshopA = "3fa85f64-5717-4562-b3fc-2c963f66af01";
@@ -30,8 +37,9 @@ describe("TicketScanService", () => {
   const confirmedAt = new Date("2026-01-01T10:00:00.000Z");
 
   const mockPrismaService = {
-    ticket: { findFirst: jest.fn() },
-    block: { findFirst: jest.fn(), findMany: jest.fn() },
+    ticket: { findFirst: jest.fn(), findUnique: jest.fn() },
+    block: { findFirst: jest.fn(), findMany: jest.fn(), findUnique: jest.fn() },
+    $transaction: jest.fn(),
     participant: { findUnique: jest.fn() },
     attribute: { findMany: jest.fn() },
     ticketCheckIn: { findFirst: jest.fn(), create: jest.fn() },
@@ -79,10 +87,21 @@ describe("TicketScanService", () => {
         TicketScanService,
         TicketsService,
         { provide: PrismaService, useValue: mockPrismaService },
+        {
+          provide: AuditLogService,
+          useValue: { record: jest.fn() },
+        },
       ],
     }).compile();
 
     service = module.get(TicketScanService);
+
+    mockPrismaService.$transaction.mockImplementation(
+      (callback: (tx: typeof mockPrismaService) => unknown) =>
+        callback(mockPrismaService),
+    );
+    mockPrismaService.ticket.findUnique.mockResolvedValue(null);
+    mockPrismaService.block.findUnique.mockResolvedValue(null);
 
     mockPrismaService.ticket.findFirst.mockResolvedValue(eventTicket);
     mockPrismaService.participant.findUnique.mockResolvedValue(participant());
@@ -326,7 +345,7 @@ describe("TicketScanService", () => {
       participantUuid,
       blockUuid: null,
       confirmedAt,
-      confirmedByAdminUuid: adminUuid,
+      confirmedByAdminUuid: ACTOR.uuid,
     };
 
     it("creates a check-in attributed to the admin and hides the admin in the response", async () => {
@@ -336,7 +355,7 @@ describe("TicketScanService", () => {
         eventUuid,
         ticketUuid,
         { token: "tok" },
-        adminUuid,
+        ACTOR,
       );
 
       expect(mockPrismaService.ticketCheckIn.create).toHaveBeenCalledWith({
@@ -344,7 +363,7 @@ describe("TicketScanService", () => {
           ticketUuid,
           participantUuid,
           blockUuid: null,
-          confirmedByAdminUuid: adminUuid,
+          confirmedByAdminUuid: ACTOR.uuid,
         },
       });
       expect(result).toEqual({
@@ -362,7 +381,7 @@ describe("TicketScanService", () => {
       });
 
       await expect(
-        service.confirm(eventUuid, ticketUuid, { token: "tok" }, adminUuid),
+        service.confirm(eventUuid, ticketUuid, { token: "tok" }, ACTOR),
       ).rejects.toThrow(ConflictException);
       expect(mockPrismaService.ticketCheckIn.create).not.toHaveBeenCalled();
     });
@@ -376,7 +395,7 @@ describe("TicketScanService", () => {
       );
 
       await expect(
-        service.confirm(eventUuid, ticketUuid, { token: "tok" }, adminUuid),
+        service.confirm(eventUuid, ticketUuid, { token: "tok" }, ACTOR),
       ).rejects.toThrow(ConflictException);
     });
 
@@ -387,7 +406,7 @@ describe("TicketScanService", () => {
       mockPrismaService.participant.findUnique.mockResolvedValue(found);
 
       await expect(
-        service.confirm(eventUuid, ticketUuid, { token: "tok" }, adminUuid),
+        service.confirm(eventUuid, ticketUuid, { token: "tok" }, ACTOR),
       ).rejects.toThrow(UnprocessableEntityException);
       expect(mockPrismaService.ticketCheckIn.create).not.toHaveBeenCalled();
     });
@@ -409,7 +428,7 @@ describe("TicketScanService", () => {
           eventUuid,
           ticketUuid,
           { token: "tok", blockUuid: workshopA },
-          adminUuid,
+          ACTOR,
         ),
       ).rejects.toThrow(UnprocessableEntityException);
       expect(mockPrismaService.ticketCheckIn.create).not.toHaveBeenCalled();
@@ -436,7 +455,7 @@ describe("TicketScanService", () => {
         eventUuid,
         ticketUuid,
         { token: "tok", blockUuid: workshopA },
-        adminUuid,
+        ACTOR,
       );
 
       expect(mockPrismaService.ticketCheckIn.create).toHaveBeenCalledWith({
