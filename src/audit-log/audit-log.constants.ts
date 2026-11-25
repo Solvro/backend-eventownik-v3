@@ -11,7 +11,6 @@ export const AuditAction = {
   ParticipantImported: "participant.imported",
   ParticipantUpdated: "participant.updated",
   ParticipantDeleted: "participant.deleted",
-  ParticipantAttributeChanged: "participant.attribute_changed",
   ParticipantsImported: "participants.imported",
   ParticipantsExported: "participants.exported",
 

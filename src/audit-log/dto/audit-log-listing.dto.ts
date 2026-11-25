@@ -31,7 +31,7 @@ export class AuditLogListingDto extends PageOptionsDto {
     isArray: true,
     description:
       "Filter by action codes. Repeat the parameter or pass a comma separated list",
-    example: "participant.deleted,participant.attribute_changed",
+    example: "participant.deleted,participant.updated",
   })
   @IsOptional()
   @Transform(({ value }: { value: unknown }) =>

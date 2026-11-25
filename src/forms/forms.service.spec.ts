@@ -1025,7 +1025,10 @@ describe("FormsService", () => {
           eventUuid,
           participantId,
           expect.anything(),
-          { trustedFileValues: true },
+          {
+            trustedFileValues: true,
+            actor: expect.objectContaining({ type: "PARTICIPANT" }),
+          },
         );
         expect(mockParticipantsService.register).not.toHaveBeenCalled();
       });
@@ -1076,7 +1079,10 @@ describe("FormsService", () => {
             { attributeUuid: "attr-1", value: "updated-value" },
           ],
         }),
-        { trustedFileValues: true },
+        {
+          trustedFileValues: true,
+          actor: expect.objectContaining({ type: "PARTICIPANT" }),
+        },
       );
     });
 
@@ -1266,7 +1272,10 @@ describe("FormsService", () => {
         eventUuid,
         participantId,
         expect.objectContaining({ participantAttributes: [] }),
-        { trustedFileValues: true },
+        {
+          trustedFileValues: true,
+          actor: expect.objectContaining({ type: "PARTICIPANT" }),
+        },
       );
     });
 

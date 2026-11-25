@@ -1,10 +1,9 @@
 import { Injectable } from "@nestjs/common";
 
-import { AttributeType, LogTrigger, Prisma } from "../generated/prisma/client";
+import { AttributeType, Prisma } from "../generated/prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { buildAttributeChange, diffFields, toStringArray } from "./audit-diff";
 import type {
-  AuditActor,
   AuditAttributeRef,
   AuditChange,
   AuditEntry,
@@ -19,33 +18,6 @@ export interface AttributeValueChangeInput {
 @Injectable()
 export class AuditLogService {
   constructor(private readonly prisma: PrismaService) {}
-
-  adminActor(admin: {
-    uuid: string;
-    firstName?: string | null;
-    lastName?: string | null;
-  }): AuditActor {
-    const name = [admin.firstName, admin.lastName]
-      .filter((part) => part !== undefined && part !== null && part !== "")
-      .join(" ");
-    return {
-      type: LogTrigger.ADMIN,
-      uuid: admin.uuid,
-      name: name === "" ? undefined : name,
-    };
-  }
-
-  participantActor(participant: { uuid: string; email: string }): AuditActor {
-    return {
-      type: LogTrigger.PARTICIPANT,
-      uuid: participant.uuid,
-      name: participant.email,
-    };
-  }
-
-  systemActor(): AuditActor {
-    return { type: LogTrigger.SYSTEM };
-  }
 
   fieldChanges(
     before: Record<string, unknown> | null,

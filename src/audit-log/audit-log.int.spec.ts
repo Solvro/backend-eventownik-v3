@@ -7,6 +7,7 @@ import { NotFoundException } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import type { TestingModule } from "@nestjs/testing";
 
+import { SYSTEM_ACTOR, adminActor, participantActor } from "./audit-actor";
 import { AuditLogQueryService } from "./audit-log-query.service";
 import { AuditAction, AuditEntityType } from "./audit-log.constants";
 import { AuditLogController } from "./audit-log.controller";
@@ -70,7 +71,7 @@ describe("AuditLog (integration)", () => {
   it("records entries scoped to the event, newest first", async () => {
     const event = await createEvent();
     const other = await createEvent();
-    const actor = service.adminActor({
+    const actor = adminActor({
       uuid: "11111111-1111-4111-8111-111111111111",
       firstName: "Jan",
       lastName: "Kowalski",
@@ -119,10 +120,10 @@ describe("AuditLog (integration)", () => {
   it("filters by action, entity and actor type, and paginates", async () => {
     const event = await createEvent();
     const participantUuid = "22222222-2222-4222-8222-222222222222";
-    const admin = service.adminActor({
+    const admin = adminActor({
       uuid: "11111111-1111-4111-8111-111111111111",
     });
-    const participant = service.participantActor({
+    const participant = participantActor({
       uuid: participantUuid,
       email: "p@example.com",
     });
@@ -138,7 +139,7 @@ describe("AuditLog (integration)", () => {
         },
         {
           eventUuid: event.uuid,
-          action: AuditAction.ParticipantAttributeChanged,
+          action: AuditAction.ParticipantUpdated,
           actor: participant,
           entityType: AuditEntityType.Participant,
           entityUuid: participantUuid,
@@ -207,7 +208,7 @@ describe("AuditLog (integration)", () => {
       await service.record(tx, {
         eventUuid: event.uuid,
         action: AuditAction.EventCreated,
-        actor: service.systemActor(),
+        actor: SYSTEM_ACTOR,
         entityType: AuditEntityType.Event,
       });
     });

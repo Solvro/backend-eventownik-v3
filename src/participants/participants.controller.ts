@@ -1,3 +1,5 @@
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { CurrentAuditActor } from "src/audit-log/current-audit-actor.decorator";
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
@@ -75,8 +77,9 @@ export class ParticipantsController {
   async create(
     @Param("eventId", ParseUUIDPipe) eventUuid: string,
     @Body() dto: ParticipantCreateDto,
+    @CurrentAuditActor() actor: AuditActor,
   ): Promise<Participant> {
-    return this.participantsService.create(eventUuid, dto);
+    return this.participantsService.create(eventUuid, dto, actor);
   }
 
   @Get(":id")
@@ -109,8 +112,11 @@ export class ParticipantsController {
     @Param("eventId", ParseUUIDPipe) eventUuid: string,
     @Param("id", ParseUUIDPipe) participantUuid: string,
     @Body() dto: ParticipantUpdateDto,
+    @CurrentAuditActor() actor: AuditActor,
   ): Promise<Participant> {
-    return this.participantsService.update(eventUuid, participantUuid, dto);
+    return this.participantsService.update(eventUuid, participantUuid, dto, {
+      actor,
+    });
   }
 
   @Delete(":id")
@@ -124,8 +130,9 @@ export class ParticipantsController {
   async remove(
     @Param("eventId", ParseUUIDPipe) eventUuid: string,
     @Param("id", ParseUUIDPipe) participantUuid: string,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
-    return this.participantsService.remove(eventUuid, participantUuid);
+    return this.participantsService.remove(eventUuid, participantUuid, actor);
   }
 
   @Delete(":id/unregister")
@@ -139,8 +146,9 @@ export class ParticipantsController {
   async unregister(
     @Param("eventId", ParseUUIDPipe) eventUuid: string,
     @Param("id", ParseUUIDPipe) participantUuid: string,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
-    return this.participantsService.remove(eventUuid, participantUuid);
+    return this.participantsService.remove(eventUuid, participantUuid, actor);
   }
 
   @Post("unregister-many")
@@ -152,10 +160,12 @@ export class ParticipantsController {
   async unregisterMany(
     @Param("eventId", ParseUUIDPipe) eventUuid: string,
     @Body() dto: UnregisterManyDto,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
     return this.participantsService.removeMany(
       eventUuid,
       dto.participantsToUnregisterIds,
+      actor,
     );
   }
 }

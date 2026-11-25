@@ -9,6 +9,7 @@ import {
   Attribute,
   AttributeType,
   EventLinkType,
+  LogTrigger,
   OpenCondition,
   Prisma,
 } from "src/generated/prisma/client";
@@ -810,7 +811,13 @@ export class FormsService {
           event.uuid,
           submissionData.participantId,
           participantDtoAttributes,
-          { trustedFileValues: true },
+          {
+            trustedFileValues: true,
+            actor: {
+              type: LogTrigger.PARTICIPANT,
+              uuid: submissionData.participantId,
+            },
+          },
         );
       } else if (
         event.registerFormUuid === formUuid &&

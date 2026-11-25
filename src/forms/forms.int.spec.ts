@@ -1,3 +1,4 @@
+import { AuditLogService } from "src/audit-log/audit-log.service";
 import { BlocksService } from "src/blocks/blocks.service";
 import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
@@ -59,6 +60,7 @@ describe("Forms Integration", () => {
           useValue: mockPrismaService,
         },
         ParticipantsService,
+        AuditLogService,
         BlocksService,
         { provide: StorageService, useValue: mockStorageService },
         { provide: ConfigService, useValue: mockConfigService },

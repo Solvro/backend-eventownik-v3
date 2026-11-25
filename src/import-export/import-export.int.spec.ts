@@ -1,5 +1,6 @@
 import * as ExcelJS from "exceljs";
 import type { Request, Response } from "express";
+import { AuditLogService } from "src/audit-log/audit-log.service";
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { PermissionsGuard } from "src/auth/permissions.guard";
 import type { Attribute, Block, Event } from "src/generated/prisma/client";
@@ -51,6 +52,7 @@ describe("Import/Export Integration", () => {
         ImportExportService,
         ParticipantsXlsxExporter,
         ParticipantsService,
+        AuditLogService,
         PrismaService,
         {
           provide: StorageService,

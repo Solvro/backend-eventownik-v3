@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
 import { AttributeChangedEvent } from "src/common/events/attribute-changed.event";
 import { ATTRIBUTE_CHANGED_EVENT } from "src/common/events/event-names.constants";
-import { Prisma } from "src/generated/prisma/client";
+import { LogTrigger, Prisma } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import {
@@ -19,6 +21,12 @@ import type { ParticipantCreateDto } from "./dto/participant-create.dto";
 import type { ParticipantListingDto } from "./dto/participant-listing.dto";
 import type { ParticipantUpdateDto } from "./dto/participant-update.dto";
 import { ParticipantsService } from "./participants.service";
+
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
 
 describe("ParticipantsService", () => {
   let service: ParticipantsService;
@@ -56,6 +64,13 @@ describe("ParticipantsService", () => {
     $transaction: jest.fn(),
   };
 
+  const mockAuditLogService = {
+    record: jest.fn(),
+    recordMany: jest.fn(),
+    fieldChanges: jest.fn().mockReturnValue([]),
+    attributeValueChanges: jest.fn().mockResolvedValue([]),
+  };
+
   const mockStorageService = {
     upload: jest.fn(),
     delete: jest.fn(),
@@ -86,6 +101,7 @@ describe("ParticipantsService", () => {
           provide: EventEmitter2,
           useValue: { emit: jest.fn() },
         },
+        { provide: AuditLogService, useValue: mockAuditLogService },
       ],
     }).compile();
 
@@ -94,6 +110,7 @@ describe("ParticipantsService", () => {
     storageService = module.get<StorageService>(StorageService);
     eventEmitter = module.get<EventEmitter2>(EventEmitter2);
     jest.clearAllMocks();
+    mockPrismaService.participant.findMany.mockResolvedValue([]);
 
     // Default transaction mock to just execute the callback
     (prisma.$transaction as jest.Mock).mockImplementation((argument) => {
@@ -139,7 +156,7 @@ describe("ParticipantsService", () => {
       };
       mockPrismaService.participant.create.mockResolvedValue(prismaParticipant);
 
-      const result = await service.create(eventUuid, createDto);
+      const result = await service.create(eventUuid, createDto, ACTOR);
 
       expect(result.uuid).toBe("part-123");
       expect(result.attributes[0].name).toBe("Attr 1");
@@ -159,7 +176,7 @@ describe("ParticipantsService", () => {
     it("should throw NotFoundException if event does not exist", async () => {
       mockPrismaService.event.findUnique.mockResolvedValue(null);
 
-      await expect(service.create(eventUuid, createDto)).rejects.toThrow(
+      await expect(service.create(eventUuid, createDto, ACTOR)).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -180,7 +197,7 @@ describe("ParticipantsService", () => {
 
       mockPrismaService.participant.create.mockRejectedValue(error);
 
-      await expect(service.create(eventUuid, createDto)).rejects.toThrow(
+      await expect(service.create(eventUuid, createDto, ACTOR)).rejects.toThrow(
         ConflictException,
       );
     });
@@ -317,6 +334,7 @@ describe("ParticipantsService", () => {
         eventUuid,
         participantUuid,
         updateDto,
+        { actor: ACTOR },
       );
 
       expect(result.email).toBe("updated@example.com");
@@ -343,7 +361,7 @@ describe("ParticipantsService", () => {
       });
 
       await expect(
-        service.update(eventUuid, participantUuid, updateDto),
+        service.update(eventUuid, participantUuid, updateDto, { actor: ACTOR }),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -358,12 +376,16 @@ describe("ParticipantsService", () => {
       mockPrismaService.attribute.findMany.mockResolvedValue([fileAttribute]);
 
       await expect(
-        service.create(eventUuid, {
-          email: "test@example.com",
-          participantAttributes: [
-            { attributeUuid: "attr-file", value: "some-key.png" },
-          ],
-        }),
+        service.create(
+          eventUuid,
+          {
+            email: "test@example.com",
+            participantAttributes: [
+              { attributeUuid: "attr-file", value: "some-key.png" },
+            ],
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -383,11 +405,16 @@ describe("ParticipantsService", () => {
         attributes: [],
       });
 
-      await service.update(eventUuid, participantUuid, {
-        participantAttributes: [
-          { attributeUuid: "attr-file", value: "old-key.png" },
-        ],
-      });
+      await service.update(
+        eventUuid,
+        participantUuid,
+        {
+          participantAttributes: [
+            { attributeUuid: "attr-file", value: "old-key.png" },
+          ],
+        },
+        { actor: ACTOR },
+      );
 
       expect(mockPrismaService.participant.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -412,11 +439,16 @@ describe("ParticipantsService", () => {
       ]);
 
       await expect(
-        service.update(eventUuid, participantUuid, {
-          participantAttributes: [
-            { attributeUuid: "attr-file", value: "different-key.png" },
-          ],
-        }),
+        service.update(
+          eventUuid,
+          participantUuid,
+          {
+            participantAttributes: [
+              { attributeUuid: "attr-file", value: "different-key.png" },
+            ],
+          },
+          { actor: ACTOR },
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -449,14 +481,19 @@ describe("ParticipantsService", () => {
       // The frontend resubmits exactly what a GET returned: the already
       // (singly) corrupted stored value with the resolved URL applied on
       // top of it once more.
-      await service.update(eventUuid, participantUuid, {
-        participantAttributes: [
-          {
-            attributeUuid: "attr-file",
-            value: `${prefix}${prefix}old-key.png`,
-          },
-        ],
-      });
+      await service.update(
+        eventUuid,
+        participantUuid,
+        {
+          participantAttributes: [
+            {
+              attributeUuid: "attr-file",
+              value: `${prefix}${prefix}old-key.png`,
+            },
+          ],
+        },
+        { actor: ACTOR },
+      );
 
       expect(mockPrismaService.participant.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -487,9 +524,14 @@ describe("ParticipantsService", () => {
         attributes: [],
       });
 
-      await service.update(eventUuid, participantUuid, {
-        participantAttributes: [{ attributeUuid: "attr-file", value: "" }],
-      });
+      await service.update(
+        eventUuid,
+        participantUuid,
+        {
+          participantAttributes: [{ attributeUuid: "attr-file", value: "" }],
+        },
+        { actor: ACTOR },
+      );
 
       expect(mockPrismaService.participant.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -523,7 +565,7 @@ describe("ParticipantsService", () => {
             { attributeUuid: "attr-file", value: "brand-new-key.png" },
           ],
         },
-        { trustedFileValues: true },
+        { trustedFileValues: true, actor: ACTOR },
       );
 
       expect(mockPrismaService.participant.update).toHaveBeenCalledWith(
@@ -548,9 +590,13 @@ describe("ParticipantsService", () => {
       mockPrismaService.participant.count.mockResolvedValue(1);
 
       await expect(
-        service.bulkUpdateAttributes(eventUuid, "attr-file", "new-key.png", [
-          "p-1",
-        ]),
+        service.bulkUpdateAttributes(
+          eventUuid,
+          "attr-file",
+          "new-key.png",
+          ["p-1"],
+          ACTOR,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -563,9 +609,13 @@ describe("ParticipantsService", () => {
       mockPrismaService.participant.count.mockResolvedValue(1);
       mockPrismaService.attribute.findMany.mockResolvedValue([fileAttribute]);
 
-      await service.bulkUpdateAttributes(eventUuid, "attr-file", undefined, [
-        "p-1",
-      ]);
+      await service.bulkUpdateAttributes(
+        eventUuid,
+        "attr-file",
+        undefined,
+        ["p-1"],
+        ACTOR,
+      );
 
       expect(
         mockPrismaService.participantAttribute.createMany,
@@ -736,7 +786,7 @@ describe("ParticipantsService", () => {
         attributes: [],
       });
 
-      await service.remove(eventUuid, participantUuid);
+      await service.remove(eventUuid, participantUuid, ACTOR);
 
       expect(mockPrismaService.participant.delete).toHaveBeenCalledWith({
         where: { uuid: participantUuid },
@@ -745,7 +795,9 @@ describe("ParticipantsService", () => {
 
     it("should throw error if participant to unregister not found", async () => {
       mockPrismaService.participant.findFirst.mockResolvedValue(null);
-      await expect(service.remove("e", "p")).rejects.toThrow(NotFoundException);
+      await expect(service.remove("e", "p", ACTOR)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -759,7 +811,7 @@ describe("ParticipantsService", () => {
         { uuid: "p-2", attributes: [] },
       ]);
 
-      await service.removeMany(eventUuid, ids);
+      await service.removeMany(eventUuid, ids, ACTOR);
 
       expect(mockPrismaService.participant.deleteMany).toHaveBeenCalledWith({
         where: {
@@ -782,9 +834,13 @@ describe("ParticipantsService", () => {
       });
 
       await expect(
-        service.bulkUpdateAttributes(eventUuid, attributeUuid, "value", [
-          "p-1",
-        ]),
+        service.bulkUpdateAttributes(
+          eventUuid,
+          attributeUuid,
+          "value",
+          ["p-1"],
+          ACTOR,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -797,10 +853,13 @@ describe("ParticipantsService", () => {
       mockPrismaService.participant.count.mockResolvedValue(1);
 
       await expect(
-        service.bulkUpdateAttributes(eventUuid, attributeUuid, "value", [
-          "p-1",
-          "p-2",
-        ]),
+        service.bulkUpdateAttributes(
+          eventUuid,
+          attributeUuid,
+          "value",
+          ["p-1", "p-2"],
+          ACTOR,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -815,10 +874,13 @@ describe("ParticipantsService", () => {
         { uuid: attributeUuid, type: "text", config: null },
       ]);
 
-      await service.bulkUpdateAttributes(eventUuid, attributeUuid, "new-val", [
-        "p-1",
-        "p-2",
-      ]);
+      await service.bulkUpdateAttributes(
+        eventUuid,
+        attributeUuid,
+        "new-val",
+        ["p-1", "p-2"],
+        ACTOR,
+      );
 
       expect(
         mockPrismaService.participantAttribute.deleteMany,
@@ -858,9 +920,13 @@ describe("ParticipantsService", () => {
         { uuid: attributeUuid, type: "text", config: null },
       ]);
 
-      await service.bulkUpdateAttributes(eventUuid, attributeUuid, undefined, [
-        "p-1",
-      ]);
+      await service.bulkUpdateAttributes(
+        eventUuid,
+        attributeUuid,
+        undefined,
+        ["p-1"],
+        ACTOR,
+      );
 
       expect(
         mockPrismaService.participantAttribute.createMany,
@@ -888,11 +954,13 @@ describe("ParticipantsService", () => {
         { value: null },
       ]);
 
-      await service.bulkUpdateAttributes(eventUuid, attributeUuid, undefined, [
-        "p-1",
-        "p-2",
-        "p-3",
-      ]);
+      await service.bulkUpdateAttributes(
+        eventUuid,
+        attributeUuid,
+        undefined,
+        ["p-1", "p-2", "p-3"],
+        ACTOR,
+      );
 
       // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(storageService.delete as jest.Mock).toHaveBeenCalledTimes(2);

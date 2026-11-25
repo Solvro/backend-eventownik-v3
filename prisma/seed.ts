@@ -341,7 +341,7 @@ async function main() {
       },
       {
         eventUuid: event.uuid,
-        action: "participant.attribute_changed",
+        action: "participant.updated",
         actorType: LogTrigger.SYSTEM,
         entityType: "participant",
         entityUuid: participant.uuid,

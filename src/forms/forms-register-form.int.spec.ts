@@ -1,3 +1,4 @@
+import { AuditLogService } from "src/audit-log/audit-log.service";
 import { BlocksService } from "src/blocks/blocks.service";
 import type { Event, Form } from "src/generated/prisma/client";
 import { ParticipantsService } from "src/participants/participants.service";
@@ -22,6 +23,7 @@ describe("FormsService registration form (integration)", () => {
       providers: [
         FormsService,
         ParticipantsService,
+        AuditLogService,
         BlocksService,
         PrismaService,
         { provide: StorageService, useValue: {} },

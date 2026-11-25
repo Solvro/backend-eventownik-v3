@@ -1,4 +1,6 @@
 import type { Response } from "express";
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { LogTrigger } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 import { StorageService } from "src/storage/storage.service";
 
@@ -15,6 +17,12 @@ const mockResponseFunction = () => {
   const response: Partial<Response> = {};
   response.redirect = jest.fn().mockReturnValue(response);
   return response as Response;
+};
+
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
 };
 
 describe("ParticipantsAttributesController", () => {
@@ -147,13 +155,14 @@ describe("ParticipantsAttributesController", () => {
 
       mockParticipantsService.bulkUpdateAttributes.mockResolvedValue(null);
 
-      await controller.bulkUpdate(eventUuid, attributeUuid, dto);
+      await controller.bulkUpdate(eventUuid, attributeUuid, dto, ACTOR);
 
       expect(mockParticipantsService.bulkUpdateAttributes).toHaveBeenCalledWith(
         eventUuid,
         attributeUuid,
         "newVal",
         ["p-1", "p-2"],
+        ACTOR,
       );
     });
   });

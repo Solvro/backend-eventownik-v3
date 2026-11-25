@@ -1,4 +1,6 @@
 import { Response } from "express";
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { CurrentAuditActor } from "src/audit-log/current-audit-actor.decorator";
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
@@ -99,12 +101,14 @@ export class ParticipantsAttributesController {
     @Param("eventId", ParseUUIDPipe) eventUuid: string,
     @Param("attributeId", ParseUUIDPipe) attributeUuid: string,
     @Body() dto: ParticipantBulkUpdateDto,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
     return this.participantsService.bulkUpdateAttributes(
       eventUuid,
       attributeUuid,
       dto.newValue,
       dto.participantIds,
+      actor,
     );
   }
 }
