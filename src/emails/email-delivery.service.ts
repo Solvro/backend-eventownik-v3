@@ -203,7 +203,7 @@ export class EmailDeliveryService {
 
     await this.auditLog.record(this.prisma, {
       eventUuid,
-      action: AuditAction.EmailsSentManually,
+      action: AuditAction.EmailsQueuedManually,
       actor,
       entityType: AuditEntityType.EmailTemplate,
       entityUuid: emailTemplate.uuid,

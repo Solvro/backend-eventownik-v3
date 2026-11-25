@@ -182,6 +182,32 @@ describe("AuditLog (integration)", () => {
     expect(secondPage.meta.hasPreviousPage).toBe(true);
   });
 
+  it("pages through entries sharing a timestamp without repeats or gaps", async () => {
+    const event = await createEvent();
+    const createdAt = new Date("2026-03-01T10:00:00.000Z");
+    await prisma.auditLog.createMany({
+      data: Array.from({ length: 7 }, () => ({
+        eventUuid: event.uuid,
+        action: AuditAction.EventUpdated,
+        actorType: LogTrigger.SYSTEM,
+        entityType: AuditEntityType.Event,
+        createdAt,
+      })),
+    });
+
+    const seen: string[] = [];
+    for (const page of [1, 2, 3, 4]) {
+      const result = await queryService.findAll(
+        event.uuid,
+        listing({ page, take: 2 }),
+      );
+      seen.push(...result.data.map((entry) => entry.uuid));
+    }
+
+    expect(seen).toHaveLength(7);
+    expect(new Set(seen).size).toBe(7);
+  });
+
   it("filters by date range", async () => {
     const event = await createEvent();
     await prisma.auditLog.create({

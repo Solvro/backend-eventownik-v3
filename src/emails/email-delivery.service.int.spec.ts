@@ -443,7 +443,7 @@ describe("EmailDeliveryService (integration)", () => {
       });
       expect(entries).toHaveLength(1);
       expect(entries[0]).toMatchObject({
-        action: "emails.sent_manually",
+        action: "emails.queued_manually",
         actorUuid: ACTOR.uuid,
         entityUuid: template.uuid,
         entityLabel: template.name,

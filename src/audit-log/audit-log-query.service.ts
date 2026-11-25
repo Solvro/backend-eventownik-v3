@@ -51,6 +51,7 @@ export class AuditLogQueryService {
     if (orderBy.length === 0) {
       orderBy.push({ createdAt: "desc" });
     }
+    orderBy.push({ uuid: "desc" });
 
     const [itemCount, entries] = await this.prisma.$transaction([
       this.prisma.auditLog.count({ where }),

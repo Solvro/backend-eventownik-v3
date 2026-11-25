@@ -161,6 +161,8 @@ export class ImportExportService {
       throw new BadRequestException(`Export format ${format} is not supported`);
     }
 
+    const content = await exporter.build(payload);
+
     await this.auditLog.record(this.prisma, {
       eventUuid: eventId,
       action: AuditAction.ParticipantsExported,
@@ -180,7 +182,7 @@ export class ImportExportService {
     return {
       fileName: `participants-export-${eventId}.${exporter.fileExtension}`,
       mimeType: exporter.mimeType,
-      content: await exporter.build(payload),
+      content,
     };
   }
 

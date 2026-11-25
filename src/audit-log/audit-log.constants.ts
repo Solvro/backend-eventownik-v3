@@ -25,7 +25,7 @@ export const AuditAction = {
   EmailTemplateCreated: "email_template.created",
   EmailTemplateUpdated: "email_template.updated",
   EmailTemplateDeleted: "email_template.deleted",
-  EmailsSentManually: "emails.sent_manually",
+  EmailsQueuedManually: "emails.queued_manually",
 
   OrganizerAdded: "organizer.added",
   OrganizerPermissionsChanged: "organizer.permissions_changed",
