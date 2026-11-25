@@ -1,5 +1,11 @@
 import { Transform } from "class-transformer";
-import { IsArray, IsEnum, IsOptional, IsUUID } from "class-validator";
+import {
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsOptional,
+  IsUUID,
+} from "class-validator";
 
 import { ApiPropertyOptional } from "@nestjs/swagger";
 
@@ -69,4 +75,15 @@ export class ExportParticipantsQueryDto {
   @IsArray()
   @IsUUID(undefined, { each: true })
   readonly attributeIds?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      "Include GDPR consent columns (gdprConsent, gdprConsentAt, consentIp, consentUserAgent). Contains personal data, so it is off by default.",
+    type: Boolean,
+    default: false,
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === "true")
+  @IsBoolean()
+  readonly includeConsent?: boolean = false;
 }

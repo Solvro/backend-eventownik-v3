@@ -78,6 +78,8 @@ export class ImportExportService {
     await this.validateParticipantMembership(eventId, participantIds);
     const attributes = await this.resolveAttributes(eventId, attributeIds);
 
+    const includeConsent = query.includeConsent === true;
+
     const participants = await this.prisma.participant.findMany({
       where: {
         eventUuid: eventId,
@@ -87,6 +89,17 @@ export class ImportExportService {
       select: {
         uuid: true,
         email: true,
+        ...(includeConsent
+          ? {
+              consent: {
+                select: {
+                  gdprConsentedAt: true,
+                  ip: true,
+                  userAgent: true,
+                },
+              },
+            }
+          : {}),
         attributes: {
           where: {
             ...(attributes.length > 0
@@ -110,9 +123,20 @@ export class ImportExportService {
         uuid: attribute.uuid,
         name: attribute.name,
       })),
+      includeConsent,
       rows: participants.map((participant) => ({
         participantUuid: participant.uuid,
         email: participant.email,
+        ...(includeConsent
+          ? {
+              consent: {
+                gdprConsent: participant.consent != null,
+                gdprConsentAt: participant.consent?.gdprConsentedAt ?? null,
+                ip: participant.consent?.ip ?? null,
+                userAgent: participant.consent?.userAgent ?? null,
+              },
+            }
+          : {}),
         attributes: Object.fromEntries(
           participant.attributes.map((attribute) => [
             attribute.attributeUuid,

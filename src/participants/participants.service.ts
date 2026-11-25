@@ -14,6 +14,7 @@ import {
   AttributeType,
   EmailTemplate,
   ParticipantAttribute,
+  ParticipantConsent,
   ParticipantEmailStatus,
   Prisma,
   Participant as PrismaParticipant,
@@ -45,6 +46,7 @@ type ParticipantWithRelations = PrismaParticipant & {
   emails?: (ParticipantEmailStatus & {
     email?: EmailTemplate | null;
   })[];
+  consent?: ParticipantConsent | null;
 };
 
 const FILE_LIKE_ATTRIBUTE_TYPES: AttributeType[] = [
@@ -56,6 +58,13 @@ function isFileLikeAttributeType(
   type: AttributeType | null | undefined,
 ): boolean {
   return type != null && FILE_LIKE_ATTRIBUTE_TYPES.includes(type);
+}
+
+export interface ParticipantConsentInput {
+  givenAt: Date;
+  termsAccepted: boolean;
+  ip: string;
+  userAgent: string | null;
 }
 
 @Injectable()
@@ -98,6 +107,12 @@ export class ParticipantsService {
         trigger: emailStatus.email?.trigger,
         triggerConfig: emailStatus.email?.triggerConfig,
       })),
+      ...(participant.consent === undefined
+        ? {}
+        : {
+            gdprConsent: participant.consent !== null,
+            gdprConsentAt: participant.consent?.gdprConsentedAt ?? null,
+          }),
     };
   }
 
@@ -255,7 +270,10 @@ export class ParticipantsService {
     eventUuid: string,
     email: string,
     participantAttributes?: ParticipantAttributeDto[],
-    options: { trustedFileValues?: boolean } = {},
+    options: {
+      trustedFileValues?: boolean;
+      consent?: ParticipantConsentInput;
+    } = {},
   ): Promise<Participant> {
     try {
       const participant = await this.prisma.$transaction(async (tx) => {
@@ -277,6 +295,21 @@ export class ParticipantsService {
             attributes: {
               create: attributesToCreate,
             },
+            ...(options.consent === undefined
+              ? {}
+              : {
+                  consent: {
+                    create: {
+                      gdprConsentedAt: options.consent.givenAt,
+                      termsAcceptedAt: options.consent.termsAccepted
+                        ? options.consent.givenAt
+                        : null,
+                      ip: options.consent.ip,
+                      userAgent: options.consent.userAgent,
+                      dataRecipientsSnapshot: event.dataRecipients,
+                    },
+                  },
+                }),
           },
           include: {
             attributes: {
@@ -616,6 +649,7 @@ export class ParticipantsService {
             },
             include: { attribute: true },
           },
+          consent: true,
         },
       }),
     ]);
@@ -642,6 +676,7 @@ export class ParticipantsService {
         emails: {
           include: { email: true },
         },
+        consent: true,
       },
     });
 
