@@ -62,6 +62,19 @@ export function diffFields(
   return changes;
 }
 
+export function diffList(
+  field: string,
+  before: readonly Prisma.JsonValue[],
+  after: readonly Prisma.JsonValue[],
+): AuditChange | null {
+  const added = setDifference([...after], [...before]);
+  const removed = setDifference([...before], [...after]);
+  if (added.length === 0 && removed.length === 0) {
+    return null;
+  }
+  return { kind: "list", field, added, removed };
+}
+
 export function buildAttributeChange(
   attribute: AuditAttributeRef,
   before: unknown,

@@ -2,7 +2,12 @@ import { Injectable } from "@nestjs/common";
 
 import { AttributeType, Prisma } from "../generated/prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
-import { buildAttributeChange, diffFields, toStringArray } from "./audit-diff";
+import {
+  buildAttributeChange,
+  diffFields,
+  diffList,
+  toStringArray,
+} from "./audit-diff";
 import type {
   AuditAttributeRef,
   AuditChange,
@@ -25,6 +30,15 @@ export class AuditLogService {
     fields: readonly string[],
   ): AuditChange[] {
     return diffFields(before, after, fields);
+  }
+
+  listChange(
+    field: string,
+    before: readonly Prisma.JsonValue[],
+    after: readonly Prisma.JsonValue[],
+  ): AuditChange[] {
+    const change = diffList(field, before, after);
+    return change === null ? [] : [change];
   }
 
   async record(tx: Prisma.TransactionClient, entry: AuditEntry) {

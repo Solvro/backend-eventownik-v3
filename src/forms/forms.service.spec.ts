@@ -1,5 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
 import { BlocksService } from "src/blocks/blocks.service";
-import { AttributeType } from "src/generated/prisma/client";
+import { AttributeType, LogTrigger } from "src/generated/prisma/client";
 import { ParticipantsService } from "src/participants/participants.service";
 import { StorageService } from "src/storage/storage.service";
 
@@ -22,6 +25,12 @@ import { isFormCurrentlyOpen } from "./utils/is-form-currently-open";
 jest.mock("./utils/is-form-currently-open");
 const mockedIsFormCurrentlyOpen = jest.mocked(isFormCurrentlyOpen);
 
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
+
 describe("FormsService", () => {
   let service: FormsService;
   const mockPrismaService = {
@@ -38,6 +47,7 @@ describe("FormsService", () => {
     attribute: {
       findFirst: jest.fn(),
       count: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     block: {
       findMany: jest.fn(),
@@ -59,6 +69,12 @@ describe("FormsService", () => {
       findUnique: jest.fn(),
     },
     $transaction: jest.fn(),
+  };
+
+  const mockAuditLogService = {
+    record: jest.fn(),
+    fieldChanges: () => [],
+    listChange: () => [],
   };
 
   const mockParticipantsService = {
@@ -93,8 +109,11 @@ describe("FormsService", () => {
         StorageService,
         ConfigService,
         EventEmitter2,
+        AuditLogService,
       ],
     })
+      .overrideProvider(AuditLogService)
+      .useValue(mockAuditLogService)
       .overrideProvider(PrismaService)
       .useValue(mockPrismaService)
       .overrideProvider(ParticipantsService)
@@ -158,7 +177,7 @@ describe("FormsService", () => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
       return callback(mockPrismaService);
     });
-    const createdForm = await service.create(eventUuid, dto);
+    const createdForm = await service.create(eventUuid, dto, ACTOR);
     expect(createdForm).toEqual(mockForm);
     expect(mockPrismaService.form.create).toHaveBeenCalledWith({
       data: {
@@ -201,7 +220,7 @@ describe("FormsService", () => {
       attributes: [],
     };
     mockPrismaService.event.findUnique.mockResolvedValue(null);
-    await expect(service.create(eventUuid, dto)).rejects.toThrow(
+    await expect(service.create(eventUuid, dto, ACTOR)).rejects.toThrow(
       `Event with id: ${eventUuid} not found`,
     );
   });
@@ -341,6 +360,7 @@ describe("FormsService", () => {
       formUuid,
       eventUuid,
       updateFormDto,
+      ACTOR,
     );
     expect(updatedForm).toEqual(mockForm);
     expect(mockPrismaService.form.update).toHaveBeenCalledWith({
@@ -372,7 +392,7 @@ describe("FormsService", () => {
     };
     mockPrismaService.event.findUnique.mockResolvedValue(null);
     await expect(
-      service.update(formUuid, eventUuid, updateFormDto),
+      service.update(formUuid, eventUuid, updateFormDto, ACTOR),
     ).rejects.toThrow(`Event with id: ${eventUuid} not found`);
   });
 
@@ -387,7 +407,7 @@ describe("FormsService", () => {
     mockPrismaService.event.findUnique.mockResolvedValue({ uuid: eventUuid });
     mockPrismaService.form.findUnique.mockResolvedValue(mockForm);
     mockPrismaService.form.deleteMany.mockResolvedValue({ mockForm });
-    const deletedForm = await service.remove(formUuid, eventUuid);
+    const deletedForm = await service.remove(formUuid, eventUuid, ACTOR);
     expect(deletedForm).toEqual({ mockForm });
     expect(mockPrismaService.form.deleteMany).toHaveBeenCalledWith({
       where: { uuid: formUuid, eventUuid },
@@ -399,7 +419,7 @@ describe("FormsService", () => {
     const eventUuid = "event-uuid-123";
     mockPrismaService.event.findUnique.mockResolvedValue({ uuid: eventUuid });
     mockPrismaService.form.deleteMany.mockResolvedValue({ count: 0 });
-    await expect(service.remove(formUuid, eventUuid)).rejects.toThrow(
+    await expect(service.remove(formUuid, eventUuid, ACTOR)).rejects.toThrow(
       `Form with id: ${formUuid} not found`,
     );
   });

@@ -1,5 +1,7 @@
 import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
 import { BlocksService } from "src/blocks/blocks.service";
+import { LogTrigger } from "src/generated/prisma/client";
 import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
 import { StorageService } from "src/storage/storage.service";
@@ -21,6 +23,12 @@ const mockConfigService: Pick<ConfigService, "getOrThrow"> = {
   getOrThrow: jest.fn().mockReturnValue("test-bucket") as never,
 };
 
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
+
 describe("Forms Integration", () => {
   let formsController: FormsController;
 
@@ -38,6 +46,7 @@ describe("Forms Integration", () => {
     attribute: {
       findFirst: jest.fn(),
       count: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     event: {
       findUnique: jest.fn(),
@@ -50,6 +59,12 @@ describe("Forms Integration", () => {
     $transaction: jest.fn(),
   };
 
+  const mockAuditLogService = {
+    record: jest.fn(),
+    fieldChanges: () => [],
+    listChange: () => [],
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -60,7 +75,7 @@ describe("Forms Integration", () => {
           useValue: mockPrismaService,
         },
         ParticipantsService,
-        AuditLogService,
+        { provide: AuditLogService, useValue: mockAuditLogService },
         BlocksService,
         { provide: StorageService, useValue: mockStorageService },
         { provide: ConfigService, useValue: mockConfigService },
@@ -105,7 +120,7 @@ describe("Forms Integration", () => {
     mockPrismaService.formDefinition.createMany.mockResolvedValue({});
 
     mockPrismaService.formDefinition.createMany.mockResolvedValue({});
-    const result = await formsController.create("event-uuid-123", dto);
+    const result = await formsController.create("event-uuid-123", dto, ACTOR);
     expect(result).toBeDefined();
     expect(result).toMatchObject({
       name: dto.name,
@@ -137,7 +152,7 @@ describe("Forms Integration", () => {
     });
     mockPrismaService.attribute.findFirst.mockResolvedValue(null);
     await expect(
-      formsController.create("event-uuid-123", dto),
+      formsController.create("event-uuid-123", dto, ACTOR),
     ).rejects.toThrow();
   });
 
@@ -165,7 +180,7 @@ describe("Forms Integration", () => {
     mockPrismaService.attribute.count.mockResolvedValue(1);
     mockPrismaService.formDefinition.createMany.mockResolvedValue({});
 
-    await formsController.create("event-uuid-123", dto);
+    await formsController.create("event-uuid-123", dto, ACTOR);
 
     expect(mockPrismaService.event.update).toHaveBeenCalledWith({
       where: { uuid: "event-uuid-123" },
@@ -267,6 +282,7 @@ describe("Forms Integration", () => {
       "event-uuid-123",
       "form-uuid-1",
       dto,
+      ACTOR,
     );
     expect(result).toBeDefined();
     expect(result).toMatchObject({
@@ -291,7 +307,7 @@ describe("Forms Integration", () => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
       callback(mockPrismaService),
     );
-    await formsController.remove("event-uuid-123", "form-uuid-1");
+    await formsController.remove("event-uuid-123", "form-uuid-1", ACTOR);
     expect(mockPrismaService.event.update).toHaveBeenCalled();
     expect(mockPrismaService.form.deleteMany).toHaveBeenCalled();
     expect(mockPrismaService.form.deleteMany).toHaveBeenCalledWith({
@@ -310,7 +326,7 @@ describe("Forms Integration", () => {
       callback(mockPrismaService),
     );
     await expect(
-      formsController.remove("event-uuid-123", "non-existent-form-uuid"),
+      formsController.remove("event-uuid-123", "non-existent-form-uuid", ACTOR),
     ).rejects.toThrow();
     expect(mockPrismaService.form.deleteMany).toHaveBeenCalledWith({
       where: { uuid: "non-existent-form-uuid", eventUuid: "event-uuid-123" },
@@ -364,7 +380,12 @@ describe("Forms Integration", () => {
         formDefinitions: [],
       });
 
-      const result = await formsController.duplicate(eventUuid, formUuid, {});
+      const result = await formsController.duplicate(
+        eventUuid,
+        formUuid,
+        {},
+        ACTOR,
+      );
 
       expect(mockPrismaService.form.findFirst).toHaveBeenCalledWith({
         where: { uuid: formUuid, eventUuid },
@@ -403,9 +424,14 @@ describe("Forms Integration", () => {
         uuid: "new-form-uuid",
       });
 
-      await formsController.duplicate(eventUuid, formUuid, {
-        name: "Custom name",
-      });
+      await formsController.duplicate(
+        eventUuid,
+        formUuid,
+        {
+          name: "Custom name",
+        },
+        ACTOR,
+      );
 
       expect(mockPrismaService.form.create).toHaveBeenCalledWith({
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -417,7 +443,7 @@ describe("Forms Integration", () => {
       mockPrismaService.form.findFirst.mockResolvedValue(null);
 
       await expect(
-        formsController.duplicate(eventUuid, "foreign-form-uuid", {}),
+        formsController.duplicate(eventUuid, "foreign-form-uuid", {}, ACTOR),
       ).rejects.toThrow();
       expect(mockPrismaService.form.create).not.toHaveBeenCalled();
     });
