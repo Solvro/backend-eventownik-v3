@@ -1,5 +1,12 @@
 import { isEmail } from "class-validator";
 import * as ExcelJS from "exceljs";
+import { randomUUID } from "node:crypto";
+import {
+  AuditAction,
+  AuditEntityType,
+} from "src/audit-log/audit-log.constants";
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
 import { Prisma } from "src/generated/prisma/client";
 import { AttributeType } from "src/generated/prisma/enums";
 import {
@@ -59,6 +66,7 @@ export class ImportExportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly participantsService: ParticipantsService,
+    private readonly auditLog: AuditLogService,
     participantsXlsxExporter: ParticipantsXlsxExporter,
   ) {
     this.exporters = new Map<ParticipantsExportFormat, ParticipantsExporter>([
@@ -69,6 +77,7 @@ export class ImportExportService {
   async exportParticipants(
     eventId: string,
     query: ExportParticipantsQueryDto,
+    actor: AuditActor,
   ): Promise<ExportedFile> {
     await this.assertEventExists(eventId);
 
@@ -152,6 +161,22 @@ export class ImportExportService {
       throw new BadRequestException(`Export format ${format} is not supported`);
     }
 
+    await this.auditLog.record(this.prisma, {
+      eventUuid: eventId,
+      action: AuditAction.ParticipantsExported,
+      actor,
+      entityType: AuditEntityType.Participant,
+      changes: [
+        { kind: "value", field: "format", from: null, to: format },
+        {
+          kind: "value",
+          field: "participants",
+          from: null,
+          to: participants.length,
+        },
+      ],
+    });
+
     return {
       fileName: `participants-export-${eventId}.${exporter.fileExtension}`,
       mimeType: exporter.mimeType,
@@ -162,14 +187,16 @@ export class ImportExportService {
   async importParticipants(
     eventId: string,
     participants: ParticipantCreateDto[],
+    actor: AuditActor,
   ): Promise<ParticipantsImportResultDto> {
     await this.assertEventExists(eventId);
-    return this.processImport(eventId, participants, new Map());
+    return this.processImport(eventId, participants, new Map(), actor);
   }
 
   async importParticipantsFromXlsx(
     eventId: string,
     buffer: Buffer,
+    actor: AuditActor,
   ): Promise<ParticipantsImportResultDto> {
     await this.assertEventExists(eventId);
 
@@ -177,13 +204,14 @@ export class ImportExportService {
     const participants = await this.parseXlsxToDto(buffer, attributes);
     const blockIndex = await this.buildBlockNameIndex(attributes);
 
-    return this.processImport(eventId, participants, blockIndex);
+    return this.processImport(eventId, participants, blockIndex, actor);
   }
 
   private async processImport(
     eventId: string,
     participants: ParticipantCreateDto[],
     blockIndex: BlockNameIndex,
+    actor: AuditActor,
   ): Promise<ParticipantsImportResultDto> {
     if (participants.length > MAX_IMPORT_PARTICIPANTS) {
       throw new BadRequestException(MAX_IMPORT_ERROR_MESSAGE);
@@ -191,6 +219,7 @@ export class ImportExportService {
 
     const importedParticipants: Participant[] = [];
     const skippedParticipants: SkippedParticipantDto[] = [];
+    const correlationId = randomUUID();
 
     if (participants.length === 0) {
       return { importedParticipants, skippedParticipants };
@@ -259,6 +288,13 @@ export class ImportExportService {
           eventId,
           email,
           attributes,
+          {
+            audit: {
+              actor,
+              action: AuditAction.ParticipantImported,
+              correlationId,
+            },
+          },
         );
         importedParticipants.push(participant);
       } catch (error) {
@@ -269,6 +305,28 @@ export class ImportExportService {
         );
       }
     }
+
+    await this.auditLog.record(this.prisma, {
+      eventUuid: eventId,
+      action: AuditAction.ParticipantsImported,
+      actor,
+      entityType: AuditEntityType.Participant,
+      changes: [
+        {
+          kind: "value",
+          field: "imported",
+          from: null,
+          to: importedParticipants.length,
+        },
+        {
+          kind: "value",
+          field: "skipped",
+          from: null,
+          to: skippedParticipants.length,
+        },
+      ],
+      correlationId,
+    });
 
     return { importedParticipants, skippedParticipants };
   }

@@ -1,3 +1,4 @@
+import { AuditLogModule } from "src/audit-log/audit-log.module";
 import { ParticipantsModule } from "src/participants/participants.module";
 
 import { Module } from "@nestjs/common";
@@ -7,7 +8,7 @@ import { ImportExportController } from "./import-export.controller";
 import { ImportExportService } from "./import-export.service";
 
 @Module({
-  imports: [ParticipantsModule],
+  imports: [ParticipantsModule, AuditLogModule],
   controllers: [ImportExportController],
   providers: [ImportExportService, ParticipantsXlsxExporter],
 })

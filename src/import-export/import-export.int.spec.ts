@@ -1,8 +1,10 @@
 import * as ExcelJS from "exceljs";
 import type { Request, Response } from "express";
 import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { PermissionsGuard } from "src/auth/permissions.guard";
+import { LogTrigger } from "src/generated/prisma/client";
 import type { Attribute, Block, Event } from "src/generated/prisma/client";
 import { AttributeType } from "src/generated/prisma/enums";
 import { ParticipantsService } from "src/participants/participants.service";
@@ -30,6 +32,12 @@ async function buildXlsx(rows: unknown[][]): Promise<Express.Multer.File> {
   const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
   return { buffer } as unknown as Express.Multer.File;
 }
+
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
 
 describe("Import/Export Integration", () => {
   let controller: ImportExportController;
@@ -149,6 +157,7 @@ describe("Import/Export Integration", () => {
       const result = await controller.importParticipants(
         event.uuid,
         jsonRequest,
+        ACTOR,
         {
           participants: [
             {
@@ -199,6 +208,7 @@ describe("Import/Export Integration", () => {
       const result = await controller.importParticipants(
         event.uuid,
         jsonRequest,
+        ACTOR,
         {
           participants: [
             {
@@ -249,6 +259,7 @@ describe("Import/Export Integration", () => {
       const result = await controller.importParticipants(
         event.uuid,
         jsonRequest,
+        ACTOR,
         {
           participants: [
             {
@@ -284,7 +295,7 @@ describe("Import/Export Integration", () => {
       const event = await createEvent();
 
       await expect(
-        controller.importParticipants(event.uuid, jsonRequest, {}),
+        controller.importParticipants(event.uuid, jsonRequest, ACTOR, {}),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -292,7 +303,7 @@ describe("Import/Export Integration", () => {
       const event = await createEvent();
 
       await expect(
-        controller.importParticipants(event.uuid, jsonRequest, {
+        controller.importParticipants(event.uuid, jsonRequest, ACTOR, {
           participants: [],
         }),
       ).rejects.toThrow(BadRequestException);
@@ -305,7 +316,7 @@ describe("Import/Export Integration", () => {
       }));
 
       await expect(
-        controller.importParticipants(event.uuid, jsonRequest, {
+        controller.importParticipants(event.uuid, jsonRequest, ACTOR, {
           participants,
         }),
       ).rejects.toThrow(BadRequestException);
@@ -319,7 +330,7 @@ describe("Import/Export Integration", () => {
       const event = await createEvent();
 
       await expect(
-        controller.importParticipants(event.uuid, jsonRequest, {
+        controller.importParticipants(event.uuid, jsonRequest, ACTOR, {
           participants: [{ email: "not-an-email" }],
         }),
       ).rejects.toThrow(BadRequestException);
@@ -330,6 +341,7 @@ describe("Import/Export Integration", () => {
         controller.importParticipants(
           "00000000-0000-4000-8000-000000000000",
           jsonRequest,
+          ACTOR,
           { participants: [{ email: "a@example.com" }] },
         ),
       ).rejects.toThrow(NotFoundException);
@@ -349,6 +361,7 @@ describe("Import/Export Integration", () => {
       const result = await controller.importParticipants(
         event.uuid,
         multipartRequest,
+        ACTOR,
         undefined,
         file,
       );
@@ -372,6 +385,7 @@ describe("Import/Export Integration", () => {
         controller.importParticipants(
           event.uuid,
           multipartRequest,
+          ACTOR,
           undefined,
           file,
         ),
@@ -400,6 +414,7 @@ describe("Import/Export Integration", () => {
       const result = await controller.importParticipants(
         event.uuid,
         multipartRequest,
+        ACTOR,
         undefined,
         file,
       );
@@ -435,6 +450,7 @@ describe("Import/Export Integration", () => {
       const result = await controller.importParticipants(
         event.uuid,
         multipartRequest,
+        ACTOR,
         undefined,
         file,
       );
@@ -447,7 +463,7 @@ describe("Import/Export Integration", () => {
       const event = await createEvent();
 
       await expect(
-        controller.importParticipants(event.uuid, multipartRequest, {}),
+        controller.importParticipants(event.uuid, multipartRequest, ACTOR, {}),
       ).rejects.toThrow("Missing file: participantsFile");
     });
   });
@@ -465,7 +481,7 @@ describe("Import/Export Integration", () => {
       });
       const email = `round-${uniq()}@example.com`;
 
-      await controller.importParticipants(event.uuid, jsonRequest, {
+      await controller.importParticipants(event.uuid, jsonRequest, ACTOR, {
         participants: [
           {
             email,
@@ -479,7 +495,7 @@ describe("Import/Export Integration", () => {
 
       const send = jest.fn();
       const response = { setHeader: jest.fn(), send } as unknown as Response;
-      await controller.exportParticipants(event.uuid, {}, response);
+      await controller.exportParticipants(event.uuid, {}, ACTOR, response);
       const exported = (send.mock.calls[0] as [Buffer])[0];
 
       await prisma.participant.deleteMany({
@@ -489,6 +505,7 @@ describe("Import/Export Integration", () => {
       const result = await controller.importParticipants(
         event.uuid,
         multipartRequest,
+        ACTOR,
         undefined,
         { buffer: exported } as unknown as Express.Multer.File,
       );
@@ -502,6 +519,58 @@ describe("Import/Export Integration", () => {
           ?.value;
       expect(valueOf(first.uuid)).toBe("one");
       expect(valueOf(second.uuid)).toBe("two");
+    });
+  });
+  describe("audit log", () => {
+    it("links imported participants to one summary entry and logs exports", async () => {
+      const event = await createEvent();
+      await prisma.participant.create({
+        data: { email: "dup@example.com", eventUuid: event.uuid },
+      });
+
+      await controller.importParticipants(event.uuid, jsonRequest, ACTOR, {
+        participants: [
+          { email: "new1@example.com" },
+          { email: "new2@example.com" },
+          { email: "dup@example.com" },
+        ],
+      });
+
+      const send = jest.fn();
+      const response = { setHeader: jest.fn(), send } as unknown as Response;
+      await controller.exportParticipants(event.uuid, {}, ACTOR, response);
+
+      const entries = await prisma.auditLog.findMany({
+        where: { eventUuid: event.uuid },
+        orderBy: { createdAt: "asc" },
+      });
+      const imported = entries.filter(
+        (entry) => entry.action === "participant.imported",
+      );
+      const summary = entries.find(
+        (entry) => entry.action === "participants.imported",
+      );
+      const exported = entries.find(
+        (entry) => entry.action === "participants.exported",
+      );
+
+      expect(imported).toHaveLength(2);
+      expect(summary?.correlationId).not.toBeNull();
+      expect(imported.map((entry) => entry.correlationId)).toEqual([
+        summary?.correlationId,
+        summary?.correlationId,
+      ]);
+      expect(summary?.changes).toMatchObject([
+        { field: "imported", to: 2 },
+        { field: "skipped", to: 1 },
+      ]);
+      expect(exported).toMatchObject({
+        actorUuid: ACTOR.uuid,
+        changes: [
+          { field: "format", to: "xlsx" },
+          { field: "participants", to: 3 },
+        ],
+      });
     });
   });
 });
