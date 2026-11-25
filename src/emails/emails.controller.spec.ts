@@ -1,4 +1,7 @@
 import { MailerService } from "@nestjs-modules/mailer";
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { LogTrigger } from "src/generated/prisma/client";
 import { EmailTrigger } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -16,6 +19,12 @@ import { EmailDeliveryService } from "./email-delivery.service";
 import { EmailTemplatesService } from "./email-templates.service";
 import { EMAIL_QUEUE_NAME } from "./emails.constants";
 import { EmailsController } from "./emails.controller";
+
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
 
 describe("EmailsController", () => {
   let controller: EmailsController;
@@ -60,6 +69,10 @@ describe("EmailsController", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EmailTemplatesService,
+        {
+          provide: AuditLogService,
+          useValue: { record: jest.fn(), fieldChanges: () => [] },
+        },
         EmailDeliveryService,
         EmailContentParserService,
         PrismaService,
@@ -222,7 +235,7 @@ describe("EmailsController", () => {
         mockPrismaOutput,
       );
 
-      const result = await controller.create(mockEventId, dto);
+      const result = await controller.create(mockEventId, dto, ACTOR);
 
       expect(result.id).toEqual(mockEmailId);
       expect(result.name).toEqual("test");
@@ -245,7 +258,7 @@ describe("EmailsController", () => {
       };
       mockPrismaService.event.findUnique.mockResolvedValue(null);
 
-      await expect(controller.create(mockEventId, dto)).rejects.toThrow(
+      await expect(controller.create(mockEventId, dto, ACTOR)).rejects.toThrow(
         BadRequestException,
       );
       expect(mockPrismaService.emailTemplate.create).not.toHaveBeenCalled();
@@ -318,7 +331,12 @@ describe("EmailsController", () => {
         mockUpdatedOutput,
       );
 
-      const result = await controller.update(mockEventId, mockEmailId, dto);
+      const result = await controller.update(
+        mockEventId,
+        mockEmailId,
+        dto,
+        ACTOR,
+      );
 
       expect(result.name).toEqual("test2");
       expect(mockPrismaService.emailTemplate.update).toHaveBeenCalledWith(
@@ -333,7 +351,7 @@ describe("EmailsController", () => {
       const dto: UpdateEmailDto = { name: "test" };
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue(null);
       await expect(
-        controller.update(mockEventId, mockEmailId, dto),
+        controller.update(mockEventId, mockEmailId, dto, ACTOR),
       ).rejects.toThrow(NotFoundException);
       expect(mockPrismaService.emailTemplate.update).not.toHaveBeenCalled();
     });
@@ -349,7 +367,7 @@ describe("EmailsController", () => {
       });
 
       // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
-      const result = await controller.remove(mockEventId, mockEmailId);
+      const result = await controller.remove(mockEventId, mockEmailId, ACTOR);
 
       expect(result).toBeUndefined();
       expect(mockPrismaService.emailTemplate.delete).toHaveBeenCalledWith({
@@ -359,9 +377,9 @@ describe("EmailsController", () => {
     it("should throw NotFoundException and prevent database deletion", async () => {
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue(null);
 
-      await expect(controller.remove(mockEventId, mockEmailId)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        controller.remove(mockEventId, mockEmailId, ACTOR),
+      ).rejects.toThrow(NotFoundException);
       expect(mockPrismaService.emailTemplate.delete).not.toHaveBeenCalled();
     });
   });
@@ -389,7 +407,12 @@ describe("EmailsController", () => {
         updatedAt: new Date(),
       });
 
-      const result = await controller.duplicate(mockEventId, mockEmailId, {});
+      const result = await controller.duplicate(
+        mockEventId,
+        mockEmailId,
+        {},
+        ACTOR,
+      );
 
       expect(mockPrismaService.emailTemplate.findFirst).toHaveBeenCalledWith({
         where: { uuid: mockEmailId, eventUuid: mockEventId },
@@ -430,9 +453,14 @@ describe("EmailsController", () => {
         updatedAt: new Date(),
       });
 
-      await controller.duplicate(mockEventId, mockEmailId, {
-        name: "Custom email",
-      });
+      await controller.duplicate(
+        mockEventId,
+        mockEmailId,
+        {
+          name: "Custom email",
+        },
+        ACTOR,
+      );
 
       expect(mockPrismaService.emailTemplate.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -446,7 +474,7 @@ describe("EmailsController", () => {
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue(null);
 
       await expect(
-        controller.duplicate(mockEventId, mockEmailId, {}),
+        controller.duplicate(mockEventId, mockEmailId, {}, ACTOR),
       ).rejects.toThrow(NotFoundException);
       expect(mockPrismaService.emailTemplate.create).not.toHaveBeenCalled();
     });

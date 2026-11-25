@@ -1,4 +1,7 @@
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
 import { BlocksService } from "src/blocks/blocks.service";
+import { LogTrigger } from "src/generated/prisma/client";
 import type { Event, Form } from "src/generated/prisma/client";
 import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
@@ -11,6 +14,12 @@ import { Test } from "@nestjs/testing";
 
 import { FormsService } from "./forms.service";
 
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
+
 describe("FormsService registration form (integration)", () => {
   let service: FormsService;
   let prisma: PrismaService;
@@ -22,6 +31,7 @@ describe("FormsService registration form (integration)", () => {
       providers: [
         FormsService,
         ParticipantsService,
+        AuditLogService,
         BlocksService,
         PrismaService,
         { provide: StorageService, useValue: {} },
@@ -70,28 +80,40 @@ describe("FormsService registration form (integration)", () => {
     it("sets the new form as the registration form", async () => {
       const event = await createEvent();
 
-      const form = await service.create(event.uuid, {
-        name: "First",
-        isFirstForm: true,
-        attributes: [],
-      });
+      const form = await service.create(
+        event.uuid,
+        {
+          name: "First",
+          isFirstForm: true,
+          attributes: [],
+        },
+        ACTOR,
+      );
 
       expect(await registerFormUuidOf(event.uuid)).toBe(form.uuid);
     });
 
     it("replaces the current registration form", async () => {
       const event = await createEvent();
-      await service.create(event.uuid, {
-        name: "Old first",
-        isFirstForm: true,
-        attributes: [],
-      });
+      await service.create(
+        event.uuid,
+        {
+          name: "Old first",
+          isFirstForm: true,
+          attributes: [],
+        },
+        ACTOR,
+      );
 
-      const replacement = await service.create(event.uuid, {
-        name: "New first",
-        isFirstForm: true,
-        attributes: [],
-      });
+      const replacement = await service.create(
+        event.uuid,
+        {
+          name: "New first",
+          isFirstForm: true,
+          attributes: [],
+        },
+        ACTOR,
+      );
 
       expect(await registerFormUuidOf(event.uuid)).toBe(replacement.uuid);
     });
@@ -107,7 +129,7 @@ describe("FormsService registration form (integration)", () => {
         data: { registerFormUuid: current.uuid },
       });
 
-      await service.update(next.uuid, event.uuid, { isFirstForm: true });
+      await service.update(next.uuid, event.uuid, { isFirstForm: true }, ACTOR);
 
       expect(await registerFormUuidOf(event.uuid)).toBe(next.uuid);
     });
@@ -120,7 +142,12 @@ describe("FormsService registration form (integration)", () => {
         data: { registerFormUuid: current.uuid },
       });
 
-      await service.update(current.uuid, event.uuid, { isFirstForm: false });
+      await service.update(
+        current.uuid,
+        event.uuid,
+        { isFirstForm: false },
+        ACTOR,
+      );
 
       expect(await registerFormUuidOf(event.uuid)).toBeNull();
     });
@@ -134,9 +161,75 @@ describe("FormsService registration form (integration)", () => {
         data: { registerFormUuid: current.uuid },
       });
 
-      await service.update(other.uuid, event.uuid, { isFirstForm: false });
+      await service.update(
+        other.uuid,
+        event.uuid,
+        { isFirstForm: false },
+        ACTOR,
+      );
 
       expect(await registerFormUuidOf(event.uuid)).toBe(current.uuid);
+    });
+  });
+  describe("audit log", () => {
+    it("records forms with attribute changes and the registration flag", async () => {
+      const event = await createEvent();
+      const first = await prisma.attribute.create({
+        data: { eventUuid: event.uuid, name: "Size", type: "text", order: 1 },
+      });
+      const second = await prisma.attribute.create({
+        data: { eventUuid: event.uuid, name: "Diet", type: "text", order: 2 },
+      });
+
+      const form = await service.create(
+        event.uuid,
+        {
+          name: "Signup",
+          attributes: [
+            { attributeUuid: first.uuid, isRequired: true, order: 1 },
+          ],
+        },
+        ACTOR,
+      );
+      await service.update(
+        form.uuid,
+        event.uuid,
+        {
+          isFirstForm: true,
+          attributes: [
+            { attributeUuid: first.uuid, isRequired: true, order: 1 },
+            { attributeUuid: second.uuid, isRequired: false, order: 2 },
+          ],
+        },
+        ACTOR,
+      );
+      await service.remove(form.uuid, event.uuid, ACTOR);
+
+      const entries = await prisma.auditLog.findMany({
+        where: { eventUuid: event.uuid },
+        orderBy: { createdAt: "asc" },
+      });
+
+      expect(entries.map((entry) => entry.action)).toEqual([
+        "form.created",
+        "form.updated",
+        "form.deleted",
+      ]);
+      expect(entries[1].changes).toEqual(
+        expect.arrayContaining([
+          { kind: "value", field: "isFirstForm", from: false, to: true },
+          {
+            kind: "list",
+            field: "attributes",
+            added: [{ name: "Diet", isRequired: false }],
+            removed: [],
+          },
+        ]),
+      );
+      expect(entries[2]).toMatchObject({
+        entityLabel: "Signup",
+        entityUuid: form.uuid,
+      });
     });
   });
 });

@@ -1,4 +1,6 @@
-import { Prisma } from "src/generated/prisma/client";
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { LogTrigger, Prisma } from "src/generated/prisma/client";
 import { AttributeType, TicketMode } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -12,6 +14,12 @@ import { Test } from "@nestjs/testing";
 
 import { TicketsService } from "./tickets.service";
 
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
+
 describe("TicketsService", () => {
   let service: TicketsService;
 
@@ -23,7 +31,8 @@ describe("TicketsService", () => {
 
   const mockTx = {
     ticketAttribute: { deleteMany: jest.fn(), createMany: jest.fn() },
-    ticket: { update: jest.fn() },
+    ticket: { update: jest.fn(), create: jest.fn(), delete: jest.fn() },
+    attribute: { findMany: jest.fn() },
   };
 
   const mockPrismaService = {
@@ -51,11 +60,20 @@ describe("TicketsService", () => {
 
   beforeEach(async () => {
     jest.resetAllMocks();
+    mockTx.attribute.findMany.mockResolvedValue([]);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TicketsService,
         { provide: PrismaService, useValue: mockPrismaService },
+        {
+          provide: AuditLogService,
+          useValue: {
+            record: jest.fn(),
+            fieldChanges: () => [],
+            listChange: () => [],
+          },
+        },
       ],
     }).compile();
 
@@ -70,11 +88,15 @@ describe("TicketsService", () => {
 
   describe("create", () => {
     it("creates an EVENT ticket", async () => {
-      mockPrismaService.ticket.create.mockResolvedValue(ticketRow());
+      mockTx.ticket.create.mockResolvedValue(ticketRow());
 
-      const result = await service.create(eventUuid, {
-        mode: TicketMode.EVENT,
-      });
+      const result = await service.create(
+        eventUuid,
+        {
+          mode: TicketMode.EVENT,
+        },
+        ACTOR,
+      );
 
       expect(result).toEqual({
         uuid: ticketUuid,
@@ -85,7 +107,7 @@ describe("TicketsService", () => {
         createdAt: new Date("2026-01-01T00:00:00.000Z"),
         updatedAt: new Date("2026-01-01T00:00:00.000Z"),
       });
-      expect(mockPrismaService.ticket.create).toHaveBeenCalledWith(
+      expect(mockTx.ticket.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             eventUuid,
@@ -103,7 +125,7 @@ describe("TicketsService", () => {
       mockPrismaService.attribute.findMany.mockResolvedValue([
         { uuid: textAttributeUuid, type: AttributeType.text },
       ]);
-      mockPrismaService.ticket.create.mockResolvedValue(
+      mockTx.ticket.create.mockResolvedValue(
         ticketRow({
           mode: TicketMode.BLOCK,
           attributeUuid: blockAttributeUuid,
@@ -111,11 +133,15 @@ describe("TicketsService", () => {
         }),
       );
 
-      const result = await service.create(eventUuid, {
-        mode: TicketMode.BLOCK,
-        attributeUuid: blockAttributeUuid,
-        shownAttributeUuids: [textAttributeUuid],
-      });
+      const result = await service.create(
+        eventUuid,
+        {
+          mode: TicketMode.BLOCK,
+          attributeUuid: blockAttributeUuid,
+          shownAttributeUuids: [textAttributeUuid],
+        },
+        ACTOR,
+      );
 
       expect(result.attributeUuid).toBe(blockAttributeUuid);
       expect(result.shownAttributeUuids).toEqual([textAttributeUuid]);
@@ -125,16 +151,20 @@ describe("TicketsService", () => {
       mockPrismaService.event.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.create(eventUuid, { mode: TicketMode.EVENT }),
+        service.create(eventUuid, { mode: TicketMode.EVENT }, ACTOR),
       ).rejects.toThrow(NotFoundException);
     });
 
     it("rejects an EVENT ticket with an attribute", async () => {
       await expect(
-        service.create(eventUuid, {
-          mode: TicketMode.EVENT,
-          attributeUuid: blockAttributeUuid,
-        }),
+        service.create(
+          eventUuid,
+          {
+            mode: TicketMode.EVENT,
+            attributeUuid: blockAttributeUuid,
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -142,10 +172,14 @@ describe("TicketsService", () => {
       mockPrismaService.attribute.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.create(eventUuid, {
-          mode: TicketMode.BLOCK,
-          attributeUuid: blockAttributeUuid,
-        }),
+        service.create(
+          eventUuid,
+          {
+            mode: TicketMode.BLOCK,
+            attributeUuid: blockAttributeUuid,
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -155,10 +189,14 @@ describe("TicketsService", () => {
       });
 
       await expect(
-        service.create(eventUuid, {
-          mode: TicketMode.BLOCK,
-          attributeUuid: textAttributeUuid,
-        }),
+        service.create(
+          eventUuid,
+          {
+            mode: TicketMode.BLOCK,
+            attributeUuid: textAttributeUuid,
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -166,10 +204,14 @@ describe("TicketsService", () => {
       mockPrismaService.attribute.findMany.mockResolvedValue([]);
 
       await expect(
-        service.create(eventUuid, {
-          mode: TicketMode.EVENT,
-          shownAttributeUuids: [textAttributeUuid],
-        }),
+        service.create(
+          eventUuid,
+          {
+            mode: TicketMode.EVENT,
+            shownAttributeUuids: [textAttributeUuid],
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -179,15 +221,19 @@ describe("TicketsService", () => {
       ]);
 
       await expect(
-        service.create(eventUuid, {
-          mode: TicketMode.EVENT,
-          shownAttributeUuids: [fileAttributeUuid],
-        }),
+        service.create(
+          eventUuid,
+          {
+            mode: TicketMode.EVENT,
+            shownAttributeUuids: [fileAttributeUuid],
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
     it("maps a unique violation to ConflictException", async () => {
-      mockPrismaService.ticket.create.mockRejectedValue(
+      mockTx.ticket.create.mockRejectedValue(
         new Prisma.PrismaClientKnownRequestError("unique", {
           code: "P2002",
           clientVersion: "test",
@@ -195,7 +241,7 @@ describe("TicketsService", () => {
       );
 
       await expect(
-        service.create(eventUuid, { mode: TicketMode.EVENT }),
+        service.create(eventUuid, { mode: TicketMode.EVENT }, ACTOR),
       ).rejects.toThrow(ConflictException);
     });
   });
@@ -251,9 +297,14 @@ describe("TicketsService", () => {
         ticketRow({ attributes: [{ attributeUuid: textAttributeUuid }] }),
       );
 
-      const result = await service.update(eventUuid, ticketUuid, {
-        shownAttributeUuids: [textAttributeUuid],
-      });
+      const result = await service.update(
+        eventUuid,
+        ticketUuid,
+        {
+          shownAttributeUuids: [textAttributeUuid],
+        },
+        ACTOR,
+      );
 
       expect(mockTx.ticketAttribute.deleteMany).toHaveBeenCalledWith({
         where: { ticketUuid },
@@ -271,9 +322,14 @@ describe("TicketsService", () => {
       ]);
 
       await expect(
-        service.update(eventUuid, ticketUuid, {
-          shownAttributeUuids: [fileAttributeUuid],
-        }),
+        service.update(
+          eventUuid,
+          ticketUuid,
+          {
+            shownAttributeUuids: [fileAttributeUuid],
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(BadRequestException);
       expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
     });
@@ -282,7 +338,12 @@ describe("TicketsService", () => {
       mockPrismaService.ticket.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.update(eventUuid, ticketUuid, { shownAttributeUuids: [] }),
+        service.update(
+          eventUuid,
+          ticketUuid,
+          { shownAttributeUuids: [] },
+          ACTOR,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -291,9 +352,9 @@ describe("TicketsService", () => {
     it("deletes the ticket", async () => {
       mockPrismaService.ticket.findFirst.mockResolvedValue(ticketRow());
 
-      await service.remove(eventUuid, ticketUuid);
+      await service.remove(eventUuid, ticketUuid, ACTOR);
 
-      expect(mockPrismaService.ticket.delete).toHaveBeenCalledWith({
+      expect(mockTx.ticket.delete).toHaveBeenCalledWith({
         where: { uuid: ticketUuid },
       });
     });
@@ -301,10 +362,10 @@ describe("TicketsService", () => {
     it("throws NotFoundException for an unknown ticket", async () => {
       mockPrismaService.ticket.findFirst.mockResolvedValue(null);
 
-      await expect(service.remove(eventUuid, ticketUuid)).rejects.toThrow(
-        NotFoundException,
-      );
-      expect(mockPrismaService.ticket.delete).not.toHaveBeenCalled();
+      await expect(
+        service.remove(eventUuid, ticketUuid, ACTOR),
+      ).rejects.toThrow(NotFoundException);
+      expect(mockTx.ticket.delete).not.toHaveBeenCalled();
     });
   });
 });

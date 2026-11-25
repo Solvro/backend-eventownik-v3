@@ -1,3 +1,4 @@
+import { AuditLogModule } from "src/audit-log/audit-log.module";
 import { PublicEventsController } from "src/events/events-public.controller";
 import { EventsController } from "src/events/events.controller";
 
@@ -6,6 +7,7 @@ import { Module } from "@nestjs/common";
 import { EventsService } from "./events.service";
 
 @Module({
+  imports: [AuditLogModule],
   controllers: [EventsController, PublicEventsController],
   providers: [EventsService],
 })

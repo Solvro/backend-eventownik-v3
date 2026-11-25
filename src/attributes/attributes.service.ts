@@ -1,8 +1,15 @@
 import { isUUID } from "class-validator";
+import { randomUUID } from "node:crypto";
 import {
   getConfigPositiveIntegerStrict,
   getConfigStringArrayStrict,
 } from "src/attributes/attribute-config.utility";
+import {
+  AuditAction,
+  AuditEntityType,
+} from "src/audit-log/audit-log.constants";
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
 import { BlocksService } from "src/blocks/blocks.service";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
@@ -25,11 +32,25 @@ import { BulkUpdateAttributeDto } from "./dto/bulk-update-attribute.dto";
 import { CreateAttributeDto } from "./dto/create-attribute.dto";
 import { UpdateAttributeDto } from "./dto/update-attribute.dto";
 
+const AUDITED_ATTRIBUTE_FIELDS = [
+  "name",
+  "type",
+  "order",
+  "showInList",
+  "config",
+] as const;
+
+interface AttributeAudit {
+  actor: AuditActor;
+  correlationId?: string;
+}
+
 @Injectable()
 export class AttributesService {
   constructor(
     private prisma: PrismaService,
     private blocksService: BlocksService,
+    private auditLog: AuditLogService,
   ) {}
 
   private getConfigObject(config?: Record<string, unknown>) {
@@ -135,6 +156,7 @@ export class AttributesService {
     prisma: Prisma.TransactionClient,
     createAttributeDto: CreateAttributeDto,
     eventId: string,
+    audit: AttributeAudit,
   ) {
     const attribute = await prisma.attribute.create({
       data: {
@@ -159,10 +181,29 @@ export class AttributesService {
       );
     }
 
+    await this.auditLog.record(prisma, {
+      eventUuid: eventId,
+      action: AuditAction.AttributeCreated,
+      actor: audit.actor,
+      entityType: AuditEntityType.Attribute,
+      entityUuid: attribute.uuid,
+      entityLabel: attribute.name,
+      changes: this.auditLog.fieldChanges(
+        null,
+        attribute,
+        AUDITED_ATTRIBUTE_FIELDS,
+      ),
+      correlationId: audit.correlationId,
+    });
+
     return attribute;
   }
 
-  async create(createAttributeDto: CreateAttributeDto, eventId: string) {
+  async create(
+    createAttributeDto: CreateAttributeDto,
+    eventId: string,
+    actor: AuditActor,
+  ) {
     return this.prisma.$transaction(async (prisma) => {
       const event = await prisma.event.findUnique({
         where: { uuid: eventId },
@@ -171,7 +212,7 @@ export class AttributesService {
         throw new NotFoundException(`Event with uuid ${eventId} not found`);
       }
 
-      return this.createTx(prisma, createAttributeDto, eventId);
+      return this.createTx(prisma, createAttributeDto, eventId, { actor });
     });
   }
 
@@ -233,6 +274,7 @@ export class AttributesService {
     id: string,
     eventId: string,
     updateAttributeDto: UpdateAttributeDto,
+    actor: AuditActor,
   ) {
     return this.prisma.$transaction(async (prisma) => {
       const event = await prisma.event.findUnique({
@@ -242,7 +284,7 @@ export class AttributesService {
         throw new NotFoundException(`Event with uuid ${eventId} not found`);
       }
 
-      return this.updateTx(prisma, id, eventId, updateAttributeDto);
+      return this.updateTx(prisma, id, eventId, updateAttributeDto, { actor });
     });
   }
 
@@ -251,6 +293,7 @@ export class AttributesService {
     id: string,
     eventId: string,
     updateAttributeDto: UpdateAttributeDto,
+    audit: AttributeAudit,
   ) {
     const foundAttribute = await prisma.attribute.findFirst({
       where: { uuid: id, eventUuid: eventId },
@@ -300,6 +343,24 @@ export class AttributesService {
       await this.blocksService.deleteRootBlocks(updated.uuid, prisma);
     }
 
+    const changes = this.auditLog.fieldChanges(
+      foundAttribute,
+      updated,
+      AUDITED_ATTRIBUTE_FIELDS,
+    );
+    if (changes.length > 0) {
+      await this.auditLog.record(prisma, {
+        eventUuid: eventId,
+        action: AuditAction.AttributeUpdated,
+        actor: audit.actor,
+        entityType: AuditEntityType.Attribute,
+        entityUuid: updated.uuid,
+        entityLabel: updated.name,
+        changes,
+        correlationId: audit.correlationId,
+      });
+    }
+
     if (
       foundAttribute.type === "block" &&
       nextType === "block" &&
@@ -315,7 +376,7 @@ export class AttributesService {
     return updated;
   }
 
-  async remove(id: string, eventId: string) {
+  async remove(id: string, eventId: string, actor: AuditActor) {
     return this.prisma.$transaction(async (prisma) => {
       const event = await prisma.event.findUnique({
         where: { uuid: eventId },
@@ -326,11 +387,24 @@ export class AttributesService {
 
       const attribute = await prisma.attribute.findFirst({
         where: { uuid: id, eventUuid: eventId },
-        select: { uuid: true },
       });
       if (attribute == null) {
         throw new NotFoundException(`Attribute with uuid ${id} not found`);
       }
+
+      await this.auditLog.record(prisma, {
+        eventUuid: eventId,
+        action: AuditAction.AttributeDeleted,
+        actor,
+        entityType: AuditEntityType.Attribute,
+        entityUuid: attribute.uuid,
+        entityLabel: attribute.name,
+        changes: this.auditLog.fieldChanges(
+          attribute,
+          null,
+          AUDITED_ATTRIBUTE_FIELDS,
+        ),
+      });
 
       await prisma.block.deleteMany({
         where: { attributeUuid: attribute.uuid },
@@ -342,7 +416,11 @@ export class AttributesService {
     });
   }
 
-  async bulkUpdate(eventId: string, attributes: BulkUpdateAttributeDto[]) {
+  async bulkUpdate(
+    eventId: string,
+    attributes: BulkUpdateAttributeDto[],
+    actor: AuditActor,
+  ) {
     return this.prisma.$transaction(async (prisma) => {
       const event = await prisma.event.findUnique({
         where: { uuid: eventId },
@@ -351,14 +429,22 @@ export class AttributesService {
         throw new NotFoundException(`Event with uuid ${eventId} not found`);
       }
 
+      const audit = { actor, correlationId: randomUUID() };
       const results: PrismaAttribute[] = [];
       for (const item of attributes) {
         if (item.uuid == null) {
           results.push(
-            await this.createTx(prisma, item as CreateAttributeDto, eventId),
+            await this.createTx(
+              prisma,
+              item as CreateAttributeDto,
+              eventId,
+              audit,
+            ),
           );
         } else {
-          results.push(await this.updateTx(prisma, item.uuid, eventId, item));
+          results.push(
+            await this.updateTx(prisma, item.uuid, eventId, item, audit),
+          );
         }
       }
       return results;

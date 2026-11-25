@@ -1,3 +1,5 @@
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { CurrentAuditActor } from "src/audit-log/current-audit-actor.decorator";
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
@@ -65,8 +67,9 @@ export class AttributesController {
   async create(
     @Body() createAttributeDto: CreateAttributeDto,
     @Param("eventId", ParseUUIDPipe) eventId: string,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
-    return this.attributesService.create(createAttributeDto, eventId);
+    return this.attributesService.create(createAttributeDto, eventId, actor);
   }
 
   @Patch("bulk")
@@ -90,8 +93,9 @@ export class AttributesController {
     @Body(new ParseArrayPipe({ items: BulkUpdateAttributeDto }))
     attributes: BulkUpdateAttributeDto[],
     @Param("eventId", ParseUUIDPipe) eventId: string,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
-    return this.attributesService.bulkUpdate(eventId, attributes);
+    return this.attributesService.bulkUpdate(eventId, attributes, actor);
   }
 
   @Get()
@@ -135,8 +139,14 @@ export class AttributesController {
     @Param("id", ParseUUIDPipe) id: string,
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Body() updateAttributeDto: UpdateAttributeDto,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
-    return this.attributesService.update(id, eventId, updateAttributeDto);
+    return this.attributesService.update(
+      id,
+      eventId,
+      updateAttributeDto,
+      actor,
+    );
   }
 
   @Delete(":id")
@@ -151,7 +161,8 @@ export class AttributesController {
   async remove(
     @Param("id", ParseUUIDPipe) id: string,
     @Param("eventId", ParseUUIDPipe) eventId: string,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
-    return this.attributesService.remove(id, eventId);
+    return this.attributesService.remove(id, eventId, actor);
   }
 }

@@ -1,3 +1,5 @@
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { CurrentAuditActor } from "src/audit-log/current-audit-actor.decorator";
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
@@ -59,8 +61,13 @@ export class OrganizersController {
   async create(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Body() createOrganizerDto: CreateOrganizerDto,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
-    return await this.organizersService.create(eventId, createOrganizerDto);
+    return await this.organizersService.create(
+      eventId,
+      createOrganizerDto,
+      actor,
+    );
   }
 
   @Get()
@@ -111,11 +118,13 @@ export class OrganizersController {
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("organizerId", ParseUUIDPipe) organizerId: string,
     @Body() updateOrganizerDto: UpdateOrganizerDto,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
     return await this.organizersService.update(
       eventId,
       organizerId,
       updateOrganizerDto,
+      actor,
     );
   }
 
@@ -131,7 +140,8 @@ export class OrganizersController {
   async remove(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("organizerId", ParseUUIDPipe) organizerId: string,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
-    return this.organizersService.remove(eventId, organizerId);
+    return this.organizersService.remove(eventId, organizerId, actor);
   }
 }

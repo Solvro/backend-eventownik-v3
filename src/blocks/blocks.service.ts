@@ -1,3 +1,9 @@
+import {
+  AuditAction,
+  AuditEntityType,
+} from "src/audit-log/audit-log.constants";
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
 import { Prisma } from "src/generated/prisma/client";
 import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
@@ -13,11 +19,19 @@ import { DuplicateBlockDto } from "./dto/duplicate-block.dto";
 import { UpdateBlockDto } from "./dto/update-block.dto";
 import { Block } from "./entities/block.entity";
 
+const AUDITED_BLOCK_FIELDS = [
+  "name",
+  "description",
+  "capacity",
+  "order",
+] as const;
+
 @Injectable()
 export class BlocksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly participantsService: ParticipantsService,
+    private readonly auditLog: AuditLogService,
   ) {}
 
   private getClient(tx?: Prisma.TransactionClient) {
@@ -66,19 +80,62 @@ export class BlocksService {
     eventId: string,
     attributeId: string,
     createBlockDto: CreateBlockDto,
+    actor: AuditActor,
   ) {
     await this.checkAttributeExists(eventId, attributeId);
     await this.checkParentBlockExists(attributeId, createBlockDto.parentUuid);
 
-    return this.prisma.block.create({
-      data: {
-        capacity: createBlockDto.capacity,
-        order: createBlockDto.order,
-        name: createBlockDto.name,
-        description: createBlockDto.description,
-        parentUuid: createBlockDto.parentUuid,
-        attributeUuid: attributeId,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const block = await tx.block.create({
+        data: {
+          capacity: createBlockDto.capacity,
+          order: createBlockDto.order,
+          name: createBlockDto.name,
+          description: createBlockDto.description,
+          parentUuid: createBlockDto.parentUuid,
+          attributeUuid: attributeId,
+        },
+      });
+      await this.recordBlockAudit(tx, eventId, actor, {
+        action: AuditAction.BlockCreated,
+        before: null,
+        after: block,
+      });
+      return block;
+    });
+  }
+
+  private async recordBlockAudit(
+    tx: Prisma.TransactionClient,
+    eventId: string,
+    actor: AuditActor,
+    change: {
+      action:
+        | typeof AuditAction.BlockCreated
+        | typeof AuditAction.BlockUpdated
+        | typeof AuditAction.BlockDeleted;
+      before: Record<string, unknown> | null;
+      after: Record<string, unknown> | null;
+    },
+  ) {
+    const changes = this.auditLog.fieldChanges(
+      change.before,
+      change.after,
+      AUDITED_BLOCK_FIELDS,
+    );
+    if (changes.length === 0) {
+      return;
+    }
+
+    const block = change.after ?? change.before;
+    await this.auditLog.record(tx, {
+      eventUuid: eventId,
+      action: change.action,
+      actor,
+      entityType: AuditEntityType.Block,
+      entityUuid: block?.uuid as string | undefined,
+      entityLabel: block?.name as string | undefined,
+      changes,
     });
   }
 
@@ -197,6 +254,7 @@ export class BlocksService {
     attributeId: string,
     id: string,
     updateBlockDto: UpdateBlockDto,
+    actor: AuditActor,
   ) {
     const block = await this.findOne(eventId, attributeId, id);
 
@@ -211,9 +269,17 @@ export class BlocksService {
       await this.checkParentBlockExists(attributeId, updateBlockDto.parentUuid);
     }
 
-    return this.prisma.block.update({
-      where: { uuid: id },
-      data: updateBlockDto,
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.block.update({
+        where: { uuid: id },
+        data: updateBlockDto,
+      });
+      await this.recordBlockAudit(tx, eventId, actor, {
+        action: AuditAction.BlockUpdated,
+        before: block,
+        after: updated,
+      });
+      return updated;
     });
   }
 
@@ -222,6 +288,7 @@ export class BlocksService {
     attributeId: string,
     id: string,
     duplicateBlockDto: DuplicateBlockDto,
+    actor: AuditActor,
   ) {
     const block = await this.findOne(eventId, attributeId, id);
 
@@ -229,19 +296,32 @@ export class BlocksService {
       throw new BadRequestException("Root block cannot be duplicated");
     }
 
-    return this.prisma.block.create({
-      data: {
-        capacity: block.capacity,
-        order: block.order,
-        name: duplicateBlockDto.name ?? `${block.name} - copy`,
-        description: block.description,
-        parentUuid: block.parentUuid,
-        attributeUuid: block.attributeUuid,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const duplicated = await tx.block.create({
+        data: {
+          capacity: block.capacity,
+          order: block.order,
+          name: duplicateBlockDto.name ?? `${block.name} - copy`,
+          description: block.description,
+          parentUuid: block.parentUuid,
+          attributeUuid: block.attributeUuid,
+        },
+      });
+      await this.recordBlockAudit(tx, eventId, actor, {
+        action: AuditAction.BlockCreated,
+        before: null,
+        after: duplicated,
+      });
+      return duplicated;
     });
   }
 
-  async remove(eventId: string, attributeId: string, id: string) {
+  async remove(
+    eventId: string,
+    attributeId: string,
+    id: string,
+    actor: AuditActor,
+  ) {
     const block = await this.findOne(eventId, attributeId, id);
 
     if (block.isRootBlock) {
@@ -250,8 +330,13 @@ export class BlocksService {
       );
     }
 
-    await this.prisma.block.delete({
-      where: { uuid: id },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.block.delete({ where: { uuid: id } });
+      await this.recordBlockAudit(tx, eventId, actor, {
+        action: AuditAction.BlockDeleted,
+        before: block,
+        after: null,
+      });
     });
   }
 

@@ -1,4 +1,7 @@
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
 import { BlocksService } from "src/blocks/blocks.service";
+import { LogTrigger } from "src/generated/prisma/client";
 import type { Attribute, Event } from "src/generated/prisma/client";
 import { AttributeType } from "src/generated/prisma/enums";
 import { ParticipantsService } from "src/participants/participants.service";
@@ -8,6 +11,12 @@ import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
 import { AttributesService } from "./attributes.service";
+
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
 
 describe("AttributesService config handling (integration)", () => {
   let service: AttributesService;
@@ -20,6 +29,7 @@ describe("AttributesService config handling (integration)", () => {
       providers: [
         AttributesService,
         BlocksService,
+        AuditLogService,
         PrismaService,
         { provide: ParticipantsService, useValue: {} },
       ],
@@ -74,7 +84,12 @@ describe("AttributesService config handling (integration)", () => {
         config,
       );
 
-      await service.update(attribute.uuid, event.uuid, { name: "Renamed" });
+      await service.update(
+        attribute.uuid,
+        event.uuid,
+        { name: "Renamed" },
+        ACTOR,
+      );
 
       expect(await storedConfig(attribute.uuid)).toEqual(config);
     });
@@ -88,7 +103,7 @@ describe("AttributesService config handling (integration)", () => {
         config,
       );
 
-      await service.update(attribute.uuid, event.uuid, { order: 5 });
+      await service.update(attribute.uuid, event.uuid, { order: 5 }, ACTOR);
 
       expect(await storedConfig(attribute.uuid)).toEqual(config);
     });
@@ -101,9 +116,14 @@ describe("AttributesService config handling (integration)", () => {
         { options: ["a"] },
       );
 
-      await service.update(attribute.uuid, event.uuid, {
-        config: { options: ["x", "y"] },
-      });
+      await service.update(
+        attribute.uuid,
+        event.uuid,
+        {
+          config: { options: ["x", "y"] },
+        },
+        ACTOR,
+      );
 
       expect(await storedConfig(attribute.uuid)).toEqual({
         options: ["x", "y"],
@@ -116,9 +136,14 @@ describe("AttributesService config handling (integration)", () => {
         maxSelections: 3,
       });
 
-      await service.update(attribute.uuid, event.uuid, {
-        type: AttributeType.text,
-      });
+      await service.update(
+        attribute.uuid,
+        event.uuid,
+        {
+          type: AttributeType.text,
+        },
+        ACTOR,
+      );
 
       expect(await storedConfig(attribute.uuid)).toEqual({});
     });
@@ -134,11 +159,79 @@ describe("AttributesService config handling (integration)", () => {
         config,
       );
 
-      await service.bulkUpdate(event.uuid, [
-        { uuid: attribute.uuid, order: 9 },
-      ]);
+      await service.bulkUpdate(
+        event.uuid,
+        [{ uuid: attribute.uuid, order: 9 }],
+        ACTOR,
+      );
 
       expect(await storedConfig(attribute.uuid)).toEqual(config);
+    });
+  });
+  describe("audit log", () => {
+    it("records create, update, delete and shares a correlation id on bulk", async () => {
+      const event = await createEvent();
+
+      const created = await service.create(
+        {
+          name: "Size",
+          order: 1,
+          showInList: true,
+          type: AttributeType.text,
+        },
+        event.uuid,
+        ACTOR,
+      );
+      await service.update(
+        created.uuid,
+        event.uuid,
+        { name: "T-shirt" },
+        ACTOR,
+      );
+      await service.update(
+        created.uuid,
+        event.uuid,
+        { name: "T-shirt" },
+        ACTOR,
+      );
+      await service.bulkUpdate(
+        event.uuid,
+        [
+          { uuid: created.uuid, order: 5 },
+          {
+            name: "Diet",
+            order: 2,
+            showInList: true,
+            type: AttributeType.text,
+          },
+        ],
+        ACTOR,
+      );
+      await service.remove(created.uuid, event.uuid, ACTOR);
+
+      const entries = await prisma.auditLog.findMany({
+        where: { eventUuid: event.uuid },
+        orderBy: { createdAt: "asc" },
+      });
+
+      expect(entries.map((entry) => entry.action)).toEqual([
+        "attribute.created",
+        "attribute.updated",
+        "attribute.updated",
+        "attribute.created",
+        "attribute.deleted",
+      ]);
+      expect(entries[0]).toMatchObject({
+        actorUuid: ACTOR.uuid,
+        entityUuid: created.uuid,
+        entityLabel: "Size",
+      });
+      expect(entries[1].changes).toMatchObject([
+        { field: "name", from: "Size", to: "T-shirt" },
+      ]);
+      expect(entries[2].correlationId).not.toBeNull();
+      expect(entries[2].correlationId).toBe(entries[3].correlationId);
+      expect(entries[4].entityLabel).toBe("T-shirt");
     });
   });
 });

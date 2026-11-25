@@ -1,3 +1,6 @@
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { LogTrigger } from "src/generated/prisma/client";
+
 import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
@@ -7,6 +10,12 @@ import type { ParticipantUpdateDto } from "./dto/participant-update.dto";
 import type { UnregisterManyDto } from "./dto/unregister-many.dto";
 import { ParticipantsController } from "./participants.controller";
 import { ParticipantsService } from "./participants.service";
+
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
 
 describe("ParticipantsController", () => {
   let controller: ParticipantsController;
@@ -68,12 +77,13 @@ describe("ParticipantsController", () => {
 
       mockParticipantsService.create.mockResolvedValue(expectedResult);
 
-      const result = await controller.create(eventUuid, dto);
+      const result = await controller.create(eventUuid, dto, ACTOR);
 
       expect(result).toBe(expectedResult);
       expect(mockParticipantsService.create).toHaveBeenCalledWith(
         eventUuid,
         dto,
+        ACTOR,
       );
     });
   });
@@ -108,13 +118,19 @@ describe("ParticipantsController", () => {
 
       mockParticipantsService.update.mockResolvedValue(expectedResult);
 
-      const result = await controller.update(eventUuid, participantUuid, dto);
+      const result = await controller.update(
+        eventUuid,
+        participantUuid,
+        dto,
+        ACTOR,
+      );
 
       expect(result).toBe(expectedResult);
       expect(mockParticipantsService.update).toHaveBeenCalledWith(
         eventUuid,
         participantUuid,
         dto,
+        { actor: ACTOR },
       );
     });
   });
@@ -126,15 +142,16 @@ describe("ParticipantsController", () => {
 
       mockParticipantsService.remove.mockResolvedValue(null);
 
-      await controller.remove(eventUuid, participantUuid);
+      await controller.remove(eventUuid, participantUuid, ACTOR);
 
       expect(mockParticipantsService.remove).toHaveBeenCalledWith(
         eventUuid,
         participantUuid,
+        ACTOR,
       );
 
       // Testing unregister alias
-      await controller.unregister(eventUuid, participantUuid);
+      await controller.unregister(eventUuid, participantUuid, ACTOR);
       expect(mockParticipantsService.remove).toHaveBeenCalledTimes(2);
     });
   });
@@ -148,11 +165,12 @@ describe("ParticipantsController", () => {
 
       mockParticipantsService.removeMany.mockResolvedValue(null);
 
-      await controller.unregisterMany(eventUuid, dto);
+      await controller.unregisterMany(eventUuid, dto, ACTOR);
 
       expect(mockParticipantsService.removeMany).toHaveBeenCalledWith(
         eventUuid,
         dto.participantsToUnregisterIds,
+        ACTOR,
       );
     });
   });

@@ -1,3 +1,4 @@
+import { AuditLogModule } from "src/audit-log/audit-log.module";
 import { ParticipantsModule } from "src/participants/participants.module";
 
 import { Module } from "@nestjs/common";
@@ -10,6 +11,6 @@ import { BlocksService } from "./blocks.service";
   controllers: [BlocksController, BlocksPublicController],
   providers: [BlocksService],
   exports: [BlocksService],
-  imports: [ParticipantsModule],
+  imports: [ParticipantsModule, AuditLogModule],
 })
 export class BlocksModule {}

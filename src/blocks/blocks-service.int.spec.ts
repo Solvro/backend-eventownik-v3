@@ -1,4 +1,7 @@
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
 import type { Attribute, Block, Event } from "src/generated/prisma/client";
+import { LogTrigger } from "src/generated/prisma/client";
 import { AttributeType } from "src/generated/prisma/enums";
 import { ParticipantsService } from "src/participants/participants.service";
 import { PrismaService } from "src/prisma/prisma.service";
@@ -7,6 +10,12 @@ import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
 import { BlocksService } from "./blocks.service";
+
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
 
 describe("BlocksService (integration)", () => {
   let service: BlocksService;
@@ -18,6 +27,7 @@ describe("BlocksService (integration)", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BlocksService,
+        AuditLogService,
         PrismaService,
         { provide: ParticipantsService, useValue: {} },
       ],
@@ -268,6 +278,53 @@ describe("BlocksService (integration)", () => {
 
       expect(fulfilled.length).toBe(1);
       expect(rejected.length).toBe(1);
+    });
+  });
+  describe("audit log", () => {
+    it("records create, update, duplicate and remove", async () => {
+      const { event, attribute, root } = await createBlockAttribute();
+
+      const block = await service.create(
+        event.uuid,
+        attribute.uuid,
+        { name: "Room A", capacity: 10, parentUuid: root.uuid },
+        ACTOR,
+      );
+      await service.update(
+        event.uuid,
+        attribute.uuid,
+        block.uuid,
+        { capacity: 20 },
+        ACTOR,
+      );
+      const copy = await service.duplicate(
+        event.uuid,
+        attribute.uuid,
+        block.uuid,
+        {},
+        ACTOR,
+      );
+      await service.remove(event.uuid, attribute.uuid, copy.uuid, ACTOR);
+
+      const entries = await prisma.auditLog.findMany({
+        where: { eventUuid: event.uuid },
+        orderBy: { createdAt: "asc" },
+      });
+
+      expect(entries.map((entry) => entry.action)).toEqual([
+        "block.created",
+        "block.updated",
+        "block.created",
+        "block.deleted",
+      ]);
+      expect(entries[1]).toMatchObject({
+        entityUuid: block.uuid,
+        entityLabel: "Room A",
+      });
+      expect(entries[1].changes).toMatchObject([
+        { field: "capacity", from: 10, to: 20 },
+      ]);
+      expect(entries[3].entityLabel).toBe("Room A - copy");
     });
   });
 });

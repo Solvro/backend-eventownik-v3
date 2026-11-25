@@ -1,4 +1,16 @@
+import { randomUUID } from "node:crypto";
 import { normalizeParticipantAttributeValue } from "src/attributes/attribute-value-normalizer";
+import { participantActor } from "src/audit-log/audit-actor";
+import {
+  AuditAction,
+  AuditEntityType,
+} from "src/audit-log/audit-log.constants";
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type {
+  AuditActor,
+  AuditChange,
+  AuditEntry,
+} from "src/audit-log/audit-log.types";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { AttributeChangedEvent } from "src/common/events/attribute-changed.event";
@@ -13,6 +25,7 @@ import {
   Attribute,
   AttributeType,
   EmailTemplate,
+  LogTrigger,
   ParticipantAttribute,
   ParticipantConsent,
   ParticipantEmailStatus,
@@ -60,6 +73,26 @@ function isFileLikeAttributeType(
   return type != null && FILE_LIKE_ATTRIBUTE_TYPES.includes(type);
 }
 
+export interface ParticipantCreationAudit {
+  actor: AuditActor;
+  action:
+    | typeof AuditAction.ParticipantCreated
+    | typeof AuditAction.ParticipantImported;
+  correlationId?: string;
+}
+
+function toAuditValue(value: unknown): Prisma.JsonValue {
+  if (
+    value === undefined ||
+    value === null ||
+    value === Prisma.JsonNull ||
+    value === Prisma.DbNull
+  ) {
+    return null;
+  }
+  return value as Prisma.JsonValue;
+}
+
 export interface ParticipantConsentInput {
   givenAt: Date;
   termsAccepted: boolean;
@@ -74,6 +107,7 @@ export class ParticipantsService {
     private readonly storageService: StorageService,
     private readonly configService: ConfigService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly auditLog: AuditLogService,
   ) {}
 
   private mapToEntity(participant: ParticipantWithRelations): Participant {
@@ -258,11 +292,13 @@ export class ParticipantsService {
   async create(
     eventUuid: string,
     createDto: ParticipantCreateDto,
+    actor: AuditActor,
   ): Promise<Participant> {
     return this.register(
       eventUuid,
       createDto.email,
       createDto.participantAttributes,
+      { audit: { actor, action: AuditAction.ParticipantCreated } },
     );
   }
 
@@ -273,6 +309,7 @@ export class ParticipantsService {
     options: {
       trustedFileValues?: boolean;
       consent?: ParticipantConsentInput;
+      audit?: ParticipantCreationAudit;
     } = {},
   ): Promise<Participant> {
     try {
@@ -318,6 +355,33 @@ export class ParticipantsService {
           },
         });
 
+        const attributeChanges = await this.auditLog.attributeValueChanges(
+          tx,
+          createdParticipant.attributes.map((attribute) => ({
+            attribute: {
+              uuid: attribute.attribute.uuid,
+              name: attribute.attribute.name,
+              type: attribute.attribute.type,
+            },
+            before: null,
+            after: attribute.value,
+          })),
+        );
+
+        await this.auditLog.record(tx, {
+          eventUuid,
+          action: options.audit?.action ?? AuditAction.ParticipantRegistered,
+          actor: options.audit?.actor ?? participantActor(createdParticipant),
+          entityType: AuditEntityType.Participant,
+          entityUuid: createdParticipant.uuid,
+          entityLabel: createdParticipant.email,
+          changes: [
+            { kind: "value", field: "email", from: null, to: email },
+            ...attributeChanges,
+          ],
+          correlationId: options.audit?.correlationId,
+        });
+
         return this.mapToEntity(createdParticipant);
       });
 
@@ -344,9 +408,10 @@ export class ParticipantsService {
     eventUuid: string,
     participantUuid: string,
     updateDto: ParticipantUpdateDto,
-    options: { trustedFileValues?: boolean } = {},
+    options: { trustedFileValues?: boolean; actor: AuditActor },
   ): Promise<Participant> {
     const { participantAttributes, ...updates } = updateDto;
+    const { actor: requestedActor } = options;
 
     const participant = await this.prisma.participant.findUnique({
       where: { uuid: participantUuid },
@@ -356,12 +421,23 @@ export class ParticipantsService {
       throw new NotFoundException("Participant not found in this event");
     }
 
+    const actor: AuditActor =
+      requestedActor.type === LogTrigger.PARTICIPANT &&
+      requestedActor.name === undefined
+        ? { ...requestedActor, name: participant.email }
+        : requestedActor;
+
     try {
       const fileKeysToDelete: string[] = [];
       let savedAttributes: Prisma.ParticipantAttributeUncheckedCreateWithoutParticipantInput[] =
         [];
       const result = await this.prisma.$transaction(async (tx) => {
         const dataToUpdate: Prisma.ParticipantUpdateInput = { ...updates };
+        const changes: AuditChange[] = this.auditLog.fieldChanges(
+          { email: participant.email },
+          { email: updates.email ?? participant.email },
+          ["email"],
+        );
 
         if (participantAttributes !== undefined) {
           const attributesToSave = await this.prepareAttributesForSave(
@@ -379,6 +455,38 @@ export class ParticipantsService {
           );
 
           if (attributeUuidsToUpdate.length > 0) {
+            const existingAttributes = await tx.participantAttribute.findMany({
+              where: {
+                participantUuid,
+                attributeUuid: { in: attributeUuidsToUpdate },
+              },
+              select: { attributeUuid: true, value: true },
+            });
+            const previousValues = new Map(
+              existingAttributes.map((attribute) => [
+                attribute.attributeUuid,
+                attribute.value,
+              ]),
+            );
+            const attributeReferences = await tx.attribute.findMany({
+              where: { uuid: { in: attributeUuidsToUpdate } },
+              select: { uuid: true, name: true, type: true },
+            });
+            changes.push(
+              ...(await this.auditLog.attributeValueChanges(
+                tx,
+                attributeReferences.map((attribute) => ({
+                  attribute,
+                  before: previousValues.get(attribute.uuid) ?? null,
+                  after: toAuditValue(
+                    attributesToSave.find(
+                      (saved) => saved.attributeUuid === attribute.uuid,
+                    )?.value,
+                  ),
+                })),
+              )),
+            );
+
             const existingFileAttributes =
               await tx.participantAttribute.findMany({
                 where: {
@@ -429,6 +537,18 @@ export class ParticipantsService {
           },
         });
 
+        if (changes.length > 0) {
+          await this.auditLog.record(tx, {
+            eventUuid,
+            action: AuditAction.ParticipantUpdated,
+            actor,
+            entityType: AuditEntityType.Participant,
+            entityUuid: participantUuid,
+            entityLabel: updatedParticipant.email,
+            changes,
+          });
+        }
+
         return this.mapToEntity(updatedParticipant);
       });
 
@@ -475,7 +595,7 @@ export class ParticipantsService {
     }
   }
 
-  async remove(eventUuid: string, participantUuid: string) {
+  async remove(eventUuid: string, participantUuid: string, actor: AuditActor) {
     const participant = await this.prisma.participant.findFirst({
       where: { uuid: participantUuid, eventUuid },
       include: {
@@ -489,8 +609,19 @@ export class ParticipantsService {
       throw new NotFoundException("Participant not found");
     }
 
-    await this.prisma.participant.delete({
-      where: { uuid: participantUuid },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.participant.delete({ where: { uuid: participantUuid } });
+      await this.auditLog.record(tx, {
+        eventUuid,
+        action: AuditAction.ParticipantDeleted,
+        actor,
+        entityType: AuditEntityType.Participant,
+        entityUuid: participantUuid,
+        entityLabel: participant.email,
+        changes: [
+          { kind: "value", field: "email", from: participant.email, to: null },
+        ],
+      });
     });
 
     this.eventEmitter.emit(
@@ -525,7 +656,11 @@ export class ParticipantsService {
     }
   }
 
-  async removeMany(eventUuid: string, participantsToUnregisterIds: string[]) {
+  async removeMany(
+    eventUuid: string,
+    participantsToUnregisterIds: string[],
+    actor: AuditActor,
+  ) {
     const participants = await this.prisma.participant.findMany({
       where: { uuid: { in: participantsToUnregisterIds }, eventUuid },
       include: {
@@ -535,11 +670,34 @@ export class ParticipantsService {
       },
     });
 
-    await this.prisma.participant.deleteMany({
-      where: {
-        uuid: { in: participantsToUnregisterIds },
-        eventUuid,
-      },
+    const correlationId = randomUUID();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.participant.deleteMany({
+        where: {
+          uuid: { in: participantsToUnregisterIds },
+          eventUuid,
+        },
+      });
+      await this.auditLog.recordMany(
+        tx,
+        participants.map((participant) => ({
+          eventUuid,
+          action: AuditAction.ParticipantDeleted,
+          actor,
+          entityType: AuditEntityType.Participant,
+          entityUuid: participant.uuid,
+          entityLabel: participant.email,
+          changes: [
+            {
+              kind: "value" as const,
+              field: "email",
+              from: participant.email,
+              to: null,
+            },
+          ],
+          correlationId,
+        })),
+      );
     });
 
     for (const participant of participants) {
@@ -738,6 +896,7 @@ export class ParticipantsService {
     attributeUuid: string,
     newValue: string | undefined,
     participantIds: string[],
+    actor: AuditActor,
   ) {
     // Verify event and attribute
     const attribute = await this.prisma.attribute.findUnique({
@@ -797,6 +956,53 @@ export class ParticipantsService {
         );
         fileKeysToDelete.push(...staleKeys);
       }
+
+      const previousAttributes = await tx.participantAttribute.findMany({
+        where: {
+          attributeUuid,
+          participantUuid: { in: uniqueParticipantIds },
+        },
+        select: { participantUuid: true, value: true },
+      });
+      const previousValues = new Map(
+        previousAttributes.map((previous) => [
+          previous.participantUuid,
+          previous.value,
+        ]),
+      );
+      const participantEmails = await tx.participant.findMany({
+        where: { uuid: { in: uniqueParticipantIds } },
+        select: { uuid: true, email: true },
+      });
+      const attributeRef = {
+        uuid: attribute.uuid,
+        name: attribute.name,
+        type: attribute.type,
+      };
+      const correlationId = randomUUID();
+      const auditEntries: AuditEntry[] = [];
+      for (const { uuid, email } of participantEmails) {
+        const changes = await this.auditLog.attributeValueChanges(tx, [
+          {
+            attribute: attributeRef,
+            before: previousValues.get(uuid) ?? null,
+            after: toAuditValue(valueToSave),
+          },
+        ]);
+        if (changes.length > 0) {
+          auditEntries.push({
+            eventUuid,
+            action: AuditAction.ParticipantUpdated,
+            actor,
+            entityType: AuditEntityType.Participant,
+            entityUuid: uuid,
+            entityLabel: email,
+            changes,
+            correlationId,
+          });
+        }
+      }
+      await this.auditLog.recordMany(tx, auditEntries);
 
       // Delete existing
       await tx.participantAttribute.deleteMany({

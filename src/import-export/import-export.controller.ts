@@ -1,4 +1,6 @@
 import { Request, Response } from "express";
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { CurrentAuditActor } from "src/audit-log/current-audit-actor.decorator";
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
@@ -96,11 +98,13 @@ export class ImportExportController {
   async exportParticipants(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Query() query: ExportParticipantsQueryDto,
+    @CurrentAuditActor() actor: AuditActor,
     @Res() response: Response,
   ): Promise<void> {
     const exportedFile = await this.importExportService.exportParticipants(
       eventId,
       query,
+      actor,
     );
 
     response.setHeader("Content-Type", exportedFile.mimeType);
@@ -129,6 +133,7 @@ export class ImportExportController {
   async importParticipants(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Req() request: Request,
+    @CurrentAuditActor() actor: AuditActor,
     @Body() body: unknown,
     @UploadedFile() file?: Express.Multer.File,
   ): Promise<ParticipantsImportResultDto> {
@@ -136,6 +141,7 @@ export class ImportExportController {
       return this.importExportService.importParticipantsFromXlsx(
         eventId,
         file.buffer,
+        actor,
       );
     }
 
@@ -147,6 +153,7 @@ export class ImportExportController {
     return this.importExportService.importParticipants(
       eventId,
       dto.participants,
+      actor,
     );
   }
 

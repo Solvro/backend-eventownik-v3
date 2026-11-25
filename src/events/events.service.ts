@@ -1,3 +1,9 @@
+import {
+  AuditAction,
+  AuditEntityType,
+} from "src/audit-log/audit-log.constants";
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { parseSortInput } from "src/common/utils/prisma.utility";
@@ -20,6 +26,27 @@ import { EventListingDto } from "./dto/event-listing.dto";
 import { EventUpdateDto } from "./dto/event-update.dto";
 import { Event } from "./entities/event.entity";
 
+const AUDITED_EVENT_FIELDS = [
+  "name",
+  "slug",
+  "startDate",
+  "endDate",
+  "location",
+  "description",
+  "organizerName",
+  "contactEmail",
+  "primaryColor",
+  "participantsLimit",
+  "dataRecipients",
+  "isPublic",
+  "isVerified",
+  "isFeatured",
+] as const;
+
+const OPAQUE_EVENT_FIELDS = ["photoKey"];
+
+type EventWithLinks = Prisma.EventGetPayload<{ include: { links: true } }>;
+
 @Injectable()
 export class EventsService {
   private readonly bucket: string;
@@ -27,6 +54,7 @@ export class EventsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
+    private readonly auditLog: AuditLogService,
     configService: ConfigService,
   ) {
     this.bucket = configService.getOrThrow<string>("S3_BUCKET_EVENTS");
@@ -43,6 +71,46 @@ export class EventsService {
           ? null
           : this.storageService.getUrl(this.bucket, photoKey),
     };
+  }
+
+  private async recordEventAudit(
+    tx: Prisma.TransactionClient,
+    actor: AuditActor,
+    change: {
+      action: typeof AuditAction.EventCreated | typeof AuditAction.EventUpdated;
+      before: EventWithLinks | null;
+      after: EventWithLinks;
+    },
+  ) {
+    const toLinks = (event: EventWithLinks | null) =>
+      (event?.links ?? []).map((link) => ({ type: link.type, url: link.url }));
+
+    const changes = [
+      ...this.auditLog.fieldChanges(
+        change.before,
+        change.after,
+        AUDITED_EVENT_FIELDS,
+        OPAQUE_EVENT_FIELDS,
+      ),
+      ...this.auditLog.listChange(
+        "links",
+        toLinks(change.before),
+        toLinks(change.after),
+      ),
+    ];
+    if (changes.length === 0) {
+      return;
+    }
+
+    await this.auditLog.record(tx, {
+      eventUuid: change.after.uuid,
+      action: change.action,
+      actor,
+      entityType: AuditEntityType.Event,
+      entityUuid: change.after.uuid,
+      entityLabel: change.after.name,
+      changes,
+    });
   }
 
   private superadminData(
@@ -133,6 +201,7 @@ export class EventsService {
     photo: Express.Multer.File | undefined,
     adminUuid: string,
     userType: OrganizerType,
+    actor: AuditActor,
   ): Promise<Event> {
     const { links, isVerified, isFeatured, ...data } = eventDto;
 
@@ -166,6 +235,12 @@ export class EventsService {
             admin: { connect: { uuid: adminUuid } },
             permission: "MANAGE_ALL",
           },
+        });
+
+        await this.recordEventAudit(tx, actor, {
+          action: AuditAction.EventCreated,
+          before: null,
+          after: createdEvent,
         });
 
         return createdEvent;
@@ -247,19 +322,11 @@ export class EventsService {
     eventDto: EventUpdateDto,
     photo: Express.Multer.File | undefined,
     userType: OrganizerType,
+    actor: AuditActor,
   ): Promise<Event> {
     // TODO: superadmin dowolny, organizator swoje
     const { links, isVerified, isFeatured, photoUrl, ...data } = eventDto;
     const removePhoto = photoUrl === null;
-
-    let previousPhotoKey: string | null = null;
-    if (photo !== undefined || removePhoto) {
-      const existing = await this.prisma.event.findUnique({ where: { uuid } });
-      if (existing == null) {
-        throw new NotFoundException(`Event with UUID ${uuid} not found`);
-      }
-      previousPhotoKey = existing.photoKey;
-    }
 
     const newPhotoKey =
       photo === undefined
@@ -277,33 +344,49 @@ export class EventsService {
       ...photoData,
     };
 
-    let event: Prisma.EventGetPayload<{ include: { links: true } }>;
+    let event: EventWithLinks;
+    let previousPhotoKey = null as string | null;
     try {
-      event =
-        links === undefined
-          ? await this.prisma.event.update({
-              where: { uuid },
-              data: updateData,
-              include: {
-                links: true,
-              },
-            })
-          : await this.prisma.$transaction(async (tx) => {
-              await tx.eventLink.deleteMany({
-                where: { eventUuid: uuid },
-              });
+      event = await this.prisma.$transaction(async (tx) => {
+        const previous = await tx.event.findUnique({
+          where: { uuid },
+          include: { links: true },
+        });
+        if (previous == null) {
+          throw new NotFoundException(`Event with UUID ${uuid} not found`);
+        }
 
-              return await tx.event.update({
-                where: { uuid },
-                data: {
-                  ...updateData,
-                  ...(links.length === 0 ? {} : { links: { create: links } }),
-                },
-                include: {
-                  links: true,
-                },
-              });
-            });
+        if (photo !== undefined || removePhoto) {
+          previousPhotoKey = previous.photoKey;
+        }
+
+        if (links !== undefined) {
+          await tx.eventLink.deleteMany({
+            where: { eventUuid: uuid },
+          });
+        }
+
+        const updated = await tx.event.update({
+          where: { uuid },
+          data: {
+            ...updateData,
+            ...(links === undefined || links.length === 0
+              ? {}
+              : { links: { create: links } }),
+          },
+          include: {
+            links: true,
+          },
+        });
+
+        await this.recordEventAudit(tx, actor, {
+          action: AuditAction.EventUpdated,
+          before: previous,
+          after: updated,
+        });
+
+        return updated;
+      });
     } catch (error) {
       if (newPhotoKey !== undefined) {
         await this.storageService.delete(this.bucket, newPhotoKey);

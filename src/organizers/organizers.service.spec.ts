@@ -1,4 +1,6 @@
-import { PermissionType } from "src/generated/prisma/client";
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { LogTrigger, PermissionType } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import { Test } from "@nestjs/testing";
@@ -7,6 +9,12 @@ import type { TestingModule } from "@nestjs/testing";
 import type { CreateOrganizerDto } from "./dto/create-organizer.dto";
 import { OrganizerListingDto } from "./dto/organizer-listing.dto";
 import { OrganizersService } from "./organizers.service";
+
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
 
 describe("OrganizersService", () => {
   let service: OrganizersService;
@@ -25,6 +33,7 @@ describe("OrganizersService", () => {
       findUnique: jest.fn(),
     },
     eventPermission: {
+      findMany: jest.fn(),
       createMany: jest.fn(),
       deleteMany: jest.fn(),
     },
@@ -34,7 +43,14 @@ describe("OrganizersService", () => {
     jest.clearAllMocks();
     jest.resetAllMocks();
     const module: TestingModule = await Test.createTestingModule({
-      providers: [OrganizersService, PrismaService],
+      providers: [
+        OrganizersService,
+        PrismaService,
+        {
+          provide: AuditLogService,
+          useValue: { record: jest.fn(), listChange: () => [] },
+        },
+      ],
     })
       .overrideProvider(PrismaService)
       .useValue(mockPrismaService)
@@ -139,7 +155,7 @@ describe("OrganizersService", () => {
 
       mockPrismaService.admin.findUnique.mockResolvedValue(expectedAdmin);
 
-      const result = await service.create(eventUuid, dto);
+      const result = await service.create(eventUuid, dto, ACTOR);
 
       expect(mockPrismaService.eventPermission.createMany).toHaveBeenCalledWith(
         {
@@ -194,6 +210,7 @@ describe("OrganizersService", () => {
         uuid: organizerUuid,
       });
 
+      mockPrismaService.eventPermission.findMany.mockResolvedValue([]);
       mockPrismaService.eventPermission.deleteMany.mockResolvedValue({
         count: 2,
       });
@@ -202,7 +219,7 @@ describe("OrganizersService", () => {
         count: 1,
       });
 
-      const result = await service.update(eventUuid, organizerUuid, dto);
+      const result = await service.update(eventUuid, organizerUuid, dto, ACTOR);
 
       expect(mockPrismaService.eventPermission.deleteMany).toHaveBeenCalledWith(
         {
@@ -240,11 +257,16 @@ describe("OrganizersService", () => {
 
       mockPrismaService.admin.count.mockResolvedValue(5);
 
+      mockPrismaService.$transaction.mockImplementation((callback) =>
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+        callback(mockPrismaService),
+      );
+      mockPrismaService.eventPermission.findMany.mockResolvedValue([]);
       mockPrismaService.eventPermission.deleteMany.mockResolvedValue({
         count: 2,
       });
 
-      await service.remove(eventUuid, organizerUuid);
+      await service.remove(eventUuid, organizerUuid, ACTOR);
 
       expect(mockPrismaService.admin.findFirst).toHaveBeenCalledWith({
         where: {

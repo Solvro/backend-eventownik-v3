@@ -1,5 +1,6 @@
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { CurrentAuditActor } from "src/audit-log/current-audit-actor.decorator";
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
-import type { AuthUser } from "src/auth/jwt.strategy";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
 import { PermissionType } from "src/generated/prisma/enums";
@@ -11,7 +12,6 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
-  Req,
   UseGuards,
 } from "@nestjs/common";
 import {
@@ -81,13 +81,8 @@ export class TicketScanController {
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("ticketId", ParseUUIDPipe) ticketId: string,
     @Body() dto: TicketScanDto,
-    @Req() request: { user: AuthUser },
+    @CurrentAuditActor() actor: AuditActor,
   ): Promise<TicketCheckIn> {
-    return this.ticketScanService.confirm(
-      eventId,
-      ticketId,
-      dto,
-      request.user.uuid,
-    );
+    return this.ticketScanService.confirm(eventId, ticketId, dto, actor);
   }
 }

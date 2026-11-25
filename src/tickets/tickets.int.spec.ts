@@ -1,5 +1,9 @@
+import { adminActor } from "src/audit-log/audit-actor";
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
 import { EmailContentParserService } from "src/emails/email-content-parser.service";
 import type { EmailTemplateForParsing } from "src/emails/email-content-parser.service";
+import { LogTrigger } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 import { StorageService } from "src/storage/storage.service";
 
@@ -38,6 +42,12 @@ const parsingParticipant = (ticketToken?: string) => ({
   attributes: [],
 });
 
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
+
 describe("Tickets (integration)", () => {
   let prisma: PrismaService;
   let tickets: TicketsService;
@@ -71,6 +81,7 @@ describe("Tickets (integration)", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TicketsService,
+        AuditLogService,
         TicketScanService,
         TicketParticipantsService,
         TicketPublicService,
@@ -223,20 +234,28 @@ describe("Tickets (integration)", () => {
     it("allows only one EVENT ticket per event and one ticket per attribute", async () => {
       const { event, blockAttribute } = await createWorkshopSetup();
 
-      await tickets.create(event.uuid, { mode: "EVENT" });
+      await tickets.create(event.uuid, { mode: "EVENT" }, ACTOR);
       await expect(
-        tickets.create(event.uuid, { mode: "EVENT" }),
+        tickets.create(event.uuid, { mode: "EVENT" }, ACTOR),
       ).rejects.toThrow(ConflictException);
 
-      await tickets.create(event.uuid, {
-        mode: "BLOCK",
-        attributeUuid: blockAttribute.uuid,
-      });
-      await expect(
-        tickets.create(event.uuid, {
+      await tickets.create(
+        event.uuid,
+        {
           mode: "BLOCK",
           attributeUuid: blockAttribute.uuid,
-        }),
+        },
+        ACTOR,
+      );
+      await expect(
+        tickets.create(
+          event.uuid,
+          {
+            mode: "BLOCK",
+            attributeUuid: blockAttribute.uuid,
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(ConflictException);
     });
 
@@ -247,15 +266,19 @@ describe("Tickets (integration)", () => {
       const participant = await addParticipant("cascade@example.com", [
         workshopA.uuid,
       ]);
-      const ticket = await tickets.create(event.uuid, {
-        mode: "BLOCK",
-        attributeUuid: blockAttribute.uuid,
-      });
+      const ticket = await tickets.create(
+        event.uuid,
+        {
+          mode: "BLOCK",
+          attributeUuid: blockAttribute.uuid,
+        },
+        ACTOR,
+      );
       await scan.confirm(
         event.uuid,
         ticket.uuid,
         { token: participant.ticketToken, blockUuid: workshopA.uuid },
-        admin.uuid,
+        adminActor(admin),
       );
 
       await prisma.admin.delete({ where: { uuid: admin.uuid } });
@@ -281,16 +304,16 @@ describe("Tickets (integration)", () => {
       const participant = await prisma.participant.create({
         data: { email: `race-${unique()}@example.com`, eventUuid: event.uuid },
       });
-      const ticket = await tickets.create(event.uuid, { mode: "EVENT" });
+      const ticket = await tickets.create(event.uuid, { mode: "EVENT" }, ACTOR);
       const dto = { token: participant.ticketToken };
 
       const before = await scan.scan(event.uuid, ticket.uuid, dto);
       expect(before.status).toBe(TicketScanStatus.VALID);
 
       const results = await Promise.allSettled([
-        scan.confirm(event.uuid, ticket.uuid, dto, admin.uuid),
-        scan.confirm(event.uuid, ticket.uuid, dto, admin.uuid),
-        scan.confirm(event.uuid, ticket.uuid, dto, admin.uuid),
+        scan.confirm(event.uuid, ticket.uuid, dto, adminActor(admin)),
+        scan.confirm(event.uuid, ticket.uuid, dto, adminActor(admin)),
+        scan.confirm(event.uuid, ticket.uuid, dto, adminActor(admin)),
       ]);
 
       expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
@@ -316,17 +339,21 @@ describe("Tickets (integration)", () => {
         workshopA.uuid,
         workshopB.uuid,
       ]);
-      const ticket = await tickets.create(event.uuid, {
-        mode: "BLOCK",
-        attributeUuid: blockAttribute.uuid,
-      });
+      const ticket = await tickets.create(
+        event.uuid,
+        {
+          mode: "BLOCK",
+          attributeUuid: blockAttribute.uuid,
+        },
+        ACTOR,
+      );
       const token = participant.ticketToken;
 
       await scan.confirm(
         event.uuid,
         ticket.uuid,
         { token, blockUuid: workshopA.uuid },
-        admin.uuid,
+        adminActor(admin),
       );
 
       const atA = await scan.scan(event.uuid, ticket.uuid, {
@@ -350,7 +377,7 @@ describe("Tickets (integration)", () => {
           eventUuid: otherEvent.uuid,
         },
       });
-      const ticket = await tickets.create(event.uuid, { mode: "EVENT" });
+      const ticket = await tickets.create(event.uuid, { mode: "EVENT" }, ACTOR);
 
       expect(
         await scan.scan(event.uuid, ticket.uuid, {
@@ -368,10 +395,14 @@ describe("Tickets (integration)", () => {
       const participant = await addParticipant("wrong@example.com", [
         workshopB.uuid,
       ]);
-      const ticket = await tickets.create(event.uuid, {
-        mode: "BLOCK",
-        attributeUuid: blockAttribute.uuid,
-      });
+      const ticket = await tickets.create(
+        event.uuid,
+        {
+          mode: "BLOCK",
+          attributeUuid: blockAttribute.uuid,
+        },
+        ACTOR,
+      );
 
       expect(
         await scan.scan(event.uuid, ticket.uuid, {
@@ -399,16 +430,20 @@ describe("Tickets (integration)", () => {
       ]);
       await addParticipant("two@example.com", [workshopB.uuid]);
       await addParticipant("three@example.com", workshopA.uuid);
-      const ticket = await tickets.create(event.uuid, {
-        mode: "BLOCK",
-        attributeUuid: blockAttribute.uuid,
-        shownAttributeUuids: [textAttribute.uuid, blockAttribute.uuid],
-      });
+      const ticket = await tickets.create(
+        event.uuid,
+        {
+          mode: "BLOCK",
+          attributeUuid: blockAttribute.uuid,
+          shownAttributeUuids: [textAttribute.uuid, blockAttribute.uuid],
+        },
+        ACTOR,
+      );
       await scan.confirm(
         event.uuid,
         ticket.uuid,
         { token: one.ticketToken, blockUuid: workshopA.uuid },
-        admin.uuid,
+        adminActor(admin),
       );
 
       const emails = async (
@@ -461,7 +496,7 @@ describe("Tickets (integration)", () => {
       const participant = await prisma.participant.create({
         data: { email: `pub-${unique()}@example.com`, eventUuid: event.uuid },
       });
-      await tickets.create(event.uuid, { mode: "EVENT" });
+      await tickets.create(event.uuid, { mode: "EVENT" }, ACTOR);
 
       const result = await publicService.findByToken(
         event.slug,
@@ -529,6 +564,73 @@ describe("Tickets (integration)", () => {
       );
 
       expect(html).toBe("<p></p>");
+    });
+  });
+  describe("audit log", () => {
+    it("records ticket configuration and check-ins", async () => {
+      const {
+        event,
+        blockAttribute,
+        textAttribute,
+        workshopA,
+        addParticipant,
+      } = await createWorkshopSetup();
+      const admin = await createAdmin();
+      const participant = await addParticipant("audit@example.com", [
+        workshopA.uuid,
+      ]);
+
+      const ticket = await tickets.create(
+        event.uuid,
+        { mode: "BLOCK", attributeUuid: blockAttribute.uuid },
+        adminActor(admin),
+      );
+      await tickets.update(
+        event.uuid,
+        ticket.uuid,
+        { shownAttributeUuids: [textAttribute.uuid] },
+        adminActor(admin),
+      );
+      await scan.confirm(
+        event.uuid,
+        ticket.uuid,
+        { token: participant.ticketToken, blockUuid: workshopA.uuid },
+        adminActor(admin),
+      );
+      await tickets.remove(event.uuid, ticket.uuid, adminActor(admin));
+
+      const entries = await prisma.auditLog.findMany({
+        where: { eventUuid: event.uuid },
+        orderBy: { createdAt: "asc" },
+      });
+
+      expect(entries.map((entry) => entry.action)).toEqual([
+        "ticket.configured",
+        "ticket.updated",
+        "ticket.checked_in",
+        "ticket.deleted",
+      ]);
+      expect(entries[0]).toMatchObject({
+        actorUuid: admin.uuid,
+        actorName: "Door Staff",
+        entityLabel: "Ticket: Workshops",
+      });
+      expect(entries[1].changes).toEqual([
+        {
+          kind: "list",
+          field: "shownAttributes",
+          added: ["Diet"],
+          removed: [],
+        },
+      ]);
+      expect(entries[2]).toMatchObject({
+        entityUuid: participant.uuid,
+        entityLabel: "audit@example.com",
+      });
+      expect(entries[2].changes).toMatchObject([
+        { field: "ticket", to: "Workshops" },
+        { field: "block", to: "A" },
+      ]);
     });
   });
 });

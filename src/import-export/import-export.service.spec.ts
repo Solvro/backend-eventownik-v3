@@ -1,4 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import * as ExcelJS from "exceljs";
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { LogTrigger } from "src/generated/prisma/client";
 import { AttributeType } from "src/generated/prisma/enums";
 import type { ParticipantCreateDto } from "src/participants/dto/participant-create.dto";
 import { ParticipantsService } from "src/participants/participants.service";
@@ -32,6 +36,12 @@ function toDto(
   return { email, participantAttributes };
 }
 
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
+
 describe("ImportExportService", () => {
   let service: ImportExportService;
 
@@ -55,6 +65,8 @@ describe("ImportExportService", () => {
     register: jest.fn(),
   };
 
+  const mockAuditLogService = { record: jest.fn() };
+
   const mockXlsxExporter = {
     format: ParticipantsExportFormat.xlsx,
     mimeType:
@@ -75,6 +87,7 @@ describe("ImportExportService", () => {
           provide: ParticipantsService,
           useValue: mockParticipantsService,
         },
+        { provide: AuditLogService, useValue: mockAuditLogService },
         {
           provide: ParticipantsXlsxExporter,
           useValue: mockXlsxExporter,
@@ -111,7 +124,7 @@ describe("ImportExportService", () => {
       ]);
       mockXlsxExporter.build.mockResolvedValue(Buffer.from("xlsx-content"));
 
-      const result = await service.exportParticipants(eventId, {});
+      const result = await service.exportParticipants(eventId, {}, ACTOR);
 
       expect(mockPrismaService.participant.count).not.toHaveBeenCalled();
       expect(mockPrismaService.participant.findMany).toHaveBeenCalledWith(
@@ -175,7 +188,11 @@ describe("ImportExportService", () => {
       ]);
       mockXlsxExporter.build.mockResolvedValue(Buffer.from("xlsx-content"));
 
-      await service.exportParticipants(eventId, { includeConsent: true });
+      await service.exportParticipants(
+        eventId,
+        { includeConsent: true },
+        ACTOR,
+      );
 
       expect(mockPrismaService.participant.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -216,9 +233,13 @@ describe("ImportExportService", () => {
       mockPrismaService.participant.count.mockResolvedValue(1);
 
       await expect(
-        service.exportParticipants(eventId, {
-          participantIds: ["p-1", "p-2"],
-        }),
+        service.exportParticipants(
+          eventId,
+          {
+            participantIds: ["p-1", "p-2"],
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(BadRequestException);
 
       expect(mockPrismaService.attribute.findMany).not.toHaveBeenCalled();
@@ -234,10 +255,14 @@ describe("ImportExportService", () => {
       ]);
 
       await expect(
-        service.exportParticipants(eventId, {
-          participantIds: ["p-1", "p-2"],
-          attributeIds: ["attr-1", "attr-2"],
-        }),
+        service.exportParticipants(
+          eventId,
+          {
+            participantIds: ["p-1", "p-2"],
+            attributeIds: ["attr-1", "attr-2"],
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(BadRequestException);
 
       expect(mockPrismaService.participant.findMany).not.toHaveBeenCalled();
@@ -247,9 +272,9 @@ describe("ImportExportService", () => {
     it("should throw NotFoundException when event does not exist", async () => {
       mockPrismaService.event.findUnique.mockResolvedValue(null);
 
-      await expect(service.exportParticipants(eventId, {})).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.exportParticipants(eventId, {}, ACTOR),
+      ).rejects.toThrow(NotFoundException);
 
       expect(mockPrismaService.participant.count).not.toHaveBeenCalled();
       expect(mockPrismaService.attribute.findMany).not.toHaveBeenCalled();
@@ -273,10 +298,14 @@ describe("ImportExportService", () => {
       ]);
       mockXlsxExporter.build.mockResolvedValue(Buffer.from("xlsx-content"));
 
-      await service.exportParticipants(eventId, {
-        participantIds: ["p-1", "p-2"],
-        attributeIds: ["attr-1", "attr-2"],
-      });
+      await service.exportParticipants(
+        eventId,
+        {
+          participantIds: ["p-1", "p-2"],
+          attributeIds: ["attr-1", "attr-2"],
+        },
+        ACTOR,
+      );
 
       expect(mockPrismaService.attribute.findMany).toHaveBeenCalledWith({
         where: {
@@ -314,9 +343,13 @@ describe("ImportExportService", () => {
       mockPrismaService.participant.findMany.mockResolvedValue([]);
 
       await expect(
-        service.exportParticipants(eventId, {
-          format: "csv" as ParticipantsExportFormat,
-        }),
+        service.exportParticipants(
+          eventId,
+          {
+            format: "csv" as ParticipantsExportFormat,
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -350,17 +383,23 @@ describe("ImportExportService", () => {
         mockPrismaService.event.findUnique.mockResolvedValue(null);
 
         await expect(
-          service.importParticipants(eventId, [toDto("a@example.com")]),
+          service.importParticipants(eventId, [toDto("a@example.com")], ACTOR),
         ).rejects.toThrow(NotFoundException);
 
         expect(mockParticipantsService.register).not.toHaveBeenCalled();
       });
 
       it("should register every new participant", async () => {
-        const result = await service.importParticipants(eventId, [
-          toDto("a@example.com", [{ attributeUuid: "attr-size", value: "M" }]),
-          toDto("b@example.com"),
-        ]);
+        const result = await service.importParticipants(
+          eventId,
+          [
+            toDto("a@example.com", [
+              { attributeUuid: "attr-size", value: "M" },
+            ]),
+            toDto("b@example.com"),
+          ],
+          ACTOR,
+        );
 
         expect(result.skippedParticipants).toEqual([]);
         expect(result.importedParticipants).toEqual([
@@ -372,33 +411,48 @@ describe("ImportExportService", () => {
           eventId,
           "a@example.com",
           [{ attributeUuid: "attr-size", value: "M" }],
+          expect.objectContaining({
+            audit: expect.objectContaining({ actor: ACTOR }),
+          }),
         );
         expect(mockParticipantsService.register).toHaveBeenNthCalledWith(
           2,
           eventId,
           "b@example.com",
           [],
+          expect.objectContaining({
+            audit: expect.objectContaining({ actor: ACTOR }),
+          }),
         );
       });
 
       it("should normalize emails with trim and toLowerCase", async () => {
-        await service.importParticipants(eventId, [
-          toDto("  Jan.Kowalski@Example.COM  "),
-        ]);
+        await service.importParticipants(
+          eventId,
+          [toDto("  Jan.Kowalski@Example.COM  ")],
+          ACTOR,
+        );
 
         expect(mockParticipantsService.register).toHaveBeenCalledWith(
           eventId,
           "jan.kowalski@example.com",
           [],
+          expect.objectContaining({
+            audit: expect.objectContaining({ actor: ACTOR }),
+          }),
         );
       });
 
       it("should mark repeated emails within the batch as duplicate_in_file", async () => {
-        const result = await service.importParticipants(eventId, [
-          toDto("a@example.com"),
-          toDto("b@example.com"),
-          toDto("A@example.com"),
-        ]);
+        const result = await service.importParticipants(
+          eventId,
+          [
+            toDto("a@example.com"),
+            toDto("b@example.com"),
+            toDto("A@example.com"),
+          ],
+          ACTOR,
+        );
 
         expect(result.importedParticipants.map((p) => p.email)).toEqual([
           "a@example.com",
@@ -415,11 +469,15 @@ describe("ImportExportService", () => {
       });
 
       it("should detect duplicates before any write, so the database is not consulted per row", async () => {
-        await service.importParticipants(eventId, [
-          toDto("a@example.com"),
-          toDto("a@example.com"),
-          toDto("b@example.com"),
-        ]);
+        await service.importParticipants(
+          eventId,
+          [
+            toDto("a@example.com"),
+            toDto("a@example.com"),
+            toDto("b@example.com"),
+          ],
+          ACTOR,
+        );
 
         expect(mockPrismaService.participant.findMany).toHaveBeenCalledTimes(1);
         expect(mockPrismaService.participant.findMany).toHaveBeenCalledWith({
@@ -436,10 +494,11 @@ describe("ImportExportService", () => {
           { email: "Existing@Example.com" },
         ]);
 
-        const result = await service.importParticipants(eventId, [
-          toDto("existing@example.com"),
-          toDto("new@example.com"),
-        ]);
+        const result = await service.importParticipants(
+          eventId,
+          [toDto("existing@example.com"), toDto("new@example.com")],
+          ACTOR,
+        );
 
         expect(result.importedParticipants.map((p) => p.email)).toEqual([
           "new@example.com",
@@ -455,10 +514,11 @@ describe("ImportExportService", () => {
       });
 
       it("should mark a row with an invalid email as failed", async () => {
-        const result = await service.importParticipants(eventId, [
-          toDto("not-an-email"),
-          toDto("ok@example.com"),
-        ]);
+        const result = await service.importParticipants(
+          eventId,
+          [toDto("not-an-email"), toDto("ok@example.com")],
+          ACTOR,
+        );
 
         expect(result.importedParticipants).toHaveLength(1);
         expect(result.skippedParticipants).toEqual([
@@ -478,11 +538,15 @@ describe("ImportExportService", () => {
           )
           .mockResolvedValueOnce({ uuid: "u3", email: "c@example.com" });
 
-        const result = await service.importParticipants(eventId, [
-          toDto("a@example.com"),
-          toDto("b@example.com"),
-          toDto("c@example.com"),
-        ]);
+        const result = await service.importParticipants(
+          eventId,
+          [
+            toDto("a@example.com"),
+            toDto("b@example.com"),
+            toDto("c@example.com"),
+          ],
+          ACTOR,
+        );
 
         expect(result.importedParticipants.map((p) => p.email)).toEqual([
           "a@example.com",
@@ -503,10 +567,16 @@ describe("ImportExportService", () => {
           new BadRequestException("Invalid value for attribute attr-size."),
         );
 
-        const result = await service.importParticipants(eventId, [
-          toDto("a@example.com", [{ attributeUuid: "attr-size", value: "XL" }]),
-          toDto("b@example.com"),
-        ]);
+        const result = await service.importParticipants(
+          eventId,
+          [
+            toDto("a@example.com", [
+              { attributeUuid: "attr-size", value: "XL" },
+            ]),
+            toDto("b@example.com"),
+          ],
+          ACTOR,
+        );
 
         expect(result.importedParticipants).toHaveLength(1);
         expect(result.skippedParticipants).toEqual([
@@ -523,7 +593,11 @@ describe("ImportExportService", () => {
           toDto(`p${String(index)}@example.com`),
         );
 
-        const result = await service.importParticipants(eventId, participants);
+        const result = await service.importParticipants(
+          eventId,
+          participants,
+          ACTOR,
+        );
 
         expect(result.importedParticipants).toHaveLength(2000);
       });
@@ -534,7 +608,7 @@ describe("ImportExportService", () => {
         );
 
         await expect(
-          service.importParticipants(eventId, participants),
+          service.importParticipants(eventId, participants, ACTOR),
         ).rejects.toThrow(BadRequestException);
 
         expect(mockPrismaService.participant.findMany).not.toHaveBeenCalled();
@@ -548,12 +622,16 @@ describe("ImportExportService", () => {
           ),
         );
 
-        const result = await service.importParticipants(eventId, [
-          toDto("a@example.com", [
-            { attributeUuid: "attr-group", value: "Workshop A" },
-          ]),
-          toDto("b@example.com"),
-        ]);
+        const result = await service.importParticipants(
+          eventId,
+          [
+            toDto("a@example.com", [
+              { attributeUuid: "attr-group", value: "Workshop A" },
+            ]),
+            toDto("b@example.com"),
+          ],
+          ACTOR,
+        );
 
         expect(mockPrismaService.block.findMany).not.toHaveBeenCalled();
         expect(mockParticipantsService.register).toHaveBeenNthCalledWith(
@@ -561,6 +639,9 @@ describe("ImportExportService", () => {
           eventId,
           "a@example.com",
           [{ attributeUuid: "attr-group", value: "Workshop A" }],
+          expect.objectContaining({
+            audit: expect.objectContaining({ actor: ACTOR }),
+          }),
         );
         expect(result.importedParticipants).toHaveLength(1);
         expect(result.skippedParticipants).toEqual([
@@ -584,7 +665,11 @@ describe("ImportExportService", () => {
           ["some-existing-uuid", "A@Example.com", "M"],
         ]);
 
-        const result = await service.importParticipantsFromXlsx(eventId, file);
+        const result = await service.importParticipantsFromXlsx(
+          eventId,
+          file,
+          ACTOR,
+        );
 
         expect(result.skippedParticipants).toEqual([]);
         expect(result.importedParticipants).toHaveLength(1);
@@ -592,6 +677,9 @@ describe("ImportExportService", () => {
           eventId,
           "a@example.com",
           [{ attributeUuid: "attr-size", value: "M" }],
+          expect.objectContaining({
+            audit: expect.objectContaining({ actor: ACTOR }),
+          }),
         );
       });
 
@@ -601,12 +689,15 @@ describe("ImportExportService", () => {
           ["a@example.com", null],
         ]);
 
-        await service.importParticipantsFromXlsx(eventId, file);
+        await service.importParticipantsFromXlsx(eventId, file, ACTOR);
 
         expect(mockParticipantsService.register).toHaveBeenCalledWith(
           eventId,
           "a@example.com",
           [],
+          expect.objectContaining({
+            audit: expect.objectContaining({ actor: ACTOR }),
+          }),
         );
       });
 
@@ -616,12 +707,15 @@ describe("ImportExportService", () => {
           [{ text: "h@example.com", hyperlink: "mailto:h@example.com" }],
         ]);
 
-        await service.importParticipantsFromXlsx(eventId, file);
+        await service.importParticipantsFromXlsx(eventId, file, ACTOR);
 
         expect(mockParticipantsService.register).toHaveBeenCalledWith(
           eventId,
           "h@example.com",
           [],
+          expect.objectContaining({
+            audit: expect.objectContaining({ actor: ACTOR }),
+          }),
         );
       });
 
@@ -635,7 +729,7 @@ describe("ImportExportService", () => {
           ["a@example.com", "first", "second"],
         ]);
 
-        await service.importParticipantsFromXlsx(eventId, file);
+        await service.importParticipantsFromXlsx(eventId, file, ACTOR);
 
         expect(mockParticipantsService.register).toHaveBeenCalledWith(
           eventId,
@@ -644,6 +738,9 @@ describe("ImportExportService", () => {
             { attributeUuid: "attr-1", value: "first" },
             { attributeUuid: "attr-2", value: "second" },
           ],
+          expect.objectContaining({
+            audit: expect.objectContaining({ actor: ACTOR }),
+          }),
         );
       });
 
@@ -654,7 +751,7 @@ describe("ImportExportService", () => {
         ]);
 
         await expect(
-          service.importParticipantsFromXlsx(eventId, file),
+          service.importParticipantsFromXlsx(eventId, file, ACTOR),
         ).rejects.toThrow('Unknown column header: "Remarks"');
 
         expect(mockPrismaService.participant.findMany).not.toHaveBeenCalled();
@@ -665,7 +762,7 @@ describe("ImportExportService", () => {
         const file = await buildXlsx([["Size"], ["M"]]);
 
         await expect(
-          service.importParticipantsFromXlsx(eventId, file),
+          service.importParticipantsFromXlsx(eventId, file, ACTOR),
         ).rejects.toThrow('Missing required column: "email"');
       });
 
@@ -676,7 +773,7 @@ describe("ImportExportService", () => {
         ]);
 
         await expect(
-          service.importParticipantsFromXlsx(eventId, file),
+          service.importParticipantsFromXlsx(eventId, file, ACTOR),
         ).rejects.toThrow('Duplicate column header: "email"');
       });
 
@@ -685,6 +782,7 @@ describe("ImportExportService", () => {
           service.importParticipantsFromXlsx(
             eventId,
             Buffer.from("definitely not an xlsx"),
+            ACTOR,
           ),
         ).rejects.toThrow("Invalid or corrupted Excel file");
       });
@@ -697,7 +795,7 @@ describe("ImportExportService", () => {
         const file = await buildXlsx(rows);
 
         await expect(
-          service.importParticipantsFromXlsx(eventId, file),
+          service.importParticipantsFromXlsx(eventId, file, ACTOR),
         ).rejects.toThrow(BadRequestException);
 
         expect(mockParticipantsService.register).not.toHaveBeenCalled();
@@ -706,7 +804,11 @@ describe("ImportExportService", () => {
       it("should return an empty result for a sheet with only a header", async () => {
         const file = await buildXlsx([["email", "Size"]]);
 
-        const result = await service.importParticipantsFromXlsx(eventId, file);
+        const result = await service.importParticipantsFromXlsx(
+          eventId,
+          file,
+          ACTOR,
+        );
 
         expect(result).toEqual({
           importedParticipants: [],
@@ -722,7 +824,11 @@ describe("ImportExportService", () => {
           ["ok@example.com", "S"],
         ]);
 
-        const result = await service.importParticipantsFromXlsx(eventId, file);
+        const result = await service.importParticipantsFromXlsx(
+          eventId,
+          file,
+          ACTOR,
+        );
 
         expect(result.importedParticipants).toHaveLength(1);
         expect(result.skippedParticipants).toEqual([
@@ -741,7 +847,11 @@ describe("ImportExportService", () => {
           ["A@example.com"],
         ]);
 
-        const result = await service.importParticipantsFromXlsx(eventId, file);
+        const result = await service.importParticipantsFromXlsx(
+          eventId,
+          file,
+          ACTOR,
+        );
 
         expect(result.importedParticipants).toHaveLength(1);
         expect(result.skippedParticipants).toEqual([
@@ -785,6 +895,7 @@ describe("ImportExportService", () => {
           const result = await service.importParticipantsFromXlsx(
             eventId,
             file,
+            ACTOR,
           );
 
           expect(result.skippedParticipants).toEqual([]);
@@ -798,12 +909,18 @@ describe("ImportExportService", () => {
             eventId,
             "a@example.com",
             [{ attributeUuid: "attr-group", value: "block-a" }],
+            expect.objectContaining({
+              audit: expect.objectContaining({ actor: ACTOR }),
+            }),
           );
           expect(mockParticipantsService.register).toHaveBeenNthCalledWith(
             2,
             eventId,
             "b@example.com",
             [{ attributeUuid: "attr-group", value: "block-a;block-b" }],
+            expect.objectContaining({
+              audit: expect.objectContaining({ actor: ACTOR }),
+            }),
           );
         });
 
@@ -817,6 +934,7 @@ describe("ImportExportService", () => {
           const result = await service.importParticipantsFromXlsx(
             eventId,
             file,
+            ACTOR,
           );
 
           expect(result.importedParticipants.map((p) => p.email)).toEqual([
@@ -841,6 +959,7 @@ describe("ImportExportService", () => {
           const result = await service.importParticipantsFromXlsx(
             eventId,
             file,
+            ACTOR,
           );
 
           expect(result.importedParticipants.map((p) => p.email)).toEqual([
@@ -860,7 +979,7 @@ describe("ImportExportService", () => {
           ["a@example.com", "M"],
         ]);
 
-        await service.importParticipantsFromXlsx(eventId, file);
+        await service.importParticipantsFromXlsx(eventId, file, ACTOR);
 
         expect(mockPrismaService.block.findMany).not.toHaveBeenCalled();
       });
@@ -870,7 +989,7 @@ describe("ImportExportService", () => {
         const file = await buildXlsx([["email"], ["a@example.com"]]);
 
         await expect(
-          service.importParticipantsFromXlsx(eventId, file),
+          service.importParticipantsFromXlsx(eventId, file, ACTOR),
         ).rejects.toThrow(NotFoundException);
       });
     });

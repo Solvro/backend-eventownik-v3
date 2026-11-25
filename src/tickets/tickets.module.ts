@@ -1,3 +1,5 @@
+import { AuditLogModule } from "src/audit-log/audit-log.module";
+
 import { Module } from "@nestjs/common";
 
 import { TicketParticipantsService } from "./ticket-participants.service";
@@ -9,6 +11,7 @@ import { TicketsController } from "./tickets.controller";
 import { TicketsService } from "./tickets.service";
 
 @Module({
+  imports: [AuditLogModule],
   controllers: [
     TicketsController,
     TicketScanController,

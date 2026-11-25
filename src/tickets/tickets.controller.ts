@@ -1,3 +1,5 @@
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { CurrentAuditActor } from "src/audit-log/current-audit-actor.decorator";
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
@@ -66,8 +68,9 @@ export class TicketsController {
   async create(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Body() dto: CreateTicketDto,
+    @CurrentAuditActor() actor: AuditActor,
   ): Promise<Ticket> {
-    return this.ticketsService.create(eventId, dto);
+    return this.ticketsService.create(eventId, dto, actor);
   }
 
   @Get()
@@ -127,8 +130,9 @@ export class TicketsController {
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("ticketId", ParseUUIDPipe) ticketId: string,
     @Body() dto: UpdateTicketDto,
+    @CurrentAuditActor() actor: AuditActor,
   ): Promise<Ticket> {
-    return this.ticketsService.update(eventId, ticketId, dto);
+    return this.ticketsService.update(eventId, ticketId, dto, actor);
   }
 
   @Delete(":ticketId")
@@ -142,7 +146,8 @@ export class TicketsController {
   async remove(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("ticketId", ParseUUIDPipe) ticketId: string,
+    @CurrentAuditActor() actor: AuditActor,
   ): Promise<void> {
-    await this.ticketsService.remove(eventId, ticketId);
+    await this.ticketsService.remove(eventId, ticketId, actor);
   }
 }

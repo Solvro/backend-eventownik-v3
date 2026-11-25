@@ -1,3 +1,4 @@
+import { AuditLogService } from "src/audit-log/audit-log.service";
 import { BlocksService } from "src/blocks/blocks.service";
 import type { Attribute, Event, Form } from "src/generated/prisma/client";
 import { AttributeType, EventLinkType } from "src/generated/prisma/enums";
@@ -45,6 +46,7 @@ describe("Forms -> Participants Integration", () => {
       providers: [
         FormsService,
         ParticipantsService,
+        AuditLogService,
         BlocksService,
         PrismaService,
         {

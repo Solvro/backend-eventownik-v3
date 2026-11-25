@@ -1,3 +1,5 @@
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { CurrentAuditActor } from "src/audit-log/current-audit-actor.decorator";
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
@@ -61,8 +63,9 @@ export class FormsController {
   async create(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Body() createFormDto: CreateFormDto,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
-    return this.formsService.create(eventId, createFormDto);
+    return this.formsService.create(eventId, createFormDto, actor);
   }
 
   @Get()
@@ -105,8 +108,14 @@ export class FormsController {
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("id", ParseUUIDPipe) formId: string,
     @Body() duplicateFormDto: DuplicateFormDto,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
-    return this.formsService.duplicate(formId, eventId, duplicateFormDto);
+    return this.formsService.duplicate(
+      formId,
+      eventId,
+      duplicateFormDto,
+      actor,
+    );
   }
 
   @Patch(":id")
@@ -124,8 +133,9 @@ export class FormsController {
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("id", ParseUUIDPipe) formId: string,
     @Body() updateFormDto: UpdateFormDto,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
-    return this.formsService.update(formId, eventId, updateFormDto);
+    return this.formsService.update(formId, eventId, updateFormDto, actor);
   }
 
   @Delete(":id")
@@ -138,7 +148,8 @@ export class FormsController {
   async remove(
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("id", ParseUUIDPipe) formId: string,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
-    return this.formsService.remove(formId, eventId);
+    return this.formsService.remove(formId, eventId, actor);
   }
 }

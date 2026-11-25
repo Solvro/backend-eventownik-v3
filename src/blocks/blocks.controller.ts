@@ -1,3 +1,5 @@
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { CurrentAuditActor } from "src/audit-log/current-audit-actor.decorator";
 import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
 import { RequirePermission } from "src/auth/permissions.decorator";
 import { PermissionsGuard } from "src/auth/permissions.guard";
@@ -54,8 +56,14 @@ export class BlocksController {
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("attributeId", ParseUUIDPipe) attributeId: string,
     @Body() createBlockDto: CreateBlockDto,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
-    return this.blocksService.create(eventId, attributeId, createBlockDto);
+    return this.blocksService.create(
+      eventId,
+      attributeId,
+      createBlockDto,
+      actor,
+    );
   }
 
   @Get()
@@ -103,12 +111,14 @@ export class BlocksController {
     @Param("attributeId", ParseUUIDPipe) attributeId: string,
     @Param("id", ParseUUIDPipe) blockId: string,
     @Body() duplicateBlockDto: DuplicateBlockDto,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
     return this.blocksService.duplicate(
       eventId,
       attributeId,
       blockId,
       duplicateBlockDto,
+      actor,
     );
   }
 
@@ -124,12 +134,14 @@ export class BlocksController {
     @Param("attributeId", ParseUUIDPipe) attributeId: string,
     @Param("id", ParseUUIDPipe) blockId: string,
     @Body() updateBlockDto: UpdateBlockDto,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
     return this.blocksService.update(
       eventId,
       attributeId,
       blockId,
       updateBlockDto,
+      actor,
     );
   }
 
@@ -145,7 +157,8 @@ export class BlocksController {
     @Param("eventId", ParseUUIDPipe) eventId: string,
     @Param("attributeId", ParseUUIDPipe) attributeId: string,
     @Param("id", ParseUUIDPipe) blockId: string,
+    @CurrentAuditActor() actor: AuditActor,
   ) {
-    return this.blocksService.remove(eventId, attributeId, blockId);
+    return this.blocksService.remove(eventId, attributeId, blockId, actor);
   }
 }

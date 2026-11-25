@@ -25,6 +25,14 @@ Full standard: [docs/api-docs.md](docs/api-docs.md).
 - Document path and query params with `@ApiParam` / `@ApiQuery`.
 - DTOs: follow the optional vs nullable rules in the doc. The swagger CLI plugin infers types, so do not add redundant `@ApiProperty`.
 
+## Audit log
+
+Every mutation that changes event state must record an audit log entry in the same transaction. Full guide: [docs/audit-log.md](docs/audit-log.md).
+
+- Inject `AuditLogService`, take the actor with `@CurrentAuditActor()` and call `record(tx, ...)` next to the write.
+- Log only allowlisted fields. Never log passwords, tokens or storage keys.
+- Assert the log row in the module's `*.int.spec.ts`.
+
 ## Tests
 
 Full guide: [docs/integration-tests.md](docs/integration-tests.md).

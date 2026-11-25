@@ -1,5 +1,7 @@
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
+import { LogTrigger, PermissionType } from "src/generated/prisma/client";
 import type { Admin, Event } from "src/generated/prisma/client";
-import { PermissionType } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import {
@@ -12,6 +14,12 @@ import type { TestingModule } from "@nestjs/testing";
 
 import { OrganizerListingDto } from "./dto/organizer-listing.dto";
 import { OrganizersService } from "./organizers.service";
+
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
 
 describe("OrganizersService (integration)", () => {
   let service: OrganizersService;
@@ -26,7 +34,7 @@ describe("OrganizersService (integration)", () => {
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [OrganizersService, PrismaService],
+      providers: [OrganizersService, AuditLogService, PrismaService],
     }).compile();
 
     service = module.get<OrganizersService>(OrganizersService);
@@ -250,13 +258,17 @@ describe("OrganizersService (integration)", () => {
       const newOrganizer = await createAdmin();
       const event = await createEvent(owner.uuid);
 
-      const result = await service.create(event.uuid, {
-        email: newOrganizer.email,
-        permissions: [
-          PermissionType.MANAGE_PARTICIPANT,
-          PermissionType.MANAGE_FORM,
-        ],
-      });
+      const result = await service.create(
+        event.uuid,
+        {
+          email: newOrganizer.email,
+          permissions: [
+            PermissionType.MANAGE_PARTICIPANT,
+            PermissionType.MANAGE_FORM,
+          ],
+        },
+        ACTOR,
+      );
 
       expect(result).toBeDefined();
       if (result == null) {
@@ -274,10 +286,14 @@ describe("OrganizersService (integration)", () => {
       const event = await createEvent(owner.uuid);
 
       await expect(
-        service.create(event.uuid, {
-          email: "nobody@organizers-int.local",
-          permissions: [PermissionType.MANAGE_EVENT],
-        }),
+        service.create(
+          event.uuid,
+          {
+            email: "nobody@organizers-int.local",
+            permissions: [PermissionType.MANAGE_EVENT],
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -286,10 +302,14 @@ describe("OrganizersService (integration)", () => {
       const fakeEventUuid = "00000000-0000-0000-0000-000000000002";
 
       await expect(
-        service.create(fakeEventUuid, {
-          email: admin.email,
-          permissions: [PermissionType.MANAGE_EVENT],
-        }),
+        service.create(
+          fakeEventUuid,
+          {
+            email: admin.email,
+            permissions: [PermissionType.MANAGE_EVENT],
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -303,10 +323,14 @@ describe("OrganizersService (integration)", () => {
       ]);
 
       await expect(
-        service.create(event.uuid, {
-          email: organizer.email,
-          permissions: [PermissionType.MANAGE_EVENT], // duplicate — hits P2002
-        }),
+        service.create(
+          event.uuid,
+          {
+            email: organizer.email,
+            permissions: [PermissionType.MANAGE_EVENT], // duplicate — hits P2002
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -324,12 +348,17 @@ describe("OrganizersService (integration)", () => {
         PermissionType.MANAGE_EVENT,
       ]);
 
-      const result = await service.update(event.uuid, organizer.uuid, {
-        permissions: [
-          PermissionType.MANAGE_PARTICIPANT,
-          PermissionType.MANAGE_EMAIL,
-        ],
-      });
+      const result = await service.update(
+        event.uuid,
+        organizer.uuid,
+        {
+          permissions: [
+            PermissionType.MANAGE_PARTICIPANT,
+            PermissionType.MANAGE_EMAIL,
+          ],
+        },
+        ACTOR,
+      );
 
       expect(result).toBeDefined();
       if (result == null) {
@@ -346,9 +375,14 @@ describe("OrganizersService (integration)", () => {
       const fakeEventUuid = "00000000-0000-0000-0000-000000000003";
 
       await expect(
-        service.update(fakeEventUuid, organizer.uuid, {
-          permissions: [PermissionType.MANAGE_EVENT],
-        }),
+        service.update(
+          fakeEventUuid,
+          organizer.uuid,
+          {
+            permissions: [PermissionType.MANAGE_EVENT],
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -358,9 +392,14 @@ describe("OrganizersService (integration)", () => {
       const event = await createEvent(owner.uuid);
 
       await expect(
-        service.update(event.uuid, unassigned.uuid, {
-          permissions: [PermissionType.MANAGE_EVENT],
-        }),
+        service.update(
+          event.uuid,
+          unassigned.uuid,
+          {
+            permissions: [PermissionType.MANAGE_EVENT],
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -376,7 +415,7 @@ describe("OrganizersService (integration)", () => {
       const event = await createEvent(owner.uuid);
       await assignPermissions(organizer.uuid, event.uuid);
 
-      await service.remove(event.uuid, organizer.uuid);
+      await service.remove(event.uuid, organizer.uuid, ACTOR);
 
       const remaining = await prisma.eventPermission.findMany({
         where: { adminUuid: organizer.uuid, eventUuid: event.uuid },
@@ -389,9 +428,9 @@ describe("OrganizersService (integration)", () => {
 
       const event = await createEvent(owner.uuid);
 
-      await expect(service.remove(event.uuid, owner.uuid)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.remove(event.uuid, owner.uuid, ACTOR),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it("throws NotFoundException when the organizer is not assigned to the event", async () => {
@@ -399,9 +438,69 @@ describe("OrganizersService (integration)", () => {
       const unassigned = await createAdmin();
       const event = await createEvent(owner.uuid);
 
-      await expect(service.remove(event.uuid, unassigned.uuid)).rejects.toThrow(
-        NotFoundException,
+      await expect(
+        service.remove(event.uuid, unassigned.uuid, ACTOR),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+  describe("audit log", () => {
+    it("records adding, changing and removing organizers without secrets", async () => {
+      const owner = await createAdmin();
+      const event = await createEvent(owner.uuid);
+      await assignPermissions(owner.uuid, event.uuid, [
+        PermissionType.MANAGE_ALL,
+      ]);
+      const organizer = await createAdmin({
+        firstName: "Anna",
+        lastName: "Nowak",
+      });
+
+      await service.create(
+        event.uuid,
+        {
+          email: organizer.email,
+          permissions: [PermissionType.MANAGE_FORM],
+        },
+        ACTOR,
       );
+      await service.update(
+        event.uuid,
+        organizer.uuid,
+        {
+          permissions: [
+            PermissionType.MANAGE_FORM,
+            PermissionType.MANAGE_EMAIL,
+          ],
+        },
+        ACTOR,
+      );
+      await service.remove(event.uuid, organizer.uuid, ACTOR);
+
+      const entries = await prisma.auditLog.findMany({
+        where: { eventUuid: event.uuid },
+        orderBy: { createdAt: "asc" },
+      });
+
+      expect(entries.map((entry) => entry.action)).toEqual([
+        "organizer.added",
+        "organizer.permissions_changed",
+        "organizer.removed",
+      ]);
+      expect(entries[0].entityLabel).toBe(`Anna Nowak (${organizer.email})`);
+      expect(entries[1].changes).toEqual([
+        {
+          kind: "list",
+          field: "permissions",
+          added: [PermissionType.MANAGE_EMAIL],
+          removed: [],
+        },
+      ]);
+      expect(entries[2].changes).toMatchObject([
+        {
+          removed: [PermissionType.MANAGE_FORM, PermissionType.MANAGE_EMAIL],
+        },
+      ]);
+      expect(JSON.stringify(entries)).not.toContain(organizer.password);
     });
   });
 });

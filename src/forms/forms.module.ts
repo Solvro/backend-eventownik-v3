@@ -1,3 +1,4 @@
+import { AuditLogModule } from "src/audit-log/audit-log.module";
 import { BlocksModule } from "src/blocks/blocks.module";
 import { ParticipantsModule } from "src/participants/participants.module";
 
@@ -11,7 +12,7 @@ import { FormsService } from "./forms.service";
 @Module({
   controllers: [FormsController, FormsPublicController],
   providers: [FormsService, FormsReaperService],
-  imports: [ParticipantsModule, BlocksModule],
+  imports: [ParticipantsModule, BlocksModule, AuditLogModule],
   exports: [FormsService],
 })
 export class FormsModule {}

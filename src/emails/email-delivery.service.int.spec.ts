@@ -1,5 +1,8 @@
 import { MailerService } from "@nestjs-modules/mailer";
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
 import { PageOptionsDto } from "src/common/dto/page-options.dto";
+import { LogTrigger } from "src/generated/prisma/client";
 import type {
   Attribute,
   Event,
@@ -22,6 +25,12 @@ import type { TestingModule } from "@nestjs/testing";
 import { EmailContentParserService } from "./email-content-parser.service";
 import { EmailDeliveryService } from "./email-delivery.service";
 import { EMAIL_QUEUE_NAME } from "./emails.constants";
+
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
 
 describe("EmailDeliveryService (integration)", () => {
   let service: EmailDeliveryService;
@@ -64,6 +73,7 @@ describe("EmailDeliveryService (integration)", () => {
         EmailDeliveryService,
         EmailContentParserService,
         PrismaService,
+        AuditLogService,
         { provide: MailerService, useValue: mockMailerService },
         { provide: getQueueToken(EMAIL_QUEUE_NAME), useValue: mockQueue },
         { provide: ConfigService, useValue: mockConfigService },
@@ -415,14 +425,45 @@ describe("EmailDeliveryService (integration)", () => {
   // ---------------------------------------------------------------------------
 
   describe("sendManualEmail", () => {
+    it("records the manual send in the audit log", async () => {
+      const event = await createEvent();
+      const template = await createEmailTemplate(event.uuid);
+      const first = await createParticipant(event.uuid);
+      const second = await createParticipant(event.uuid);
+
+      await service.sendManualEmail(
+        event.uuid,
+        template.uuid,
+        [first.uuid, second.uuid],
+        ACTOR,
+      );
+
+      const entries = await prisma.auditLog.findMany({
+        where: { eventUuid: event.uuid },
+      });
+      expect(entries).toHaveLength(1);
+      expect(entries[0]).toMatchObject({
+        action: "emails.queued_manually",
+        actorUuid: ACTOR.uuid,
+        entityUuid: template.uuid,
+        entityLabel: template.name,
+      });
+      expect(entries[0].changes).toMatchObject([
+        { field: "recipients", to: 2 },
+      ]);
+    });
+
     it("enqueues the email for participants that belong to the event", async () => {
       const event = await createEvent();
       const template = await createEmailTemplate(event.uuid);
       const participant = await createParticipant(event.uuid);
 
-      await service.sendManualEmail(event.uuid, template.uuid, [
-        participant.uuid,
-      ]);
+      await service.sendManualEmail(
+        event.uuid,
+        template.uuid,
+        [participant.uuid],
+        ACTOR,
+      );
 
       const statuses = await prisma.participantEmailStatus.findMany({
         where: { emailUuid: template.uuid },
@@ -438,7 +479,12 @@ describe("EmailDeliveryService (integration)", () => {
       const outsider = await createParticipant(otherEvent.uuid);
 
       await expect(
-        service.sendManualEmail(event.uuid, template.uuid, [outsider.uuid]),
+        service.sendManualEmail(
+          event.uuid,
+          template.uuid,
+          [outsider.uuid],
+          ACTOR,
+        ),
       ).rejects.toThrow(BadRequestException);
 
       expect(mockQueue.addBulk).not.toHaveBeenCalled();
@@ -451,9 +497,12 @@ describe("EmailDeliveryService (integration)", () => {
       const participant = await createParticipant(event.uuid);
 
       await expect(
-        service.sendManualEmail(event.uuid, templateInOtherEvent.uuid, [
-          participant.uuid,
-        ]),
+        service.sendManualEmail(
+          event.uuid,
+          templateInOtherEvent.uuid,
+          [participant.uuid],
+          ACTOR,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });

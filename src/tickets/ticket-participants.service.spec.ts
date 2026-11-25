@@ -1,3 +1,4 @@
+import { AuditLogService } from "src/audit-log/audit-log.service";
 import { AttributeType, TicketMode } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -74,6 +75,7 @@ describe("TicketParticipantsService", () => {
         TicketParticipantsService,
         TicketsService,
         { provide: PrismaService, useValue: mockPrismaService },
+        { provide: AuditLogService, useValue: {} },
       ],
     }).compile();
 

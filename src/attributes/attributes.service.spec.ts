@@ -1,6 +1,9 @@
+import { AuditLogService } from "src/audit-log/audit-log.service";
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
+import type { AuditActor } from "src/audit-log/audit-log.types";
 import { BlocksService } from "src/blocks/blocks.service";
+import { LogTrigger } from "src/generated/prisma/client";
 import { AttributeType } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -9,6 +12,12 @@ import type { TestingModule } from "@nestjs/testing";
 import { Test } from "@nestjs/testing";
 
 import { AttributesService } from "./attributes.service";
+
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
 
 describe("AttributesService", () => {
   let service: AttributesService;
@@ -36,6 +45,11 @@ describe("AttributesService", () => {
     $transaction: jest.fn(),
   };
 
+  const mockAuditLogService = {
+    record: jest.fn(),
+    fieldChanges: () => [],
+  };
+
   const mockBlocksService = {
     ensureRootBlock: jest.fn(),
     deleteRootBlocks: jest.fn(),
@@ -47,6 +61,7 @@ describe("AttributesService", () => {
         AttributesService,
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: BlocksService, useValue: mockBlocksService },
+        { provide: AuditLogService, useValue: mockAuditLogService },
       ],
     }).compile();
 
@@ -79,6 +94,7 @@ describe("AttributesService", () => {
         type: AttributeType.block,
       },
       eventId,
+      ACTOR,
     );
 
     expect(result).toEqual({
@@ -120,6 +136,7 @@ describe("AttributesService", () => {
           config: {},
         },
         eventId,
+        ACTOR,
       ),
     ).rejects.toThrow(BadRequestException);
   });
@@ -150,12 +167,17 @@ describe("AttributesService", () => {
       config: { maxSelections: 1 },
     });
 
-    await service.update(attributeUuid, eventId, {
-      name: "Block attribute",
-      order: 2,
-      showInList: false,
-      type: AttributeType.block,
-    });
+    await service.update(
+      attributeUuid,
+      eventId,
+      {
+        name: "Block attribute",
+        order: 2,
+        showInList: false,
+        type: AttributeType.block,
+      },
+      ACTOR,
+    );
 
     expect(mockPrismaService.attribute.update).toHaveBeenCalledWith({
       where: { uuid: attributeUuid, eventUuid: eventId },
@@ -200,6 +222,7 @@ describe("AttributesService", () => {
         },
       },
       eventId,
+      ACTOR,
     );
 
     expect(mockPrismaService.attribute.create).toHaveBeenCalledWith({
@@ -245,7 +268,12 @@ describe("AttributesService", () => {
       });
 
       await expect(
-        service.update(attributeUuid, eventId, { type: AttributeType.text }),
+        service.update(
+          attributeUuid,
+          eventId,
+          { type: AttributeType.text },
+          ACTOR,
+        ),
       ).rejects.toThrow(ConflictException);
 
       expect(mockPrismaService.attribute.update).not.toHaveBeenCalled();
@@ -258,9 +286,11 @@ describe("AttributesService", () => {
       });
 
       await expect(
-        service.bulkUpdate(eventId, [
-          { uuid: attributeUuid, type: AttributeType.text },
-        ]),
+        service.bulkUpdate(
+          eventId,
+          [{ uuid: attributeUuid, type: AttributeType.text }],
+          ACTOR,
+        ),
       ).rejects.toThrow(ConflictException);
 
       expect(mockPrismaService.attribute.update).not.toHaveBeenCalled();
@@ -273,9 +303,14 @@ describe("AttributesService", () => {
         type: AttributeType.text,
       });
 
-      await service.update(attributeUuid, eventId, {
-        type: AttributeType.text,
-      });
+      await service.update(
+        attributeUuid,
+        eventId,
+        {
+          type: AttributeType.text,
+        },
+        ACTOR,
+      );
 
       expect(mockBlocksService.deleteRootBlocks).toHaveBeenCalledWith(
         attributeUuid,
@@ -286,7 +321,7 @@ describe("AttributesService", () => {
     it("does not look for a ticket when the type stays block", async () => {
       mockPrismaService.attribute.update.mockResolvedValue(blockAttribute);
 
-      await service.update(attributeUuid, eventId, { name: "Renamed" });
+      await service.update(attributeUuid, eventId, { name: "Renamed" }, ACTOR);
 
       expect(mockPrismaService.ticket.findUnique).not.toHaveBeenCalled();
     });

@@ -1,3 +1,9 @@
+import {
+  AuditAction,
+  AuditEntityType,
+} from "src/audit-log/audit-log.constants";
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
 import { parseSortInput } from "src/common/utils/prisma.utility";
@@ -17,9 +23,55 @@ import { UpdateOrganizerDto } from "./dto/update-organizer.dto";
 
 @Injectable()
 export class OrganizersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLog: AuditLogService,
+  ) {}
 
-  async create(eventUuid: string, createOrganizerDto: CreateOrganizerDto) {
+  private async recordOrganizerAudit(
+    tx: Prisma.TransactionClient,
+    eventUuid: string,
+    actor: AuditActor,
+    change: {
+      action:
+        | typeof AuditAction.OrganizerAdded
+        | typeof AuditAction.OrganizerPermissionsChanged
+        | typeof AuditAction.OrganizerRemoved;
+      organizer: {
+        uuid: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+      };
+      before: readonly string[];
+      after: readonly string[];
+    },
+  ) {
+    const changes = this.auditLog.listChange(
+      "permissions",
+      change.before,
+      change.after,
+    );
+    if (changes.length === 0) {
+      return;
+    }
+
+    await this.auditLog.record(tx, {
+      eventUuid,
+      action: change.action,
+      actor,
+      entityType: AuditEntityType.Organizer,
+      entityUuid: change.organizer.uuid,
+      entityLabel: `${change.organizer.firstName} ${change.organizer.lastName} (${change.organizer.email})`,
+      changes,
+    });
+  }
+
+  async create(
+    eventUuid: string,
+    createOrganizerDto: CreateOrganizerDto,
+    actor: AuditActor,
+  ) {
     const { email, permissions } = createOrganizerDto;
 
     return await this.prisma.$transaction(async (tx) => {
@@ -59,6 +111,13 @@ export class OrganizersService {
 
         throw error;
       }
+
+      await this.recordOrganizerAudit(tx, eventUuid, actor, {
+        action: AuditAction.OrganizerAdded,
+        organizer: admin,
+        before: [],
+        after: permissions,
+      });
 
       return tx.admin.findUnique({
         where: { uuid: admin.uuid },
@@ -177,6 +236,7 @@ export class OrganizersService {
     eventUuid: string,
     organizerUuid: string,
     updateOrganizerDto: UpdateOrganizerDto,
+    actor: AuditActor,
   ) {
     const { permissions } = updateOrganizerDto;
 
@@ -223,6 +283,11 @@ export class OrganizersService {
         );
       }
 
+      const previousPermissions = await tx.eventPermission.findMany({
+        where: { eventUuid, adminUuid: organizerUuid },
+        select: { permission: true },
+      });
+
       await tx.eventPermission.deleteMany({
         where: {
           eventUuid,
@@ -236,6 +301,13 @@ export class OrganizersService {
           adminUuid: organizerUuid,
           permission,
         })),
+      });
+
+      await this.recordOrganizerAudit(tx, eventUuid, actor, {
+        action: AuditAction.OrganizerPermissionsChanged,
+        organizer: admin,
+        before: previousPermissions.map((entry) => entry.permission),
+        after: permissions,
       });
 
       return await tx.admin.findUnique({
@@ -254,7 +326,7 @@ export class OrganizersService {
     });
   }
 
-  async remove(eventUuid: string, organizerUuid: string) {
+  async remove(eventUuid: string, organizerUuid: string, actor: AuditActor) {
     const targetOrganizer = await this.prisma.admin.findFirst({
       where: {
         uuid: organizerUuid,
@@ -302,11 +374,25 @@ export class OrganizersService {
       );
     }
 
-    await this.prisma.eventPermission.deleteMany({
-      where: {
-        adminUuid: organizerUuid,
-        eventUuid,
-      },
+    await this.prisma.$transaction(async (tx) => {
+      const previousPermissions = await tx.eventPermission.findMany({
+        where: { adminUuid: organizerUuid, eventUuid },
+        select: { permission: true },
+      });
+
+      await tx.eventPermission.deleteMany({
+        where: {
+          adminUuid: organizerUuid,
+          eventUuid,
+        },
+      });
+
+      await this.recordOrganizerAudit(tx, eventUuid, actor, {
+        action: AuditAction.OrganizerRemoved,
+        organizer: targetOrganizer,
+        before: previousPermissions.map((entry) => entry.permission),
+        after: [],
+      });
     });
   }
 }

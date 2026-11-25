@@ -1,3 +1,4 @@
+import { AuditLogModule } from "src/audit-log/audit-log.module";
 import { PrismaModule } from "src/prisma/prisma.module";
 
 import { Module } from "@nestjs/common";
@@ -8,7 +9,7 @@ import { ParticipantsService } from "./participants.service";
 import { PublicParticipantsController } from "./public-participants.controller";
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, AuditLogModule],
   controllers: [
     ParticipantsController,
     ParticipantsAttributesController,

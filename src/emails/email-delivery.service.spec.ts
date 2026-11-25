@@ -1,5 +1,8 @@
 import { MailerService } from "@nestjs-modules/mailer";
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor } from "src/audit-log/audit-log.types";
 import { PageOptionsDto } from "src/common/dto/page-options.dto";
+import { LogTrigger } from "src/generated/prisma/client";
 import { EmailStatus } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -12,6 +15,12 @@ import { Test } from "@nestjs/testing";
 import { EmailContentParserService } from "./email-content-parser.service";
 import { EmailDeliveryService } from "./email-delivery.service";
 import { EMAIL_QUEUE_NAME } from "./emails.constants";
+
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
 
 describe("EmailDeliveryService", () => {
   let service: EmailDeliveryService;
@@ -55,6 +64,10 @@ describe("EmailDeliveryService", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EmailDeliveryService,
+        {
+          provide: AuditLogService,
+          useValue: { record: jest.fn(), fieldChanges: () => [] },
+        },
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: MailerService, useValue: mockMailerService },
         { provide: getQueueToken(EMAIL_QUEUE_NAME), useValue: mockQueue },
@@ -272,10 +285,12 @@ describe("EmailDeliveryService", () => {
       mockPrismaService.participant.count.mockResolvedValue(1);
 
       await expect(
-        service.sendManualEmail("event-uuid", "email-uuid", [
-          "participant-1",
-          "participant-2",
-        ]),
+        service.sendManualEmail(
+          "event-uuid",
+          "email-uuid",
+          ["participant-1", "participant-2"],
+          ACTOR,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -283,7 +298,12 @@ describe("EmailDeliveryService", () => {
       mockPrismaService.emailTemplate.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.sendManualEmail("event-uuid", "email-uuid", ["participant-1"]),
+        service.sendManualEmail(
+          "event-uuid",
+          "email-uuid",
+          ["participant-1"],
+          ACTOR,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -293,11 +313,12 @@ describe("EmailDeliveryService", () => {
       });
       mockPrismaService.participant.count.mockResolvedValue(2);
 
-      await service.sendManualEmail("event-uuid", "email-uuid", [
-        "participant-1",
-        "participant-1",
-        "participant-2",
-      ]);
+      await service.sendManualEmail(
+        "event-uuid",
+        "email-uuid",
+        ["participant-1", "participant-1", "participant-2"],
+        ACTOR,
+      );
 
       expect(mockPrismaService.participant.count).toHaveBeenCalledWith({
         where: {

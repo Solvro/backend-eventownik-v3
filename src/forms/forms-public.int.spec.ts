@@ -1,3 +1,4 @@
+import { AuditLogService } from "src/audit-log/audit-log.service";
 import { BlocksService } from "src/blocks/blocks.service";
 import { TurnstileGuard } from "src/common/guards/turnstile.guard";
 import { ParticipantsService } from "src/participants/participants.service";
@@ -53,6 +54,7 @@ describe("Forms Public Integration", () => {
           useValue: mockPrismaService,
         },
         ParticipantsService,
+        AuditLogService,
         BlocksService,
         {
           provide: StorageService,

@@ -1,4 +1,10 @@
 import { isString, isUUID } from "class-validator";
+import {
+  AuditAction,
+  AuditEntityType,
+} from "src/audit-log/audit-log.constants";
+import { AuditLogService } from "src/audit-log/audit-log.service";
+import type { AuditActor, AuditChange } from "src/audit-log/audit-log.types";
 import { BlocksService } from "src/blocks/blocks.service";
 import { PageMetaDto } from "src/common/dto/page-meta.dto";
 import { PageDto } from "src/common/dto/page.dto";
@@ -9,6 +15,8 @@ import {
   Attribute,
   AttributeType,
   EventLinkType,
+  Form,
+  LogTrigger,
   OpenCondition,
   Prisma,
 } from "src/generated/prisma/client";
@@ -37,6 +45,28 @@ const IMAGE_MIME_PREFIX = "image/";
 
 const MAX_USER_AGENT_LENGTH = 512;
 
+const AUDITED_FORM_FIELDS = [
+  "name",
+  "description",
+  "isEditable",
+  "isOpen",
+  "openCondition",
+  "openDate",
+  "closeDate",
+  "closeOnParticipantsLimit",
+  "order",
+  "isFirstForm",
+] as const;
+
+interface FormAuditSnapshot {
+  form: Form;
+  isFirstForm: boolean;
+  definitions: {
+    attributeUuid: string | null;
+    isRequired?: boolean;
+  }[];
+}
+
 @Injectable()
 export class FormsService {
   private readonly bucket: string;
@@ -47,9 +77,75 @@ export class FormsService {
     private readonly blocksService: BlocksService,
     private readonly storageService: StorageService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly auditLog: AuditLogService,
     configService: ConfigService,
   ) {
     this.bucket = configService.getOrThrow<string>("S3_BUCKET_FORMS");
+  }
+
+  private async recordFormAudit(
+    tx: Prisma.TransactionClient,
+    eventUuid: string,
+    actor: AuditActor,
+    change: {
+      action:
+        | typeof AuditAction.FormCreated
+        | typeof AuditAction.FormUpdated
+        | typeof AuditAction.FormDeleted;
+      before: FormAuditSnapshot | null;
+      after: FormAuditSnapshot | null;
+    },
+  ) {
+    const { before, after } = change;
+    const attributeUuids = [
+      ...(before?.definitions ?? []),
+      ...(after?.definitions ?? []),
+    ].flatMap((definition) =>
+      definition.attributeUuid === null ? [] : [definition.attributeUuid],
+    );
+    const attributes = await tx.attribute.findMany({
+      where: { uuid: { in: attributeUuids } },
+      select: { uuid: true, name: true },
+    });
+    const names = new Map(
+      attributes.map((attribute) => [attribute.uuid, attribute.name]),
+    );
+    const toItems = (snapshot: FormAuditSnapshot | null) =>
+      (snapshot?.definitions ?? []).map((definition) => ({
+        name: names.get(definition.attributeUuid ?? "") ?? "",
+        isRequired: definition.isRequired ?? true,
+      }));
+    const toRecord = (snapshot: FormAuditSnapshot | null) =>
+      snapshot === null
+        ? null
+        : { ...snapshot.form, isFirstForm: snapshot.isFirstForm };
+
+    const changes: AuditChange[] = [
+      ...this.auditLog.fieldChanges(
+        toRecord(before),
+        toRecord(after),
+        AUDITED_FORM_FIELDS,
+      ),
+      ...this.auditLog.listChange(
+        "attributes",
+        toItems(before),
+        toItems(after),
+      ),
+    ];
+    if (changes.length === 0) {
+      return;
+    }
+
+    const form = (after ?? before)?.form;
+    await this.auditLog.record(tx, {
+      eventUuid,
+      action: change.action,
+      actor,
+      entityType: AuditEntityType.Form,
+      entityUuid: form?.uuid,
+      entityLabel: form?.name,
+      changes,
+    });
   }
 
   private async uploadFiles(
@@ -167,7 +263,11 @@ export class FormsService {
     );
   }
 
-  async create(eventUuid: string, createFormDto: CreateFormDto) {
+  async create(
+    eventUuid: string,
+    createFormDto: CreateFormDto,
+    actor: AuditActor,
+  ) {
     if (
       createFormDto.openDate != null &&
       createFormDto.closeDate != null &&
@@ -244,6 +344,16 @@ export class FormsService {
         data: formAttributesData,
       });
 
+      await this.recordFormAudit(prisma, eventUuid, actor, {
+        action: AuditAction.FormCreated,
+        before: null,
+        after: {
+          form,
+          isFirstForm: createFormDto.isFirstForm ?? false,
+          definitions: formAttributesData,
+        },
+      });
+
       return form;
     });
   }
@@ -304,6 +414,7 @@ export class FormsService {
     formUuid: string,
     eventUuid: string,
     duplicateFormDto: DuplicateFormDto,
+    actor: AuditActor,
   ) {
     return await this.prisma.$transaction(async (prisma) => {
       const sourceForm = await prisma.form.findFirst({
@@ -341,6 +452,16 @@ export class FormsService {
           })),
         });
       }
+
+      await this.recordFormAudit(prisma, eventUuid, actor, {
+        action: AuditAction.FormCreated,
+        before: null,
+        after: {
+          form: newForm,
+          isFirstForm: false,
+          definitions: sourceForm.formDefinitions,
+        },
+      });
 
       return prisma.form.findUnique({
         where: { uuid: newForm.uuid },
@@ -408,6 +529,7 @@ export class FormsService {
     formUuid: string,
     eventUuid: string,
     updateFormDto: UpdateFormDto,
+    actor: AuditActor,
   ) {
     if (
       updateFormDto.openDate != null &&
@@ -438,6 +560,7 @@ export class FormsService {
 
       const existingForm = await prisma.form.findFirst({
         where: { uuid: formUuid, eventUuid: event.uuid },
+        include: { formDefinitions: true },
       });
       if (existingForm == null) {
         throw new NotFoundException(
@@ -498,7 +621,7 @@ export class FormsService {
           })),
         });
       }
-      return await prisma.form.update({
+      const updatedForm = await prisma.form.update({
         where: { uuid: formUuid },
         data: {
           name: updateFormDto.name,
@@ -517,10 +640,27 @@ export class FormsService {
           },
         },
       });
+
+      const wasFirstForm = event.registerFormUuid === formUuid;
+      await this.recordFormAudit(prisma, eventUuid, actor, {
+        action: AuditAction.FormUpdated,
+        before: {
+          form: existingForm,
+          isFirstForm: wasFirstForm,
+          definitions: existingForm.formDefinitions,
+        },
+        after: {
+          form: updatedForm,
+          isFirstForm: updateFormDto.isFirstForm ?? wasFirstForm,
+          definitions: updatedForm.formDefinitions,
+        },
+      });
+
+      return updatedForm;
     });
   }
 
-  async remove(formUuid: string, eventUuid: string) {
+  async remove(formUuid: string, eventUuid: string, actor: AuditActor) {
     return await this.prisma.$transaction(async (prisma) => {
       const event = await prisma.event.findUnique({
         where: { uuid: eventUuid },
@@ -528,6 +668,11 @@ export class FormsService {
       if (event == null) {
         throw new NotFoundException(`Event with id: ${eventUuid} not found`);
       }
+
+      const existingForm = await prisma.form.findFirst({
+        where: { uuid: formUuid, eventUuid },
+        include: { formDefinitions: true },
+      });
 
       if (event.registerFormUuid === formUuid) {
         await prisma.event.update({
@@ -542,6 +687,18 @@ export class FormsService {
         throw new NotFoundException(
           `Form with id: ${formUuid} not found or does not belong to event ${eventUuid}`,
         );
+      }
+
+      if (existingForm !== null) {
+        await this.recordFormAudit(prisma, eventUuid, actor, {
+          action: AuditAction.FormDeleted,
+          before: {
+            form: existingForm,
+            isFirstForm: event.registerFormUuid === formUuid,
+            definitions: existingForm.formDefinitions,
+          },
+          after: null,
+        });
       }
       return deletedForms;
     });
@@ -810,7 +967,13 @@ export class FormsService {
           event.uuid,
           submissionData.participantId,
           participantDtoAttributes,
-          { trustedFileValues: true },
+          {
+            trustedFileValues: true,
+            actor: {
+              type: LogTrigger.PARTICIPANT,
+              uuid: submissionData.participantId,
+            },
+          },
         );
       } else if (
         event.registerFormUuid === formUuid &&
