@@ -1,6 +1,9 @@
+import { AuditLogService } from "src/audit-log/audit-log.service";
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
+import type { AuditActor } from "src/audit-log/audit-log.types";
 import { BlocksService } from "src/blocks/blocks.service";
+import { LogTrigger } from "src/generated/prisma/client";
 import { AttributeType } from "src/generated/prisma/enums";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -13,6 +16,12 @@ import { AttributesService } from "./attributes.service";
 import { AttributeListingDto } from "./dto/attribute-listing.dto";
 import type { CreateAttributeDto } from "./dto/create-attribute.dto";
 import type { UpdateAttributeDto } from "./dto/update-attribute.dto";
+
+const ACTOR: AuditActor = {
+  type: LogTrigger.ADMIN,
+  uuid: "00000000-0000-4000-8000-0000000000aa",
+  name: "Test Admin",
+};
 
 describe("Attributes Integration", () => {
   let attributeController: AttributesController;
@@ -39,6 +48,11 @@ describe("Attributes Integration", () => {
     $transaction: jest.fn(),
   };
 
+  const mockAuditLogService = {
+    record: jest.fn(),
+    fieldChanges: () => [],
+  };
+
   const mockBlocksService = {
     ensureRootBlock: jest.fn(),
     deleteRootBlocks: jest.fn(),
@@ -51,6 +65,7 @@ describe("Attributes Integration", () => {
         AttributesService,
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: BlocksService, useValue: mockBlocksService },
+        { provide: AuditLogService, useValue: mockAuditLogService },
       ],
     }).compile();
 
@@ -88,7 +103,7 @@ describe("Attributes Integration", () => {
       type: dto.type,
       eventUuid: eventId,
     });
-    const result = await attributeController.create(dto, eventId);
+    const result = await attributeController.create(dto, eventId, ACTOR);
     expect(result).toEqual({
       uuid: attributeId,
       name: dto.name,
@@ -132,9 +147,9 @@ describe("Attributes Integration", () => {
       return await callback(mockPrismaService);
     });
     mockPrismaService.event.findUnique.mockResolvedValue(null);
-    await expect(attributeController.create(dto, eventId)).rejects.toThrow(
-      NotFoundException,
-    );
+    await expect(
+      attributeController.create(dto, eventId, ACTOR),
+    ).rejects.toThrow(NotFoundException);
   });
 
   it("should find a list of attributes for an event", async () => {
@@ -243,7 +258,12 @@ describe("Attributes Integration", () => {
       type: dto.type,
       eventUuid: eventId,
     });
-    const result = await attributeController.update(attributeId, eventId, dto);
+    const result = await attributeController.update(
+      attributeId,
+      eventId,
+      dto,
+      ACTOR,
+    );
 
     expect(result).toEqual({
       uuid: attributeId,
@@ -274,7 +294,11 @@ describe("Attributes Integration", () => {
     });
     mockPrismaService.block.deleteMany.mockResolvedValue({ count: 3 });
     mockPrismaService.attribute.deleteMany.mockResolvedValue({ count: 1 });
-    const result = await attributeController.remove(attributeId, eventId);
+    const result = await attributeController.remove(
+      attributeId,
+      eventId,
+      ACTOR,
+    );
     expect(result).toEqual({ count: 1 });
     expect(mockPrismaService.block.deleteMany).toHaveBeenCalledWith({
       where: { attributeUuid: attributeId },
