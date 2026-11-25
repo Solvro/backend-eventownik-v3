@@ -11,7 +11,6 @@ import type {
   EventLink,
   Form,
   Participant,
-  ParticipantAttributeLog,
   ParticipantEmailStatus,
   ParticipantFormLog,
 } from "../src/generated/prisma/client";
@@ -42,7 +41,6 @@ const prisma = new PrismaClient({ adapter });
 
 async function main() {
   await prisma.auditLog.deleteMany();
-  await prisma.participantAttributeLog.deleteMany();
   await prisma.eventPermission.deleteMany();
   await prisma.eventLink.deleteMany();
   await prisma.participantAttribute.deleteMany();
@@ -324,48 +322,45 @@ async function main() {
       },
     });
 
-  const participantAttributeLog: ParticipantAttributeLog =
-    await prisma.participantAttributeLog.create({
-      data: {
-        participantUuid: participant.uuid,
-        triggeredBy: LogTrigger.SYSTEM,
-        triggeredUuid: admin.uuid,
-        attributeUuid: sizeAttribute.uuid,
-        before: undefined,
-        after: "M",
-      },
-    });
-
   await prisma.event.update({
     where: { uuid: event.uuid },
     data: { registerFormUuid: form.uuid },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      action: "CREATE",
-      entityType: "Event",
-      entityUuid: event.uuid,
-      triggeredBy: admin.email,
-      before: undefined,
-      after: {
-        name: event.name,
-        slug: event.slug,
-        location: event.location,
-        participantsLimit: event.participantsLimit,
+  await prisma.auditLog.createMany({
+    data: [
+      {
+        eventUuid: event.uuid,
+        action: "event.created",
+        actorType: LogTrigger.ADMIN,
+        actorUuid: admin.uuid,
+        actorName: `${admin.firstName} ${admin.lastName}`,
+        entityType: "event",
+        entityUuid: event.uuid,
+        entityLabel: event.name,
       },
-    },
-  });
-
-  await prisma.auditLog.create({
-    data: {
-      action: "UPDATE",
-      entityType: "Event",
-      entityUuid: event.uuid,
-      triggeredBy: "SYSTEM",
-      before: { registerFormUuid: null },
-      after: { registerFormUuid: form.uuid },
-    },
+      {
+        eventUuid: event.uuid,
+        action: "participant.attribute_changed",
+        actorType: LogTrigger.SYSTEM,
+        entityType: "participant",
+        entityUuid: participant.uuid,
+        entityLabel: participant.email,
+        changes: [
+          {
+            kind: "value",
+            field: sizeAttribute.name,
+            attribute: {
+              uuid: sizeAttribute.uuid,
+              name: sizeAttribute.name,
+              type: sizeAttribute.type,
+            },
+            from: null,
+            to: "M",
+          },
+        ],
+      },
+    ],
   });
 
   console.warn("Default password 'changeme'.", {

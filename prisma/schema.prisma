@@ -96,6 +96,7 @@ model Event {
   participants     Participant[]
   links            EventLink[]
   tickets          Ticket[]
+  auditLogs        AuditLog[]
 
   @@map("Events")
 }
@@ -277,10 +278,9 @@ model Participant {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  event               Event                     @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+  event               Event                    @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
   attributes          ParticipantAttribute[]
   emails              ParticipantEmailStatus[]
-  attributeLogs       ParticipantAttributeLog[]
   participantFormLogs ParticipantFormLog[]
   consent             ParticipantConsent?
   ticketCheckIns      TicketCheckIn[]
@@ -290,14 +290,14 @@ model Participant {
 }
 
 model ParticipantConsent {
-  uuid                   String   @id @default(uuid()) @db.Uuid
-  participantUuid        String   @unique @db.Uuid
+  uuid                   String    @id @default(uuid()) @db.Uuid
+  participantUuid        String    @unique @db.Uuid
   gdprConsentedAt        DateTime
   termsAcceptedAt        DateTime?
   ip                     String
   userAgent              String?
   dataRecipientsSnapshot String?
-  createdAt              DateTime @default(now())
+  createdAt              DateTime  @default(now())
 
   participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
 
@@ -358,21 +358,6 @@ model ParticipantFormLog {
 
   @@unique([participantUuid, formUuid])
   @@map("ParticipantsFormLogs")
-}
-
-model ParticipantAttributeLog {
-  uuid            String     @id @default(uuid()) @db.Uuid
-  participantUuid String     @db.Uuid
-  triggeredBy     LogTrigger
-  createdAt       DateTime   @default(now())
-  triggeredUuid   String?    @db.Uuid
-  attributeUuid   String?    @db.Uuid
-  before          Json?
-  after           Json?
-
-  participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
-
-  @@map("ParticipantsAttributesLogs")
 }
 
 enum TicketMode {
@@ -452,14 +437,22 @@ model PasswordResetToken {
 }
 
 model AuditLog {
-  uuid        String   @id @default(uuid()) @db.Uuid
-  action      String
-  entityType  String
-  entityUuid  String?  @db.Uuid
-  triggeredBy String?
-  before      Json?
-  after       Json?
-  createdAt   DateTime @default(now())
+  uuid          String     @id @default(uuid()) @db.Uuid
+  eventUuid     String     @db.Uuid
+  action        String
+  actorType     LogTrigger
+  actorUuid     String?    @db.Uuid
+  actorName     String?
+  entityType    String
+  entityUuid    String?    @db.Uuid
+  entityLabel   String?
+  changes       Json?
+  correlationId String?    @db.Uuid
+  createdAt     DateTime   @default(now())
 
+  event Event @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+
+  @@index([eventUuid, createdAt(sort: Desc)])
+  @@index([eventUuid, entityUuid])
   @@map("AuditLogs")
 }
