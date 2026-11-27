@@ -115,3 +115,54 @@ export interface MobileBingoTaskAdminDto {
 export interface MobileBerealRoundAdminDto extends MobileBerealRoundDto {
   postsCount: number;
 }
+
+// ---------------------------------------------------------------- Tinderownik (organizer)
+
+/** One participant with a profile, with their Tinderownik activity */
+export interface MobileTinderPersonAdminDto extends MobilePerson {
+  email: string;
+  tinderOptIn: boolean;
+  likesGiven: number;
+  passesGiven: number;
+  likesReceived: number;
+  matchesCount: number;
+}
+
+/** A mutual like; matchedAt is when the second of the two likes happened */
+export interface MobileTinderMatchAdminDto {
+  a: MobilePerson;
+  b: MobilePerson;
+  matchedAt: string;
+}
+
+/** GET /events/:eventId/mobile/tinder */
+export interface MobileTinderOverviewDto {
+  totals: {
+    optedIn: number;
+    swipes: number;
+    likes: number;
+    matches: number;
+  };
+  /** Most active first */
+  people: MobileTinderPersonAdminDto[];
+  /** Newest first */
+  matches: MobileTinderMatchAdminDto[];
+}
+
+export interface MobileTinderSwipeAdminDto {
+  /** The other side of the swipe */
+  person: MobilePerson;
+  liked: boolean;
+  swipedAt: string;
+  /** How the swipe was answered from the other side; null = not swiped back yet */
+  reciprocal: boolean | null;
+}
+
+/** GET /events/:eventId/mobile/tinder/participants/:participantUuid */
+export interface MobileTinderParticipantSwipesDto {
+  participant: MobileTinderPersonAdminDto;
+  /** Their swipes on others, newest first */
+  given: MobileTinderSwipeAdminDto[];
+  /** Others' swipes on them, newest first; reciprocal = their answer */
+  received: MobileTinderSwipeAdminDto[];
+}

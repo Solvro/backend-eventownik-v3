@@ -32,12 +32,15 @@ import {
 import { MobileBerealService } from "./mobile-bereal.service";
 import { MobileBingoService } from "./mobile-bingo.service";
 import { MobileChatService } from "./mobile-chat.service";
+import { MobileTinderService } from "./mobile-tinder.service";
 import type {
   MobileBerealPostDto,
   MobileBerealRoundAdminDto,
   MobileBingoCompletionAdminDto,
   MobileBingoTaskAdminDto,
   MobileChatMessageDto,
+  MobileTinderOverviewDto,
+  MobileTinderParticipantSwipesDto,
 } from "./social.types";
 
 @ApiTags("Mobile")
@@ -53,7 +56,25 @@ export class MobileSocialAdminController {
     private readonly chatService: MobileChatService,
     private readonly bingoService: MobileBingoService,
     private readonly berealService: MobileBerealService,
+    private readonly tinderService: MobileTinderService,
   ) {}
+
+  // ---------------------------------------------------------------- Tinderownik
+
+  @Get("tinder")
+  async tinderOverview(
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+  ): Promise<MobileTinderOverviewDto> {
+    return this.tinderService.adminOverview(eventId);
+  }
+
+  @Get("tinder/participants/:participantUuid")
+  async tinderParticipantSwipes(
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @Param("participantUuid", ParseUUIDPipe) participantUuid: string,
+  ): Promise<MobileTinderParticipantSwipesDto> {
+    return this.tinderService.adminParticipantSwipes(eventId, participantUuid);
+  }
 
   // ---------------------------------------------------------------- Bingo
 
