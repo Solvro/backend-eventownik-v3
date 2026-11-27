@@ -27,6 +27,7 @@ import {
 export interface MobileAppConfigView {
   isEnabled: boolean;
   welcomeMessage: string | null;
+  accentColor: string | null;
   sosEnabled: boolean;
   scheduleEnabled: boolean;
   chatEnabled: boolean;
@@ -40,6 +41,7 @@ export interface MobileAppConfigView {
 const CONFIG_SELECT = {
   isEnabled: true,
   welcomeMessage: true,
+  accentColor: true,
   sosEnabled: true,
   scheduleEnabled: true,
   chatEnabled: true,
@@ -84,6 +86,7 @@ export class MobileAdminService {
     const data = {
       isEnabled: nonNull(dto.isEnabled),
       welcomeMessage: dto.welcomeMessage,
+      accentColor: dto.accentColor,
       sosEnabled: nonNull(dto.sosEnabled),
       scheduleEnabled: nonNull(dto.scheduleEnabled),
       chatEnabled: nonNull(dto.chatEnabled),

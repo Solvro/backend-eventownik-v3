@@ -41,6 +41,7 @@ export class MobileAuthController {
       },
       app: {
         welcomeMessage: app.welcomeMessage,
+        accentColor: app.accentColor,
         features: {
           sos: app.sosEnabled,
           schedule: app.scheduleEnabled,

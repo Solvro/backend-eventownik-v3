@@ -475,6 +475,8 @@ model MobileApp {
   eventUuid       String   @unique @db.Uuid
   isEnabled       Boolean  @default(false)
   welcomeMessage  String?
+  // Hex colour (#rrggbb) of the app accent; falls back to the event primaryColor
+  accentColor     String?
   sosEnabled      Boolean  @default(true)
   scheduleEnabled Boolean  @default(true)
   chatEnabled     Boolean  @default(true)

@@ -5,6 +5,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -34,6 +35,13 @@ export class MobileAppConfigDto {
   @IsString()
   @MaxLength(2000)
   welcomeMessage?: string | null;
+
+  @Transform(trimToNull)
+  @IsOptional()
+  @Matches(/^#[0-9a-f]{6}$/i, {
+    message: "accentColor must be a hex colour like #F9D574",
+  })
+  accentColor?: string | null;
 
   @IsOptional()
   @IsBoolean()
