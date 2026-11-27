@@ -9,8 +9,10 @@ import {
 } from "@nestjs/common";
 
 import type { ParticipantContext } from "../auth/current-participant.decorator";
+import { MobileEventService } from "../common/mobile-event.service";
 import { MobileImageService } from "../common/mobile-image.service";
 import { toPerson } from "../common/mobile-person";
+import { MobilePushService } from "../push/mobile-push.service";
 import { isUniqueViolation, loadProfiles } from "./social-utils";
 import type {
   MobileBerealPostDto,
@@ -65,6 +67,8 @@ export class MobileBerealService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mobileImageService: MobileImageService,
+    private readonly mobileEventService: MobileEventService,
+    private readonly mobilePushService: MobilePushService,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -224,6 +228,20 @@ export class MobileBerealService {
         select: { uuid: true },
       }),
     ]);
+    this.mobilePushService.run("bereal round", async () => {
+      const { event } = await this.mobileEventService.getByUuid(eventUuid);
+      this.mobilePushService.sendToEvent(
+        eventUuid,
+        {
+          title: NOTIFICATION_TITLE,
+          body: cleanPrompt ?? NOTIFICATION_DEFAULT_BODY,
+          url: `/${event.slug}/app/bereal`,
+          tag: "bereal",
+        },
+        // Pointless once the round is over
+        { ttlSeconds: minutes * 60, urgency: "high" },
+      );
+    });
     return { ...this.toRound(round), postsCount: 0 };
   }
 

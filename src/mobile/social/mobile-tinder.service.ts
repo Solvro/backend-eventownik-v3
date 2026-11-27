@@ -8,7 +8,9 @@ import {
 } from "@nestjs/common";
 
 import type { ParticipantContext } from "../auth/current-participant.decorator";
+import { MobileEventService } from "../common/mobile-event.service";
 import { toPerson } from "../common/mobile-person";
+import { MobilePushService } from "../push/mobile-push.service";
 import { directRoomKey } from "./social-utils";
 import type {
   MobileSwipeResultDto,
@@ -18,7 +20,11 @@ import type {
 
 @Injectable()
 export class MobileTinderService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mobileEventService: MobileEventService,
+    private readonly mobilePushService: MobilePushService,
+  ) {}
 
   async candidates(
     me: ParticipantContext,
@@ -108,6 +114,7 @@ export class MobileTinderService {
       me.uuid,
       toParticipantUuid,
     );
+    this.notifyMatch(me, toParticipantUuid, roomUuid);
     return { matched: true, roomUuid };
   }
 
@@ -181,6 +188,30 @@ export class MobileTinderService {
   }
 
   /** Idempotent and safe under concurrent mutual likes (unique on [eventUuid, key]). */
+  /** Tell the other person about the match (they were not the one swiping now). */
+  private notifyMatch(
+    me: ParticipantContext,
+    otherUuid: string,
+    roomUuid: string,
+  ): void {
+    this.mobilePushService.run("tinder match", async () => {
+      const [{ event }, profile] = await Promise.all([
+        this.mobileEventService.getByUuid(me.eventUuid),
+        this.prisma.mobileProfile.findUnique({
+          where: { participantUuid: me.uuid },
+          select: { displayName: true },
+        }),
+      ]);
+      const name = toPerson(profile, me.uuid).displayName;
+      this.mobilePushService.sendToParticipants([otherUuid], {
+        title: "To match! 🎉",
+        body: `${name} też Cię polubił(a). Napisz pierwszy!`,
+        url: `/${event.slug}/app/chats/${roomUuid}`,
+        tag: `match-${roomUuid}`,
+      });
+    });
+  }
+
   private async ensureDirectRoom(
     eventUuid: string,
     a: string,

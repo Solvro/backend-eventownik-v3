@@ -73,6 +73,10 @@ import { TicketsModule } from "./tickets/tickets.module";
           "application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         ),
         UPLOAD_TTL_HOURS: Joi.number().default(24),
+        // Web Push for the participant app; push stays off unless both keys are set
+        VAPID_PUBLIC_KEY: Joi.string().allow("").optional(),
+        VAPID_PRIVATE_KEY: Joi.string().allow("").optional(),
+        VAPID_SUBJECT: Joi.string().allow("").optional(),
       }),
       isGlobal: true,
     }),

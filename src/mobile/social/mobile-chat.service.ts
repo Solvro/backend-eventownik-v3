@@ -12,6 +12,7 @@ import type { ParticipantContext } from "../auth/current-participant.decorator";
 import { MobileEventService } from "../common/mobile-event.service";
 import { MobileImageService } from "../common/mobile-image.service";
 import { MOBILE_DEFAULT_DISPLAY_NAME, toPerson } from "../common/mobile-person";
+import { MobilePushService } from "../push/mobile-push.service";
 import type { ChatMessagesQueryDto } from "./dto/social.dto";
 import type { ProfileLite } from "./social-utils";
 import { isUniqueViolation, loadProfiles, otherFromKey } from "./social-utils";
@@ -57,6 +58,7 @@ export class MobileChatService {
     private readonly prisma: PrismaService,
     private readonly mobileEventService: MobileEventService,
     private readonly mobileImageService: MobileImageService,
+    private readonly mobilePushService: MobilePushService,
   ) {}
 
   async ensureEventRoom(eventUuid: string): Promise<string> {
@@ -269,6 +271,14 @@ export class MobileChatService {
       select: MESSAGE_SELECT,
     });
     const [dto] = await this.toMessages([message], me.uuid);
+    if (access.type === "DIRECT") {
+      this.notifyDirectMessage(
+        me,
+        access.uuid,
+        dto.sender?.displayName ?? MOBILE_DEFAULT_DISPLAY_NAME,
+        message.body,
+      );
+    }
     return dto;
   }
 
@@ -315,6 +325,33 @@ export class MobileChatService {
   // -------------------------------------------------------------------------
   // Helpers
   // -------------------------------------------------------------------------
+
+  /** Push a direct message to the other member. Never for the event-wide room. */
+  private notifyDirectMessage(
+    me: ParticipantContext,
+    roomUuid: string,
+    senderName: string,
+    body: string,
+  ): void {
+    this.mobilePushService.run("direct message", async () => {
+      const [{ event }, others] = await Promise.all([
+        this.mobileEventService.getByUuid(me.eventUuid),
+        this.prisma.mobileChatMember.findMany({
+          where: { roomUuid, participantUuid: { not: me.uuid } },
+          select: { participantUuid: true },
+        }),
+      ]);
+      this.mobilePushService.sendToParticipants(
+        others.map((member) => member.participantUuid),
+        {
+          title: senderName,
+          body,
+          url: `/${event.slug}/app/chats/${roomUuid}`,
+          tag: roomUuid,
+        },
+      );
+    });
+  }
 
   private async getAccess(
     me: ParticipantContext,

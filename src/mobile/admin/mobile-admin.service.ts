@@ -23,6 +23,7 @@ import {
   MOBILE_SCHEDULE_SELECT,
   MOBILE_SOS_CONTACT_SELECT,
 } from "../participant/mobile-participant.service";
+import { MobilePushService } from "../push/mobile-push.service";
 
 export interface MobileAppConfigView {
   isEnabled: boolean;
@@ -61,6 +62,7 @@ export class MobileAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mobileEventService: MobileEventService,
+    private readonly mobilePushService: MobilePushService,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -326,7 +328,7 @@ export class MobileAdminService {
     dto: CreateMobileNotificationDto,
   ) {
     await this.assertEvent(eventUuid);
-    return this.prisma.mobileNotification.create({
+    const notification = await this.prisma.mobileNotification.create({
       data: {
         eventUuid,
         title: dto.title,
@@ -335,6 +337,15 @@ export class MobileAdminService {
       },
       select: MOBILE_NOTIFICATION_SELECT,
     });
+    this.mobilePushService.run("announcement", async () => {
+      const { event } = await this.mobileEventService.getByUuid(eventUuid);
+      this.mobilePushService.sendToEvent(eventUuid, {
+        title: dto.title,
+        body: dto.body,
+        url: `/${event.slug}/app`,
+      });
+    });
+    return notification;
   }
 
   async deleteNotification(eventUuid: string, uuid: string): Promise<void> {

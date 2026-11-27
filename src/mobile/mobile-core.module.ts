@@ -15,10 +15,13 @@ import { MobileEventService } from "./common/mobile-event.service";
 import { MobileImageService } from "./common/mobile-image.service";
 import { MobileParticipantController } from "./participant/mobile-participant.controller";
 import { MobileParticipantService } from "./participant/mobile-participant.service";
+import { MobilePushController } from "./push/mobile-push.controller";
+import { MobilePushModule } from "./push/mobile-push.module";
 
 @Module({
   imports: [
     JwtModule.register({}),
+    MobilePushModule,
     BullModule.registerQueue({
       name: MOBILE_OTP_EMAIL_QUEUE_NAME,
       defaultJobOptions: {
@@ -33,6 +36,7 @@ import { MobileParticipantService } from "./participant/mobile-participant.servi
     MobileAuthController,
     MobileParticipantController,
     MobileAdminController,
+    MobilePushController,
   ],
   providers: [
     MobileTokenService,
@@ -50,6 +54,7 @@ import { MobileParticipantService } from "./participant/mobile-participant.servi
     MobileEventService,
     MobileImageService,
     ParticipantAuthGuard,
+    MobilePushModule,
   ],
 })
 export class MobileCoreModule {}

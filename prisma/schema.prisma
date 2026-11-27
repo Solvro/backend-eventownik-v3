@@ -106,6 +106,7 @@ model Event {
   mobileSwipes        MobileSwipe[]
   mobileBingoTasks    MobileBingoTask[]
   mobileBerealRounds  MobileBerealRound[]
+  mobilePushSubs      MobilePushSubscription[]
 
   @@map("Events")
 }
@@ -297,10 +298,11 @@ model Participant {
   mobileOtpCodes         MobileOtpCode[]
   mobileChatMemberships  MobileChatMember[]
   mobileChatMessages     MobileChatMessage[]
-  mobileSwipesSent       MobileSwipe[]           @relation("MobileSwipeFrom")
-  mobileSwipesReceived   MobileSwipe[]           @relation("MobileSwipeTo")
+  mobileSwipesSent       MobileSwipe[]            @relation("MobileSwipeFrom")
+  mobileSwipesReceived   MobileSwipe[]            @relation("MobileSwipeTo")
   mobileBingoCompletions MobileBingoCompletion[]
   mobileBerealPosts      MobileBerealPost[]
+  mobilePushSubs         MobilePushSubscription[]
 
   @@unique([email, eventUuid])
   @@map("Participants")
@@ -722,4 +724,21 @@ model MobileBerealPost {
   @@unique([roundUuid, participantUuid])
   @@index([participantUuid])
   @@map("MobileBerealPosts")
+}
+
+model MobilePushSubscription {
+  uuid            String   @id @default(uuid()) @db.Uuid
+  participantUuid String   @db.Uuid
+  eventUuid       String   @db.Uuid
+  endpoint        String   @unique
+  p256dh          String
+  auth            String
+  createdAt       DateTime @default(now())
+
+  participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
+  event       Event       @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+
+  @@index([participantUuid])
+  @@index([eventUuid])
+  @@map("MobilePushSubscriptions")
 }
