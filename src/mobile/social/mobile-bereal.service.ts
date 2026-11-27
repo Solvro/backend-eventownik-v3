@@ -21,7 +21,7 @@ import type {
 
 const DEFAULT_DURATION_MINUTES = 5;
 const FEED_LIMIT = 300;
-const NOTIFICATION_TITLE = "Czas na BeReal!";
+const NOTIFICATION_TITLE = "Czas na BeerReal!";
 const NOTIFICATION_DEFAULT_BODY =
   "Masz chwilę, żeby zrobić zdjęcie i pokazać, co teraz robisz!";
 
