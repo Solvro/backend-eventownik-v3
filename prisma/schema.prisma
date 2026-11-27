@@ -683,6 +683,8 @@ model MobileBingoCompletion {
   taskUuid        String   @db.Uuid
   participantUuid String   @db.Uuid
   photoKey        String?
+  // Optional text the participant adds as proof or comment
+  note            String?
   createdAt       DateTime @default(now())
 
   task        MobileBingoTask @relation(fields: [taskUuid], references: [uuid], onDelete: Cascade)

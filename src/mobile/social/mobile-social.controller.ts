@@ -152,9 +152,10 @@ export class MobileSocialController {
     @CurrentParticipant() me: ParticipantContext,
     @Param("taskUuid", ParseUUIDPipe) taskUuid: string,
     @UploadedFile() photo: Express.Multer.File | undefined,
+    @Body("note") note: unknown,
   ): Promise<MobileBingoBoardDto> {
     await this.mobileEventService.assertFeature(me.eventUuid, "bingo");
-    return this.bingoService.complete(me, taskUuid, photo);
+    return this.bingoService.complete(me, taskUuid, photo, note);
   }
 
   @Delete("bingo/tasks/:taskUuid/complete")

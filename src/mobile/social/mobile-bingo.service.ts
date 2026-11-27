@@ -44,6 +44,8 @@ function countLines(completed: boolean[], size: number): number {
   return lines + Number(diagonal) + Number(antiDiagonal);
 }
 
+const MAX_NOTE_LENGTH = 300;
+
 @Injectable()
 export class MobileBingoService {
   constructor(
@@ -86,7 +88,7 @@ export class MobileBingoService {
         participantUuid: me.uuid,
         taskUuid: { in: boardTasks.map((task) => task.uuid) },
       },
-      select: { taskUuid: true, photoKey: true, createdAt: true },
+      select: { taskUuid: true, photoKey: true, note: true, createdAt: true },
     });
     const byTask = new Map(
       completions.map((completion) => [completion.taskUuid, completion]),
@@ -99,6 +101,7 @@ export class MobileBingoService {
         text: task.text,
         completed: completion !== undefined,
         photoUrl: this.mobileImageService.url(completion?.photoKey ?? null),
+        note: completion?.note ?? null,
         completedAt: completion?.createdAt.toISOString() ?? null,
       };
     });
@@ -119,8 +122,14 @@ export class MobileBingoService {
     me: ParticipantContext,
     taskUuid: string,
     photo: Express.Multer.File | undefined,
+    rawNote?: unknown,
   ): Promise<MobileBingoBoardDto> {
     await this.assertTaskOnBoard(me, taskUuid);
+    // undefined = the field was not sent, so an existing note is kept
+    const note =
+      typeof rawNote === "string"
+        ? rawNote.trim().slice(0, MAX_NOTE_LENGTH) || null
+        : undefined;
     const photoKey =
       photo === undefined ? null : await this.mobileImageService.upload(photo);
 
@@ -135,8 +144,11 @@ export class MobileBingoService {
       where: {
         taskUuid_participantUuid: { taskUuid, participantUuid: me.uuid },
       },
-      create: { taskUuid, participantUuid: me.uuid, photoKey },
-      update: photoKey === null ? {} : { photoKey },
+      create: { taskUuid, participantUuid: me.uuid, photoKey, note },
+      update: {
+        ...(photoKey === null ? {} : { photoKey }),
+        ...(note === undefined ? {} : { note }),
+      },
     });
 
     if (

@@ -43,6 +43,8 @@ export interface MobileBingoCellDto {
   text: string;
   completed: boolean;
   photoUrl: string | null;
+  /** Text the participant added when completing the task */
+  note: string | null;
   completedAt: string | null;
 }
 
