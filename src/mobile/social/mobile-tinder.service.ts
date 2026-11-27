@@ -61,11 +61,12 @@ export class MobileTinderService {
       throw new BadRequestException("You cannot swipe yourself");
     }
     await this.assertHasProfile(me);
-    const target = await this.prisma.participant.findUnique({
-      where: { uuid: toParticipantUuid },
-      select: { eventUuid: true },
+    // Only people who opted into Tinderownik can be swiped, same as the candidate list
+    const target = await this.prisma.mobileProfile.findUnique({
+      where: { participantUuid: toParticipantUuid },
+      select: { eventUuid: true, tinderOptIn: true },
     });
-    if (target?.eventUuid !== me.eventUuid) {
+    if (target?.eventUuid !== me.eventUuid || !target.tinderOptIn) {
       throw new NotFoundException("Participant not found");
     }
 

@@ -7,7 +7,7 @@ import {
 
 import { MobileEventService } from "../common/mobile-event.service";
 import type { ParticipantRequest } from "./current-participant.decorator";
-import { MobileTokenService } from "./mobile-token.service";
+import { MobileTokenService, emailFingerprint } from "./mobile-token.service";
 
 /**
  * Authenticates a participant of `:eventSlug` from `Authorization: Bearer <participant token>`
@@ -55,6 +55,10 @@ export class ParticipantAuthGuard implements CanActivate {
       payload.sub,
     );
     if (participant?.eventUuid !== event.uuid) {
+      throw new UnauthorizedException();
+    }
+    // The session belongs to whoever owned the email at login, not to the participant row
+    if (emailFingerprint(participant.email) !== payload.em) {
       throw new UnauthorizedException();
     }
 

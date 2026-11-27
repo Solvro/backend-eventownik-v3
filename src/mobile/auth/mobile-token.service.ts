@@ -12,6 +12,19 @@ export interface MobileTokenPayload {
   sub: string;
   eventUuid: string;
   typ: typeof MOBILE_TOKEN_TYP;
+  /** Fingerprint of the email the participant logged in with, see `emailFingerprint` */
+  em: string;
+}
+
+/**
+ * Short hash of a participant email. Stored in the token so that sessions stop
+ * working once the participant's email is changed to someone else's.
+ */
+export function emailFingerprint(email: string): string {
+  return createHash("sha256")
+    .update(email.trim().toLowerCase())
+    .digest("hex")
+    .slice(0, 16);
 }
 
 @Injectable()
@@ -33,12 +46,14 @@ export class MobileTokenService {
   sign(
     participantUuid: string,
     eventUuid: string,
+    email: string,
   ): { token: string; expiresAt: Date } {
     const token = this.jwtService.sign(
       {
         sub: participantUuid,
         eventUuid,
         typ: MOBILE_TOKEN_TYP,
+        em: emailFingerprint(email),
       } satisfies MobileTokenPayload,
       {
         secret: this.secret,
@@ -68,7 +83,8 @@ export class MobileTokenService {
     if (
       payload.typ !== MOBILE_TOKEN_TYP ||
       typeof payload.sub !== "string" ||
-      typeof payload.eventUuid !== "string"
+      typeof payload.eventUuid !== "string" ||
+      typeof payload.em !== "string"
     ) {
       return null;
     }
@@ -76,6 +92,7 @@ export class MobileTokenService {
       sub: payload.sub,
       eventUuid: payload.eventUuid,
       typ: MOBILE_TOKEN_TYP,
+      em: payload.em,
     };
   }
 }

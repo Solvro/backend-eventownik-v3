@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { StorageService } from "src/storage/storage.service";
 
 import {
@@ -80,11 +81,16 @@ export class MobileImageService {
       );
     }
 
-    return this.storageService.upload(this.bucket, {
-      ...file,
-      originalname: `mobile.${detected.extension}`,
-      mimetype: detected.mime,
-    });
+    // The bucket is publicly readable, so the key is the only thing protecting a photo
+    return this.storageService.upload(
+      this.bucket,
+      {
+        ...file,
+        originalname: `mobile.${detected.extension}`,
+        mimetype: detected.mime,
+      },
+      `mobile-${randomUUID()}.${detected.extension}`,
+    );
   }
 
   url(key: string | null | undefined): string | null {

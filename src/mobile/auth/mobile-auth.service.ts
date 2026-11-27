@@ -159,6 +159,7 @@ export class MobileAuthService {
     const { token, expiresAt } = this.tokenService.sign(
       participant.uuid,
       event.uuid,
+      participant.email,
     );
     return {
       token,

@@ -43,6 +43,9 @@ interface RoomAccess {
   isMember: boolean;
 }
 
+/** Unread badges show at most this many; the client renders it as "99+" */
+const UNREAD_COUNT_CAP = 100;
+
 @Injectable()
 export class MobileChatService {
   /** eventUuid -> event room uuid */
@@ -126,14 +129,21 @@ export class MobileChatService {
 
     const [unreadRows, lastRows, snapshot] = await Promise.all([
       this.prisma.$queryRaw<{ roomUuid: string; count: bigint | number }[]>`
-        SELECT r.room_uuid::text AS "roomUuid", COUNT(m.uuid) AS count
+        SELECT r.room_uuid::text AS "roomUuid", u.count
         FROM unnest(${roomUuids}::uuid[], ${lastSeqs}::int[]) AS r(room_uuid, last_seq)
-        JOIN "MobileChatMessages" m
-          ON m."roomUuid" = r.room_uuid
-         AND m.seq > r.last_seq
-         AND m."deletedAt" IS NULL
-         AND (m."senderParticipantUuid" IS NULL OR m."senderParticipantUuid" <> ${me.uuid}::uuid)
-        GROUP BY r.room_uuid`,
+        CROSS JOIN LATERAL (
+          -- Capped, so the cost does not grow with the size of a busy room
+          SELECT COUNT(*) AS count FROM (
+            SELECT 1
+            FROM "MobileChatMessages" m
+            WHERE m."roomUuid" = r.room_uuid
+              AND m.seq > r.last_seq
+              AND m."deletedAt" IS NULL
+              AND (m."senderParticipantUuid" IS NULL OR m."senderParticipantUuid" <> ${me.uuid}::uuid)
+            LIMIT ${UNREAD_COUNT_CAP}
+          ) capped
+        ) u
+        WHERE u.count > 0`,
       this.prisma.$queryRaw<
         {
           roomUuid: string;
@@ -231,20 +241,12 @@ export class MobileChatService {
 
     const newest = messages.at(-1)?.seq;
     if (newest !== undefined && newest > access.lastReadSeq) {
-      await this.prisma.mobileChatMember.upsert({
-        where: {
-          roomUuid_participantUuid: {
-            roomUuid: access.uuid,
-            participantUuid: me.uuid,
-          },
-        },
-        create: {
-          roomUuid: access.uuid,
-          participantUuid: me.uuid,
-          lastReadSeq: newest,
-        },
-        update: { lastReadSeq: { set: newest } },
-      });
+      // Only ever move the read position forward: a slow older request must not undo a newer one
+      await this.prisma.$executeRaw`
+        INSERT INTO "MobileChatMembers" ("uuid", "roomUuid", "participantUuid", "lastReadSeq")
+        VALUES (gen_random_uuid(), ${access.uuid}::uuid, ${me.uuid}::uuid, ${newest})
+        ON CONFLICT ("roomUuid", "participantUuid")
+        DO UPDATE SET "lastReadSeq" = GREATEST("MobileChatMembers"."lastReadSeq", EXCLUDED."lastReadSeq")`;
     }
 
     return this.toMessages(messages, me.uuid);

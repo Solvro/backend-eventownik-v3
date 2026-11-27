@@ -41,9 +41,16 @@ export class StorageService {
     return key;
   }
 
-  async upload(bucket: string, file: Express.Multer.File): Promise<string> {
+  /**
+   * @param key - Object key to store the file under; generated from the time and a random number when omitted
+   */
+  async upload(
+    bucket: string,
+    file: Express.Multer.File,
+    key?: string,
+  ): Promise<string> {
     const extension = extname(file.originalname);
-    const key = `${String(Date.now())}-${String(Math.round(Math.random() * 1e9))}${extension}`;
+    key ??= `${String(Date.now())}-${String(Math.round(Math.random() * 1e9))}${extension}`;
 
     await this.client.send(
       new PutObjectCommand({

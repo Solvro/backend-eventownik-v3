@@ -73,7 +73,8 @@ export class MobileParticipantService {
         eventUuid: participant.eventUuid,
         displayName: dto.displayName,
         bio: bio ?? null,
-        tinderOptIn: dto.tinderOptIn ?? true,
+        // Showing a profile to others in Tinderownik needs an explicit choice
+        tinderOptIn: dto.tinderOptIn ?? false,
       },
       update: {
         displayName: dto.displayName,
