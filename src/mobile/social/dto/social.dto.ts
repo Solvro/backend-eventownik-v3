@@ -12,6 +12,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateNested,
 } from "class-validator";
 
 const trim = ({ value }: { value: unknown }): unknown =>
@@ -61,17 +62,55 @@ export class ChatMessagesQueryDto {
   limit?: number;
 }
 
+export class ChatGifDto {
+  @IsString()
+  @MaxLength(500)
+  url: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(2000)
+  width: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(2000)
+  height: number;
+}
+
 export class SendChatMessageDto {
+  /** May be empty when the message is a GIF */
+  @IsOptional()
   @Transform(trim)
   @IsString()
-  @MinLength(1)
   @MaxLength(1000)
-  body: string;
+  body?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ChatGifDto)
+  gif?: ChatGifDto;
 
   /** Message in the same room this one replies to */
   @IsOptional()
   @IsUUID()
   replyToUuid?: string;
+}
+
+export class GifSearchQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  q?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(4999)
+  offset?: number;
 }
 
 // ---------------------------------------------------------------------------

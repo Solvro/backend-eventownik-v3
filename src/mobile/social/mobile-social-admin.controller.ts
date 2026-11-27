@@ -206,6 +206,7 @@ export class MobileSocialAdminController {
       request.user.uuid,
       dto.body,
       dto.replyToUuid,
+      dto.gif,
     );
   }
 

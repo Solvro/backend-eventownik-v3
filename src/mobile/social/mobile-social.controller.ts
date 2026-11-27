@@ -29,6 +29,7 @@ import { MOBILE_IMAGE_MAX_BYTES } from "../common/mobile-image.service";
 import {
   ChatMessagesQueryDto,
   CreateBerealPostDto,
+  GifSearchQueryDto,
   SendChatMessageDto,
   SwipeDto,
   TinderCandidatesQueryDto,
@@ -36,6 +37,7 @@ import {
 import { MobileBerealService } from "./mobile-bereal.service";
 import { MobileBingoService } from "./mobile-bingo.service";
 import { MobileChatService } from "./mobile-chat.service";
+import { MobileGifService } from "./mobile-gif.service";
 import { MobileTinderService } from "./mobile-tinder.service";
 import type {
   MobileBerealPostDto,
@@ -44,6 +46,7 @@ import type {
   MobileBingoLeaderboardEntryDto,
   MobileChatMessageDto,
   MobileChatRoomDto,
+  MobileGifSearchDto,
   MobileSwipeResultDto,
   MobileTinderCandidateDto,
   MobileTinderMatchDto,
@@ -65,6 +68,7 @@ export class MobileSocialController {
     private readonly tinderService: MobileTinderService,
     private readonly bingoService: MobileBingoService,
     private readonly berealService: MobileBerealService,
+    private readonly gifService: MobileGifService,
   ) {}
 
   // ---------------------------------------------------------------- Chat
@@ -87,6 +91,15 @@ export class MobileSocialController {
     return this.chatService.listMessages(me, roomUuid, query);
   }
 
+  @Get("chat/gifs")
+  async searchGifs(
+    @CurrentParticipant() me: ParticipantContext,
+    @Query() query: GifSearchQueryDto,
+  ): Promise<MobileGifSearchDto> {
+    await this.mobileEventService.assertFeature(me.eventUuid, "chat");
+    return this.gifService.search(me.uuid, query.q ?? "", query.offset ?? 0);
+  }
+
   @Post("chat/rooms/:roomUuid/messages")
   async sendChatMessage(
     @CurrentParticipant() me: ParticipantContext,
@@ -99,6 +112,7 @@ export class MobileSocialController {
       roomUuid,
       dto.body,
       dto.replyToUuid,
+      dto.gif,
     );
   }
 

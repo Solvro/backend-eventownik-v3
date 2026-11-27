@@ -640,6 +640,10 @@ model MobileChatMessage {
   body                  String
   /// Message this one replies to, in the same room
   replyToUuid           String?   @db.Uuid
+  /// GIPHY media URL of a GIF message; body may then be empty
+  gifUrl                String?
+  gifWidth              Int?
+  gifHeight             Int?
   createdAt             DateTime  @default(now())
   deletedAt             DateTime?
 

@@ -14,13 +14,16 @@ import { MobileEventService } from "../common/mobile-event.service";
 import { MobileImageService } from "../common/mobile-image.service";
 import { MOBILE_DEFAULT_DISPLAY_NAME, toPerson } from "../common/mobile-person";
 import { MobilePushService } from "../push/mobile-push.service";
-import type { ChatMessagesQueryDto } from "./dto/social.dto";
+import type { ChatGifDto, ChatMessagesQueryDto } from "./dto/social.dto";
+import { MobileGifService } from "./mobile-gif.service";
 import type { ProfileLite } from "./social-utils";
 import { isUniqueViolation, loadProfiles, otherFromKey } from "./social-utils";
 import type { MobileChatMessageDto, MobileChatRoomDto } from "./social.types";
 
 const EVENT_ROOM_KEY = "EVENT";
 const ORGANIZER_NAME = "Organizator";
+/** Shown wherever a GIF message has to be summed up as text */
+const GIF_LABEL = "GIF";
 const DEFAULT_LIMIT = 50;
 const FLOOD_WINDOW_MS = 30_000;
 const FLOOD_MAX_MESSAGES = 20;
@@ -32,6 +35,9 @@ const MESSAGE_SELECT = {
   createdAt: true,
   senderParticipantUuid: true,
   senderAdminUuid: true,
+  gifUrl: true,
+  gifWidth: true,
+  gifHeight: true,
   replyTo: {
     select: {
       uuid: true,
@@ -70,6 +76,7 @@ export class MobileChatService {
     private readonly mobileEventService: MobileEventService,
     private readonly mobileImageService: MobileImageService,
     private readonly mobilePushService: MobilePushService,
+    private readonly mobileGifService: MobileGifService,
   ) {}
 
   async ensureEventRoom(eventUuid: string): Promise<string> {
@@ -202,7 +209,7 @@ export class MobileChatService {
         return null;
       }
       return {
-        body: row.body,
+        body: row.body === "" ? GIF_LABEL : row.body,
         createdAt: row.createdAt.toISOString(),
         senderName: this.senderName(row, profiles),
       };
@@ -268,9 +275,11 @@ export class MobileChatService {
   async sendMessage(
     me: ParticipantContext,
     roomUuid: string,
-    body: string,
+    body: string | undefined,
     replyToUuid?: string,
+    gif?: ChatGifDto,
   ): Promise<MobileChatMessageDto> {
+    const content = this.toContent(body, gif);
     const access = await this.getAccess(me, roomUuid);
     await this.assertReplyTarget(access.uuid, replyToUuid);
     this.assertNotFlooding(me.uuid);
@@ -279,7 +288,7 @@ export class MobileChatService {
       data: {
         roomUuid: access.uuid,
         senderParticipantUuid: me.uuid,
-        body: body.trim(),
+        ...content,
         replyToUuid: replyToUuid ?? null,
       },
       select: MESSAGE_SELECT,
@@ -287,7 +296,12 @@ export class MobileChatService {
     const [dto] = await this.toMessages([message], me.uuid);
     const senderName = dto.sender?.displayName ?? MOBILE_DEFAULT_DISPLAY_NAME;
     if (access.type === "DIRECT") {
-      this.notifyDirectMessage(me, access.uuid, senderName, message.body);
+      this.notifyDirectMessage(
+        me,
+        access.uuid,
+        senderName,
+        message.body === "" ? GIF_LABEL : message.body,
+      );
     } else {
       // In the event room only the person replied to hears about it
       const repliedTo = message.replyTo?.senderParticipantUuid;
@@ -296,7 +310,13 @@ export class MobileChatService {
         repliedTo !== null &&
         repliedTo !== me.uuid
       ) {
-        this.notifyReply(me, access.uuid, repliedTo, senderName, message.body);
+        this.notifyReply(
+          me,
+          access.uuid,
+          repliedTo,
+          senderName,
+          message.body === "" ? GIF_LABEL : message.body,
+        );
       }
     }
     return dto;
@@ -318,16 +338,18 @@ export class MobileChatService {
   async adminSendMessage(
     eventUuid: string,
     adminUuid: string,
-    body: string,
+    body: string | undefined,
     replyToUuid?: string,
+    gif?: ChatGifDto,
   ): Promise<MobileChatMessageDto> {
+    const content = this.toContent(body, gif);
     const roomUuid = await this.ensureEventRoom(eventUuid);
     await this.assertReplyTarget(roomUuid, replyToUuid);
     const message = await this.prisma.mobileChatMessage.create({
       data: {
         roomUuid,
         senderAdminUuid: adminUuid,
-        body: body.trim(),
+        ...content,
         replyToUuid: replyToUuid ?? null,
       },
       select: MESSAGE_SELECT,
@@ -352,6 +374,36 @@ export class MobileChatService {
   // -------------------------------------------------------------------------
   // Helpers
   // -------------------------------------------------------------------------
+
+  /** Text and GIF of a new message; at least one of them is required */
+  private toContent(
+    body: string | undefined,
+    gif: ChatGifDto | undefined,
+  ): {
+    body: string;
+    gifUrl: string | null;
+    gifWidth: number | null;
+    gifHeight: number | null;
+  } {
+    const text = body?.trim() ?? "";
+    if (gif === undefined) {
+      if (text === "") {
+        throw new BadRequestException("A message needs text or a GIF");
+      }
+      return { body: text, gifUrl: null, gifWidth: null, gifHeight: null };
+    }
+    if (!this.mobileGifService.isAllowedUrl(gif.url)) {
+      throw new BadRequestException(
+        "Only GIFs from the GIF search can be sent",
+      );
+    }
+    return {
+      body: text,
+      gifUrl: gif.url,
+      gifWidth: gif.width,
+      gifHeight: gif.height,
+    };
+  }
 
   /** A reply may only point at a live message of the same room */
   private async assertReplyTarget(
@@ -516,13 +568,22 @@ export class MobileChatService {
           : {
               uuid: row.replyTo.uuid,
               seq: row.replyTo.seq,
-              body: row.replyTo.deletedAt === null ? row.replyTo.body : null,
+              body:
+                row.replyTo.deletedAt === null
+                  ? row.replyTo.body === ""
+                    ? GIF_LABEL
+                    : row.replyTo.body
+                  : null,
               senderName:
                 this.senderName(row.replyTo, profiles) ??
                 MOBILE_DEFAULT_DISPLAY_NAME,
               isMine:
                 meUuid !== null && row.replyTo.senderParticipantUuid === meUuid,
             },
+      gif:
+        row.gifUrl === null || row.gifWidth === null || row.gifHeight === null
+          ? null
+          : { url: row.gifUrl, width: row.gifWidth, height: row.gifHeight },
     }));
   }
 

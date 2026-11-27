@@ -24,6 +24,28 @@ export interface MobileChatReplyToDto {
   isMine: boolean;
 }
 
+export interface MobileChatGifDto {
+  url: string;
+  width: number;
+  height: number;
+}
+
+/** One GIF search result */
+export interface MobileGifDto extends MobileChatGifDto {
+  id: string;
+  title: string;
+  /** Smaller rendition for the picker grid */
+  previewUrl: string;
+}
+
+/** GET /chat/gifs?q=&offset= (trending when q is empty) */
+export interface MobileGifSearchDto {
+  /** False when the server has no GIF provider configured */
+  enabled: boolean;
+  results: MobileGifDto[];
+  nextOffset: number | null;
+}
+
 export interface MobileChatMessageDto {
   uuid: string;
   seq: number;
@@ -33,6 +55,7 @@ export interface MobileChatMessageDto {
   isOrganizer: boolean;
   isMine: boolean;
   replyTo: MobileChatReplyToDto | null;
+  gif: MobileChatGifDto | null;
 }
 
 export interface MobileTinderCandidateDto extends MobilePerson {
