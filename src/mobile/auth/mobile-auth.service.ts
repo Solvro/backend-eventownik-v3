@@ -78,7 +78,7 @@ export class MobileAuthService {
       this.prisma.mobileOtpCode.create({
         data: {
           participantUuid: participant.uuid,
-          codeHash: this.hashCode(code, participant.uuid),
+          codeHash: this.hashCode(code, participant),
           expiresAt: new Date(now.getTime() + OTP_TTL_MS),
         },
         select: { uuid: true },
@@ -98,7 +98,14 @@ export class MobileAuthService {
       );
       // The code never left the server: drop it so it does not count against
       // the resend wait, and tell the client so the participant can retry
-      await this.prisma.mobileOtpCode.delete({ where: { uuid: created.uuid } });
+      await this.prisma.$transaction([
+        this.prisma.mobileOtpCode.delete({ where: { uuid: created.uuid } }),
+        // Bring back the codes this request had just retired
+        this.prisma.mobileOtpCode.updateMany({
+          where: { participantUuid: participant.uuid, consumedAt: now },
+          data: { consumedAt: null },
+        }),
+      ]);
       throw new ServiceUnavailableException("Could not send the code");
     }
     return { ok: true };
@@ -146,7 +153,7 @@ export class MobileAuthService {
     }
 
     const expected = Buffer.from(otp.codeHash, "hex");
-    const actual = Buffer.from(this.hashCode(code, participant.uuid), "hex");
+    const actual = Buffer.from(this.hashCode(code, participant), "hex");
     if (
       expected.length !== actual.length ||
       !timingSafeEqual(expected, actual)
@@ -190,9 +197,17 @@ export class MobileAuthService {
     });
   }
 
-  private hashCode(code: string, participantUuid: string): string {
+  /**
+   * The hash covers the email the code was sent to, so a code mailed to an old
+   * address stops working once the participant's email is changed.
+   */
+  private hashCode(
+    code: string,
+    participant: { uuid: string; email: string },
+  ): string {
+    const email = participant.email.trim().toLowerCase();
     return createHash("sha256")
-      .update(`${code}${participantUuid}${this.tokenService.secret}`)
+      .update(`${code}${participant.uuid}${email}${this.tokenService.secret}`)
       .digest("hex");
   }
 }

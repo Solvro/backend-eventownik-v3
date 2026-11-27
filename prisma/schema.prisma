@@ -562,7 +562,7 @@ model MobileProfile {
   displayName     String
   bio             String?
   photoKey        String?
-  tinderOptIn     Boolean  @default(true)
+  tinderOptIn     Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
