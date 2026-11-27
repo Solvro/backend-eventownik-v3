@@ -96,7 +96,8 @@ export class MobileGifService {
       api_key: this.apiKey,
       limit: String(PAGE_SIZE),
       offset: String(offset),
-      rating: "pg-13",
+      // GIPHY's least strict rating: no extra filtering on top of GIPHY's own
+      rating: "r",
       bundle: "messaging_non_clips",
     });
     if (normalized !== "") {
