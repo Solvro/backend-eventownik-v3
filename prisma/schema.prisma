@@ -96,6 +96,17 @@ model Event {
   links            EventLink[]
   tickets          Ticket[]
 
+  mobileApp           MobileApp?
+  mobileSosContacts   MobileSosContact[]
+  mobileFaqItems      MobileFaqItem[]
+  mobileScheduleItems MobileScheduleItem[]
+  mobileNotifications MobileNotification[]
+  mobileProfiles      MobileProfile[]
+  mobileChatRooms     MobileChatRoom[]
+  mobileSwipes        MobileSwipe[]
+  mobileBingoTasks    MobileBingoTask[]
+  mobileBerealRounds  MobileBerealRound[]
+
   @@map("Events")
 }
 
@@ -282,6 +293,15 @@ model Participant {
   participantFormLogs ParticipantFormLog[]
   ticketCheckIns      TicketCheckIn[]
 
+  mobileProfile          MobileProfile?
+  mobileOtpCodes         MobileOtpCode[]
+  mobileChatMemberships  MobileChatMember[]
+  mobileChatMessages     MobileChatMessage[]
+  mobileSwipesSent       MobileSwipe[]           @relation("MobileSwipeFrom")
+  mobileSwipesReceived   MobileSwipe[]           @relation("MobileSwipeTo")
+  mobileBingoCompletions MobileBingoCompletion[]
+  mobileBerealPosts      MobileBerealPost[]
+
   @@unique([email, eventUuid])
   @@map("Participants")
 }
@@ -444,4 +464,258 @@ model AuditLog {
   createdAt   DateTime @default(now())
 
   @@map("AuditLogs")
+}
+
+// ---------------------------------------------------------------------------
+// Mobile app (participant PWA)
+// ---------------------------------------------------------------------------
+
+model MobileApp {
+  uuid            String   @id @default(uuid()) @db.Uuid
+  eventUuid       String   @unique @db.Uuid
+  isEnabled       Boolean  @default(false)
+  welcomeMessage  String?
+  sosEnabled      Boolean  @default(true)
+  scheduleEnabled Boolean  @default(true)
+  chatEnabled     Boolean  @default(true)
+  tinderEnabled   Boolean  @default(true)
+  bingoEnabled    Boolean  @default(true)
+  berealEnabled   Boolean  @default(true)
+  bingoSize       Int      @default(4)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  event Event @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("MobileApps")
+}
+
+model MobileSosContact {
+  uuid        String   @id @default(uuid()) @db.Uuid
+  eventUuid   String   @db.Uuid
+  label       String
+  phone       String
+  description String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  event Event @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+
+  @@index([eventUuid])
+  @@map("MobileSosContacts")
+}
+
+model MobileFaqItem {
+  uuid      String   @id @default(uuid()) @db.Uuid
+  eventUuid String   @db.Uuid
+  question  String
+  answer    String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  event Event @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+
+  @@index([eventUuid])
+  @@map("MobileFaqItems")
+}
+
+model MobileScheduleItem {
+  uuid        String    @id @default(uuid()) @db.Uuid
+  eventUuid   String    @db.Uuid
+  title       String
+  description String?
+  location    String?
+  startsAt    DateTime
+  endsAt      DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  event Event @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+
+  @@index([eventUuid, startsAt])
+  @@map("MobileScheduleItems")
+}
+
+model MobileNotification {
+  uuid               String   @id @default(uuid()) @db.Uuid
+  seq                Int      @unique @default(autoincrement())
+  eventUuid          String   @db.Uuid
+  title              String
+  body               String
+  createdByAdminUuid String?  @db.Uuid
+  createdAt          DateTime @default(now())
+
+  event Event @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+
+  @@index([eventUuid, seq])
+  @@map("MobileNotifications")
+}
+
+model MobileProfile {
+  uuid            String   @id @default(uuid()) @db.Uuid
+  participantUuid String   @unique @db.Uuid
+  eventUuid       String   @db.Uuid
+  displayName     String
+  bio             String?
+  photoKey        String?
+  tinderOptIn     Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
+  event       Event       @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+
+  @@index([eventUuid])
+  @@map("MobileProfiles")
+}
+
+model MobileOtpCode {
+  uuid            String    @id @default(uuid()) @db.Uuid
+  participantUuid String    @db.Uuid
+  codeHash        String
+  attempts        Int       @default(0)
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  createdAt       DateTime  @default(now())
+
+  participant Participant @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
+
+  @@index([participantUuid, createdAt])
+  @@map("MobileOtpCodes")
+}
+
+enum MobileChatRoomType {
+  EVENT
+  DIRECT
+}
+
+model MobileChatRoom {
+  uuid      String             @id @default(uuid()) @db.Uuid
+  eventUuid String             @db.Uuid
+  type      MobileChatRoomType
+  // "EVENT" for the event-wide room, "<lowerUuid>:<higherUuid>" for a direct room
+  key       String
+  createdAt DateTime           @default(now())
+
+  event    Event               @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+  members  MobileChatMember[]
+  messages MobileChatMessage[]
+
+  @@unique([eventUuid, key])
+  @@map("MobileChatRooms")
+}
+
+model MobileChatMember {
+  uuid            String   @id @default(uuid()) @db.Uuid
+  roomUuid        String   @db.Uuid
+  participantUuid String   @db.Uuid
+  lastReadSeq     Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  room        MobileChatRoom @relation(fields: [roomUuid], references: [uuid], onDelete: Cascade)
+  participant Participant    @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
+
+  @@unique([roomUuid, participantUuid])
+  @@index([participantUuid])
+  @@map("MobileChatMembers")
+}
+
+model MobileChatMessage {
+  uuid                  String    @id @default(uuid()) @db.Uuid
+  seq                   Int       @unique @default(autoincrement())
+  roomUuid              String    @db.Uuid
+  senderParticipantUuid String?   @db.Uuid
+  senderAdminUuid       String?   @db.Uuid
+  body                  String
+  createdAt             DateTime  @default(now())
+  deletedAt             DateTime?
+
+  room   MobileChatRoom @relation(fields: [roomUuid], references: [uuid], onDelete: Cascade)
+  sender Participant?   @relation(fields: [senderParticipantUuid], references: [uuid], onDelete: SetNull)
+
+  @@index([roomUuid, seq])
+  @@map("MobileChatMessages")
+}
+
+model MobileSwipe {
+  uuid                String   @id @default(uuid()) @db.Uuid
+  eventUuid           String   @db.Uuid
+  fromParticipantUuid String   @db.Uuid
+  toParticipantUuid   String   @db.Uuid
+  liked               Boolean
+  createdAt           DateTime @default(now())
+
+  event Event       @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+  from  Participant @relation("MobileSwipeFrom", fields: [fromParticipantUuid], references: [uuid], onDelete: Cascade)
+  to    Participant @relation("MobileSwipeTo", fields: [toParticipantUuid], references: [uuid], onDelete: Cascade)
+
+  @@unique([fromParticipantUuid, toParticipantUuid])
+  @@index([toParticipantUuid, liked])
+  @@index([eventUuid])
+  @@map("MobileSwipes")
+}
+
+model MobileBingoTask {
+  uuid      String   @id @default(uuid()) @db.Uuid
+  eventUuid String   @db.Uuid
+  text      String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  event       Event                   @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+  completions MobileBingoCompletion[]
+
+  @@index([eventUuid])
+  @@map("MobileBingoTasks")
+}
+
+model MobileBingoCompletion {
+  uuid            String   @id @default(uuid()) @db.Uuid
+  taskUuid        String   @db.Uuid
+  participantUuid String   @db.Uuid
+  photoKey        String?
+  createdAt       DateTime @default(now())
+
+  task        MobileBingoTask @relation(fields: [taskUuid], references: [uuid], onDelete: Cascade)
+  participant Participant     @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
+
+  @@unique([taskUuid, participantUuid])
+  @@index([participantUuid])
+  @@map("MobileBingoCompletions")
+}
+
+model MobileBerealRound {
+  uuid      String   @id @default(uuid()) @db.Uuid
+  eventUuid String   @db.Uuid
+  prompt    String?
+  startedAt DateTime @default(now())
+  endsAt    DateTime
+  createdAt DateTime @default(now())
+
+  event Event              @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+  posts MobileBerealPost[]
+
+  @@index([eventUuid, startedAt])
+  @@map("MobileBerealRounds")
+}
+
+model MobileBerealPost {
+  uuid            String   @id @default(uuid()) @db.Uuid
+  roundUuid       String   @db.Uuid
+  participantUuid String   @db.Uuid
+  photoKey        String
+  selfieKey       String?
+  caption         String?
+  isLate          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  round       MobileBerealRound @relation(fields: [roundUuid], references: [uuid], onDelete: Cascade)
+  participant Participant       @relation(fields: [participantUuid], references: [uuid], onDelete: Cascade)
+
+  @@unique([roundUuid, participantUuid])
+  @@index([participantUuid])
+  @@map("MobileBerealPosts")
 }

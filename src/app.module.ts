@@ -21,6 +21,8 @@ import { EmailsModule } from "./emails/emails.module";
 import { EventsModule } from "./events/events.module";
 import { FormsModule } from "./forms/forms.module";
 import { ImportExportModule } from "./import-export/import-export.module";
+import { MobileCoreModule } from "./mobile/mobile-core.module";
+import { MobileSocialModule } from "./mobile/social/mobile-social.module";
 import { OrganizersModule } from "./organizers/organizers.module";
 import { ParticipantsModule } from "./participants/participants.module";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -133,6 +135,8 @@ import { TicketsModule } from "./tickets/tickets.module";
     ReportsModule,
     StorageModule,
     TicketsModule,
+    MobileCoreModule,
+    MobileSocialModule,
   ],
   controllers: [AppController],
   providers: [AppService],
