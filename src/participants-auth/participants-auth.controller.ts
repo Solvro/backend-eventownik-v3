@@ -1,3 +1,5 @@
+import { TokenResponseDto } from "src/auth/dto/token-response.dto";
+
 import { Body, Controller, Post } from "@nestjs/common";
 import {
   ApiBadRequestResponse,
@@ -7,6 +9,10 @@ import {
   ApiTooManyRequestsResponse,
 } from "@nestjs/swagger";
 
+import {
+  CodeVerificationRequestDTO,
+  CodeVerificationResponseDTO,
+} from "./dto/code-verification-rquest.dto";
 import { RequestLoginCodeRequestDTO } from "./dto/request-code-request.dto";
 import { RequestLoginCodeResponseDTO } from "./dto/request-code-response.dto";
 import { ParticipantsAuthService } from "./participants-auth.service";
@@ -34,4 +40,21 @@ export class ParticipantsAuthController {
       message: "If this email is registered, a login code has been sent.",
     };
   }
+
+  @Post("verify-code")
+  @ApiOperation({ summary: "Validate a login code" })
+  @ApiOkResponse({ type: TokenResponseDto })
+  async vrifyCode(
+    @Body() codeVerificationRequestDTO: CodeVerificationRequestDTO,
+  ) {
+    return await this.participantsAuthService.vrifyCode(
+      codeVerificationRequestDTO,
+    );
+  }
+
+  // @Post("refresh")
+  // async refresh() {}
+  //
+  // @Post("logout")
+  // async logout() {}
 }
