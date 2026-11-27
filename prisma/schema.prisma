@@ -546,6 +546,8 @@ model MobileNotification {
   eventUuid          String   @db.Uuid
   title              String
   body               String
+  // Screen of the app the announcement opens, e.g. "bereal"; null for a plain announcement
+  link               String?
   createdByAdminUuid String?  @db.Uuid
   createdAt          DateTime @default(now())
 

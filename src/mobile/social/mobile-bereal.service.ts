@@ -217,6 +217,8 @@ export class MobileBerealService {
           eventUuid,
           title: NOTIFICATION_TITLE,
           body: cleanPrompt ?? NOTIFICATION_DEFAULT_BODY,
+          // Tapping the announcement takes the participant straight to the round
+          link: "bereal",
           createdByAdminUuid: adminUuid,
         },
         select: { uuid: true },

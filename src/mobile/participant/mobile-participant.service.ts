@@ -14,6 +14,7 @@ export const MOBILE_NOTIFICATION_SELECT = {
   seq: true,
   title: true,
   body: true,
+  link: true,
   createdAt: true,
 } as const;
 
