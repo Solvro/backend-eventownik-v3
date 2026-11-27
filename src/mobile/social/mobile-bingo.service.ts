@@ -15,6 +15,7 @@ import type { UpdateBingoTaskDto } from "./dto/social.dto";
 import { loadProfiles } from "./social-utils";
 import type {
   MobileBingoBoardDto,
+  MobileBingoCompletionAdminDto,
   MobileBingoLeaderboardEntryDto,
   MobileBingoStatus,
   MobileBingoTaskAdminDto,
@@ -50,6 +51,8 @@ function countLines(completed: boolean[], size: number): number {
 }
 
 const MAX_NOTE_LENGTH = 300;
+
+const COMPLETIONS_LIMIT = 1000;
 
 /** The organizer's time window for bingo and where "now" falls in it */
 function bingoWindow(
@@ -214,15 +217,22 @@ export class MobileBingoService {
   async leaderboard(
     me: ParticipantContext,
   ): Promise<MobileBingoLeaderboardEntryDto[]> {
+    // Same number of tasks: whoever reached that number first ranks higher
     const rows = await this.prisma.$queryRaw<
-      { participantUuid: string; count: bigint | number }[]
+      {
+        participantUuid: string;
+        count: bigint | number;
+        lastCompletedAt: Date;
+      }[]
     >`
-      SELECT c."participantUuid"::text AS "participantUuid", COUNT(*) AS count
+      SELECT c."participantUuid"::text AS "participantUuid",
+             COUNT(*) AS count,
+             MAX(c."createdAt") AS "lastCompletedAt"
       FROM "MobileBingoCompletions" c
       JOIN "MobileBingoTasks" t ON t.uuid = c."taskUuid"
       WHERE t."eventUuid" = ${me.eventUuid}::uuid
       GROUP BY c."participantUuid"
-      ORDER BY count DESC, MIN(c."createdAt") ASC
+      ORDER BY count DESC, MAX(c."createdAt") ASC
       LIMIT ${LEADERBOARD_SIZE}`;
     const profiles = await loadProfiles(
       this.prisma,
@@ -231,6 +241,7 @@ export class MobileBingoService {
     return rows.map((row) => ({
       ...toPerson(profiles.get(row.participantUuid), row.participantUuid),
       completedCount: Number(row.count),
+      lastCompletedAt: row.lastCompletedAt.toISOString(),
     }));
   }
 
@@ -306,6 +317,70 @@ export class MobileBingoService {
       order: task.order,
       completionsCount: task._count.completions,
     };
+  }
+
+  /** Newest first; at most COMPLETIONS_LIMIT rows */
+  async listCompletions(
+    eventUuid: string,
+    filters: { taskUuid?: string; participantUuid?: string },
+  ): Promise<MobileBingoCompletionAdminDto[]> {
+    const rows = await this.prisma.mobileBingoCompletion.findMany({
+      where: {
+        task: { eventUuid },
+        ...(filters.taskUuid === undefined
+          ? {}
+          : { taskUuid: filters.taskUuid }),
+        ...(filters.participantUuid === undefined
+          ? {}
+          : { participantUuid: filters.participantUuid }),
+      },
+      select: {
+        uuid: true,
+        taskUuid: true,
+        participantUuid: true,
+        photoKey: true,
+        note: true,
+        createdAt: true,
+        task: { select: { text: true } },
+        participant: { select: { email: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: COMPLETIONS_LIMIT,
+    });
+    const profiles = await loadProfiles(
+      this.prisma,
+      rows.map((row) => row.participantUuid),
+    );
+    return rows.map((row) => ({
+      uuid: row.uuid,
+      taskUuid: row.taskUuid,
+      taskText: row.task.text,
+      participant: {
+        ...toPerson(profiles.get(row.participantUuid), row.participantUuid),
+        email: row.participant.email,
+      },
+      photoUrl: this.mobileImageService.url(row.photoKey),
+      note: row.note,
+      completedAt: row.createdAt.toISOString(),
+    }));
+  }
+
+  /** Moderation: removes a completion and its proof photo */
+  async deleteCompletion(
+    eventUuid: string,
+    completionUuid: string,
+  ): Promise<void> {
+    const completion = await this.prisma.mobileBingoCompletion.findFirst({
+      where: { uuid: completionUuid, task: { eventUuid } },
+      select: { photoKey: true },
+    });
+    if (completion === null) {
+      throw new NotFoundException("Completion not found");
+    }
+    await this.prisma.mobileBingoCompletion.delete({
+      where: { uuid: completionUuid },
+    });
+    await this.safeDelete(completion.photoKey);
   }
 
   async deleteTask(eventUuid: string, taskUuid: string): Promise<void> {

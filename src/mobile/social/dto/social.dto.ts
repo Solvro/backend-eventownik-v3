@@ -29,6 +29,17 @@ const emptyToUndefined = ({ value }: { value: unknown }): unknown => {
 // Chat
 // ---------------------------------------------------------------------------
 
+/** Filters for the organizer's list of bingo completions */
+export class BingoCompletionsQueryDto {
+  @IsOptional()
+  @IsUUID()
+  taskUuid?: string;
+
+  @IsOptional()
+  @IsUUID()
+  participantUuid?: string;
+}
+
 export class ChatMessagesQueryDto {
   @IsOptional()
   @Type(() => Number)

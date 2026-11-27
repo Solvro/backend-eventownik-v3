@@ -21,6 +21,7 @@ import {
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 
 import {
+  BingoCompletionsQueryDto,
   BulkCreateBingoTasksDto,
   ChatMessagesQueryDto,
   CreateBerealRoundDto,
@@ -34,6 +35,7 @@ import { MobileChatService } from "./mobile-chat.service";
 import type {
   MobileBerealPostDto,
   MobileBerealRoundAdminDto,
+  MobileBingoCompletionAdminDto,
   MobileBingoTaskAdminDto,
   MobileChatMessageDto,
 } from "./social.types";
@@ -94,6 +96,23 @@ export class MobileSocialAdminController {
     @Param("uuid", ParseUUIDPipe) uuid: string,
   ): Promise<void> {
     await this.bingoService.deleteTask(eventId, uuid);
+  }
+
+  @Get("bingo-completions")
+  async listBingoCompletions(
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @Query() query: BingoCompletionsQueryDto,
+  ): Promise<MobileBingoCompletionAdminDto[]> {
+    return this.bingoService.listCompletions(eventId, query);
+  }
+
+  @Delete("bingo-completions/:uuid")
+  @HttpCode(204)
+  async deleteBingoCompletion(
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @Param("uuid", ParseUUIDPipe) uuid: string,
+  ): Promise<void> {
+    await this.bingoService.deleteCompletion(eventId, uuid);
   }
 
   // ---------------------------------------------------------------- BeReal

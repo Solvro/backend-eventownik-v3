@@ -65,6 +65,8 @@ export type MobileBingoStatus = "upcoming" | "active" | "ended";
 
 export interface MobileBingoLeaderboardEntryDto extends MobilePerson {
   completedCount: number;
+  /** When the participant ticked their latest task: breaks ties in the ranking */
+  lastCompletedAt: string;
 }
 
 export interface MobileBerealRoundDto {
@@ -90,6 +92,17 @@ export interface MobileBerealStateDto {
   isActive: boolean;
   myPost: MobileBerealPostDto | null;
   canViewFeed: boolean;
+}
+
+/** One ticked task, as organizers see it */
+export interface MobileBingoCompletionAdminDto {
+  uuid: string;
+  taskUuid: string;
+  taskText: string;
+  participant: MobilePerson & { email: string };
+  photoUrl: string | null;
+  note: string | null;
+  completedAt: string;
 }
 
 export interface MobileBingoTaskAdminDto {
