@@ -14,7 +14,7 @@ export class MobileProfileDto {
   @Transform(trim)
   @IsString()
   @MinLength(1)
-  @MaxLength(40)
+  @MaxLength(50)
   displayName: string;
 
   @Transform(trim)

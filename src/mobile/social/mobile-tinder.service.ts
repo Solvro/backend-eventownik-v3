@@ -208,10 +208,14 @@ export class MobileTinderService {
   private async assertHasProfile(me: ParticipantContext): Promise<void> {
     const profile = await this.prisma.mobileProfile.findUnique({
       where: { participantUuid: me.uuid },
-      select: { uuid: true },
+      select: { tinderOptIn: true },
     });
     if (profile === null) {
       throw new ForbiddenException("Complete your profile first");
+    }
+    // Swiping while hidden from everyone else would be one-sided
+    if (!profile.tinderOptIn) {
+      throw new ForbiddenException("Join Tinderownik first");
     }
   }
 }

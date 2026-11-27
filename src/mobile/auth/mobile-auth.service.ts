@@ -1,7 +1,12 @@
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { PrismaService } from "src/prisma/prisma.service";
 
-import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from "@nestjs/common";
 
 import { MobileEventService } from "../common/mobile-event.service";
 import type { MobileMeView } from "../common/mobile-profile";
@@ -65,7 +70,7 @@ export class MobileAuthService {
     }
 
     const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
-    await this.prisma.$transaction([
+    const [, created] = await this.prisma.$transaction([
       this.prisma.mobileOtpCode.updateMany({
         where: { participantUuid: participant.uuid, consumedAt: null },
         data: { consumedAt: now },
@@ -76,6 +81,7 @@ export class MobileAuthService {
           codeHash: this.hashCode(code, participant.uuid),
           expiresAt: new Date(now.getTime() + OTP_TTL_MS),
         },
+        select: { uuid: true },
       }),
     ]);
 
@@ -90,6 +96,10 @@ export class MobileAuthService {
         `Failed to enqueue OTP email for participant ${participant.uuid}`,
         error instanceof Error ? error.stack : String(error),
       );
+      // The code never left the server: drop it so it does not count against
+      // the resend wait, and tell the client so the participant can retry
+      await this.prisma.mobileOtpCode.delete({ where: { uuid: created.uuid } });
+      throw new ServiceUnavailableException("Could not send the code");
     }
     return { ok: true };
   }

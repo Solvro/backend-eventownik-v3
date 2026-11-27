@@ -78,19 +78,19 @@ export class CreateMobileSosContactDto {
   @Transform(trim)
   @IsString()
   @MinLength(1)
-  @MaxLength(100)
+  @MaxLength(200)
   label: string;
 
   @Transform(trim)
   @IsString()
   @MinLength(1)
-  @MaxLength(40)
+  @MaxLength(50)
   phone: string;
 
   @Transform(trimToNull)
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(1000)
   description?: string | null;
 
   @IsOptional()
@@ -106,7 +106,7 @@ export class CreateMobileFaqItemDto {
   @Transform(trim)
   @IsString()
   @MinLength(1)
-  @MaxLength(300)
+  @MaxLength(500)
   question: string;
 
   @Transform(trim)

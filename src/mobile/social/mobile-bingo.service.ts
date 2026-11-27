@@ -120,7 +120,7 @@ export class MobileBingoService {
     taskUuid: string,
     photo: Express.Multer.File | undefined,
   ): Promise<MobileBingoBoardDto> {
-    await this.assertTaskInEvent(taskUuid, me.eventUuid);
+    await this.assertTaskOnBoard(me, taskUuid);
     const photoKey =
       photo === undefined ? null : await this.mobileImageService.upload(photo);
 
@@ -286,6 +286,35 @@ export class MobileBingoService {
       _max: { order: true },
     });
     return (aggregate._max.order ?? -1) + 1;
+  }
+
+  /** Only tasks on the participant's own board can be ticked, so the ranking cannot be inflated */
+  private async assertTaskOnBoard(
+    me: ParticipantContext,
+    taskUuid: string,
+  ): Promise<void> {
+    const [snapshot, tasks] = await Promise.all([
+      this.mobileEventService.getByUuid(me.eventUuid),
+      this.prisma.mobileBingoTask.findMany({
+        where: { eventUuid: me.eventUuid },
+        select: { uuid: true },
+      }),
+    ]);
+    const size = snapshot.app?.bingoSize ?? DEFAULT_SIZE;
+    const cellCount = size * size;
+    const onBoard =
+      tasks.length >= cellCount &&
+      tasks
+        .map((task) => ({
+          uuid: task.uuid,
+          key: shuffleKey(me.uuid, task.uuid),
+        }))
+        .toSorted((a, b) => a.key.localeCompare(b.key))
+        .slice(0, cellCount)
+        .some((task) => task.uuid === taskUuid);
+    if (!onBoard) {
+      throw new NotFoundException("Task not found");
+    }
   }
 
   private async assertTaskInEvent(
