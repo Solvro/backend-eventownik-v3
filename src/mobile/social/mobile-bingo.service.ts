@@ -1,7 +1,11 @@
 import { createHash } from "node:crypto";
 import { PrismaService } from "src/prisma/prisma.service";
 
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 
 import type { ParticipantContext } from "../auth/current-participant.decorator";
 import { MobileEventService } from "../common/mobile-event.service";
@@ -12,6 +16,7 @@ import { loadProfiles } from "./social-utils";
 import type {
   MobileBingoBoardDto,
   MobileBingoLeaderboardEntryDto,
+  MobileBingoStatus,
   MobileBingoTaskAdminDto,
 } from "./social.types";
 
@@ -46,6 +51,26 @@ function countLines(completed: boolean[], size: number): number {
 
 const MAX_NOTE_LENGTH = 300;
 
+/** The organizer's time window for bingo and where "now" falls in it */
+function bingoWindow(
+  app: { bingoStartsAt: Date | null; bingoEndsAt: Date | null } | null,
+): Pick<MobileBingoBoardDto, "startsAt" | "endsAt" | "status"> {
+  const startsAt = app?.bingoStartsAt ?? null;
+  const endsAt = app?.bingoEndsAt ?? null;
+  const now = Date.now();
+  const status: MobileBingoStatus =
+    startsAt !== null && now < startsAt.getTime()
+      ? "upcoming"
+      : endsAt !== null && now >= endsAt.getTime()
+        ? "ended"
+        : "active";
+  return {
+    startsAt: startsAt?.toISOString() ?? null,
+    endsAt: endsAt?.toISOString() ?? null,
+    status,
+  };
+}
+
 @Injectable()
 export class MobileBingoService {
   constructor(
@@ -67,6 +92,7 @@ export class MobileBingoService {
       }),
     ]);
     const size = snapshot.app?.bingoSize ?? DEFAULT_SIZE;
+    const timeWindow = bingoWindow(snapshot.app);
     const cellCount = size * size;
     if (tasks.length < cellCount) {
       return {
@@ -75,6 +101,7 @@ export class MobileBingoService {
         completedCount: 0,
         bingoLines: 0,
         hasBingo: false,
+        ...timeWindow,
       };
     }
 
@@ -115,6 +142,7 @@ export class MobileBingoService {
       completedCount: completions.length,
       bingoLines,
       hasBingo: bingoLines > 0,
+      ...timeWindow,
     };
   }
 
@@ -124,6 +152,7 @@ export class MobileBingoService {
     photo: Express.Multer.File | undefined,
     rawNote?: unknown,
   ): Promise<MobileBingoBoardDto> {
+    await this.assertActive(me.eventUuid);
     await this.assertTaskOnBoard(me, taskUuid);
     // undefined = the field was not sent, so an existing note is kept
     const note =
@@ -165,6 +194,7 @@ export class MobileBingoService {
     me: ParticipantContext,
     taskUuid: string,
   ): Promise<MobileBingoBoardDto> {
+    await this.assertActive(me.eventUuid);
     await this.assertTaskInEvent(taskUuid, me.eventUuid);
     const existing = await this.prisma.mobileBingoCompletion.findUnique({
       where: {
@@ -298,6 +328,14 @@ export class MobileBingoService {
       _max: { order: true },
     });
     return (aggregate._max.order ?? -1) + 1;
+  }
+
+  /** Ticking and unticking are allowed only inside the organizer's time window */
+  private async assertActive(eventUuid: string): Promise<void> {
+    const snapshot = await this.mobileEventService.getByUuid(eventUuid);
+    if (bingoWindow(snapshot.app).status !== "active") {
+      throw new ForbiddenException("Bingo is not active right now");
+    }
   }
 
   /** Only tasks on the participant's own board can be ticked, so the ranking cannot be inflated */

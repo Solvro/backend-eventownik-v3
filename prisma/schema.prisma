@@ -473,21 +473,24 @@ model AuditLog {
 // ---------------------------------------------------------------------------
 
 model MobileApp {
-  uuid            String   @id @default(uuid()) @db.Uuid
-  eventUuid       String   @unique @db.Uuid
-  isEnabled       Boolean  @default(false)
+  uuid            String    @id @default(uuid()) @db.Uuid
+  eventUuid       String    @unique @db.Uuid
+  isEnabled       Boolean   @default(false)
   welcomeMessage  String?
   // Hex colour (#rrggbb) of the app accent; falls back to the event primaryColor
   accentColor     String?
-  sosEnabled      Boolean  @default(true)
-  scheduleEnabled Boolean  @default(true)
-  chatEnabled     Boolean  @default(true)
-  tinderEnabled   Boolean  @default(true)
-  bingoEnabled    Boolean  @default(true)
-  berealEnabled   Boolean  @default(true)
-  bingoSize       Int      @default(4)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  sosEnabled      Boolean   @default(true)
+  scheduleEnabled Boolean   @default(true)
+  chatEnabled     Boolean   @default(true)
+  tinderEnabled   Boolean   @default(true)
+  bingoEnabled    Boolean   @default(true)
+  berealEnabled   Boolean   @default(true)
+  bingoSize       Int       @default(4)
+  // Bingo can be played only inside this window; null = no limit on that side
+  bingoStartsAt   DateTime?
+  bingoEndsAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   event Event @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
 

@@ -54,7 +54,14 @@ export interface MobileBingoBoardDto {
   completedCount: number;
   bingoLines: number;
   hasBingo: boolean;
+  /** When the organizer limits bingo to a time window; null = no limit on that side */
+  startsAt: string | null;
+  endsAt: string | null;
+  /** Tasks can be ticked only while "active" */
+  status: MobileBingoStatus;
 }
+
+export type MobileBingoStatus = "upcoming" | "active" | "ended";
 
 export interface MobileBingoLeaderboardEntryDto extends MobilePerson {
   completedCount: number;

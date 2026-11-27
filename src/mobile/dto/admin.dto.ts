@@ -72,6 +72,16 @@ export class MobileAppConfigDto {
   @Min(3)
   @Max(5)
   bingoSize?: number;
+
+  /** ISO date-time from which bingo can be played; null clears it */
+  @IsOptional()
+  @IsDateString()
+  bingoStartsAt?: string | null;
+
+  /** ISO date-time after which bingo is read-only; null clears it */
+  @IsOptional()
+  @IsDateString()
+  bingoEndsAt?: string | null;
 }
 
 export class CreateMobileSosContactDto {

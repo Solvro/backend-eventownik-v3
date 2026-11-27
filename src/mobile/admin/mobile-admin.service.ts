@@ -36,6 +36,8 @@ export interface MobileAppConfigView {
   bingoEnabled: boolean;
   berealEnabled: boolean;
   bingoSize: number;
+  bingoStartsAt: Date | null;
+  bingoEndsAt: Date | null;
   profilesCount: number;
 }
 
@@ -50,7 +52,14 @@ const CONFIG_SELECT = {
   bingoEnabled: true,
   berealEnabled: true,
   bingoSize: true,
+  bingoStartsAt: true,
+  bingoEndsAt: true,
 } as const;
+
+/** undefined = leave unchanged, null = clear */
+function toDate(value: string | null | undefined): Date | null | undefined {
+  return value === undefined || value === null ? value : new Date(value);
+}
 
 /** `null` is accepted by @IsOptional, but these columns are not nullable. */
 function nonNull<T>(value: T | null | undefined): T | undefined {
@@ -96,7 +105,16 @@ export class MobileAdminService {
       bingoEnabled: nonNull(dto.bingoEnabled),
       berealEnabled: nonNull(dto.berealEnabled),
       bingoSize: nonNull(dto.bingoSize),
+      bingoStartsAt: toDate(dto.bingoStartsAt),
+      bingoEndsAt: toDate(dto.bingoEndsAt),
     };
+    if (
+      data.bingoStartsAt instanceof Date &&
+      data.bingoEndsAt instanceof Date &&
+      data.bingoEndsAt <= data.bingoStartsAt
+    ) {
+      throw new BadRequestException("Bingo must end after it starts");
+    }
     const app = await this.prisma.mobileApp.upsert({
       where: { eventUuid },
       create: { eventUuid, ...data },
