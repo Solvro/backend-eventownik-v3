@@ -14,6 +14,16 @@ export interface MobileChatRoomDto {
   unreadCount: number;
 }
 
+/** Short view of the message a reply points to */
+export interface MobileChatReplyToDto {
+  uuid: string;
+  seq: number;
+  /** null when that message was deleted */
+  body: string | null;
+  senderName: string;
+  isMine: boolean;
+}
+
 export interface MobileChatMessageDto {
   uuid: string;
   seq: number;
@@ -22,6 +32,7 @@ export interface MobileChatMessageDto {
   sender: MobilePerson | null;
   isOrganizer: boolean;
   isMine: boolean;
+  replyTo: MobileChatReplyToDto | null;
 }
 
 export interface MobileTinderCandidateDto extends MobilePerson {

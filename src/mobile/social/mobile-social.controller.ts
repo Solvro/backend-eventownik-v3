@@ -94,7 +94,12 @@ export class MobileSocialController {
     @Body() dto: SendChatMessageDto,
   ): Promise<MobileChatMessageDto> {
     await this.mobileEventService.assertFeature(me.eventUuid, "chat");
-    return this.chatService.sendMessage(me, roomUuid, dto.body);
+    return this.chatService.sendMessage(
+      me,
+      roomUuid,
+      dto.body,
+      dto.replyToUuid,
+    );
   }
 
   // ---------------------------------------------------------------- Tinder

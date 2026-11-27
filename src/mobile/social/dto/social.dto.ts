@@ -67,6 +67,11 @@ export class SendChatMessageDto {
   @MinLength(1)
   @MaxLength(1000)
   body: string;
+
+  /** Message in the same room this one replies to */
+  @IsOptional()
+  @IsUUID()
+  replyToUuid?: string;
 }
 
 // ---------------------------------------------------------------------------

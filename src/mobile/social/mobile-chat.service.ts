@@ -2,6 +2,7 @@ import { Prisma } from "src/generated/prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 
 import {
+  BadRequestException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -31,6 +32,16 @@ const MESSAGE_SELECT = {
   createdAt: true,
   senderParticipantUuid: true,
   senderAdminUuid: true,
+  replyTo: {
+    select: {
+      uuid: true,
+      seq: true,
+      body: true,
+      deletedAt: true,
+      senderParticipantUuid: true,
+      senderAdminUuid: true,
+    },
+  },
 } as const;
 
 type MessageRow = Prisma.MobileChatMessageGetPayload<{
@@ -258,8 +269,10 @@ export class MobileChatService {
     me: ParticipantContext,
     roomUuid: string,
     body: string,
+    replyToUuid?: string,
   ): Promise<MobileChatMessageDto> {
     const access = await this.getAccess(me, roomUuid);
+    await this.assertReplyTarget(access.uuid, replyToUuid);
     this.assertNotFlooding(me.uuid);
 
     const message = await this.prisma.mobileChatMessage.create({
@@ -267,17 +280,24 @@ export class MobileChatService {
         roomUuid: access.uuid,
         senderParticipantUuid: me.uuid,
         body: body.trim(),
+        replyToUuid: replyToUuid ?? null,
       },
       select: MESSAGE_SELECT,
     });
     const [dto] = await this.toMessages([message], me.uuid);
+    const senderName = dto.sender?.displayName ?? MOBILE_DEFAULT_DISPLAY_NAME;
     if (access.type === "DIRECT") {
-      this.notifyDirectMessage(
-        me,
-        access.uuid,
-        dto.sender?.displayName ?? MOBILE_DEFAULT_DISPLAY_NAME,
-        message.body,
-      );
+      this.notifyDirectMessage(me, access.uuid, senderName, message.body);
+    } else {
+      // In the event room only the person replied to hears about it
+      const repliedTo = message.replyTo?.senderParticipantUuid;
+      if (
+        repliedTo !== undefined &&
+        repliedTo !== null &&
+        repliedTo !== me.uuid
+      ) {
+        this.notifyReply(me, access.uuid, repliedTo, senderName, message.body);
+      }
     }
     return dto;
   }
@@ -299,10 +319,17 @@ export class MobileChatService {
     eventUuid: string,
     adminUuid: string,
     body: string,
+    replyToUuid?: string,
   ): Promise<MobileChatMessageDto> {
     const roomUuid = await this.ensureEventRoom(eventUuid);
+    await this.assertReplyTarget(roomUuid, replyToUuid);
     const message = await this.prisma.mobileChatMessage.create({
-      data: { roomUuid, senderAdminUuid: adminUuid, body: body.trim() },
+      data: {
+        roomUuid,
+        senderAdminUuid: adminUuid,
+        body: body.trim(),
+        replyToUuid: replyToUuid ?? null,
+      },
       select: MESSAGE_SELECT,
     });
     const [dto] = await this.toMessages([message], null);
@@ -325,6 +352,42 @@ export class MobileChatService {
   // -------------------------------------------------------------------------
   // Helpers
   // -------------------------------------------------------------------------
+
+  /** A reply may only point at a live message of the same room */
+  private async assertReplyTarget(
+    roomUuid: string,
+    replyToUuid: string | undefined,
+  ): Promise<void> {
+    if (replyToUuid === undefined) {
+      return;
+    }
+    const target = await this.prisma.mobileChatMessage.findFirst({
+      where: { uuid: replyToUuid, roomUuid, deletedAt: null },
+      select: { uuid: true },
+    });
+    if (target === null) {
+      throw new BadRequestException("The message you reply to is gone");
+    }
+  }
+
+  /** Push to the author of an event-room message that someone replied to */
+  private notifyReply(
+    me: ParticipantContext,
+    roomUuid: string,
+    recipientUuid: string,
+    senderName: string,
+    body: string,
+  ): void {
+    this.mobilePushService.run("chat reply", async () => {
+      const { event } = await this.mobileEventService.getByUuid(me.eventUuid);
+      this.mobilePushService.sendToParticipants([recipientUuid], {
+        title: `${senderName} odpowiada na Twoją wiadomość`,
+        body,
+        url: `/${event.slug}/app/chats/${roomUuid}`,
+        tag: `reply-${roomUuid}`,
+      });
+    });
+  }
 
   /** Push a direct message to the other member. Never for the event-wide room. */
   private notifyDirectMessage(
@@ -427,7 +490,10 @@ export class MobileChatService {
     const profiles = await loadProfiles(
       this.prisma,
       rows
-        .map((row) => row.senderParticipantUuid)
+        .flatMap((row) => [
+          row.senderParticipantUuid,
+          row.replyTo?.senderParticipantUuid ?? null,
+        ])
         .filter((uuid): uuid is string => uuid !== null),
     );
     return rows.map((row) => ({
@@ -444,6 +510,19 @@ export class MobileChatService {
             ),
       isOrganizer: row.senderAdminUuid !== null,
       isMine: meUuid !== null && row.senderParticipantUuid === meUuid,
+      replyTo:
+        row.replyTo === null
+          ? null
+          : {
+              uuid: row.replyTo.uuid,
+              seq: row.replyTo.seq,
+              body: row.replyTo.deletedAt === null ? row.replyTo.body : null,
+              senderName:
+                this.senderName(row.replyTo, profiles) ??
+                MOBILE_DEFAULT_DISPLAY_NAME,
+              isMine:
+                meUuid !== null && row.replyTo.senderParticipantUuid === meUuid,
+            },
     }));
   }
 

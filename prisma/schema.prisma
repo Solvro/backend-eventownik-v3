@@ -638,11 +638,15 @@ model MobileChatMessage {
   senderParticipantUuid String?   @db.Uuid
   senderAdminUuid       String?   @db.Uuid
   body                  String
+  /// Message this one replies to, in the same room
+  replyToUuid           String?   @db.Uuid
   createdAt             DateTime  @default(now())
   deletedAt             DateTime?
 
-  room   MobileChatRoom @relation(fields: [roomUuid], references: [uuid], onDelete: Cascade)
-  sender Participant?   @relation(fields: [senderParticipantUuid], references: [uuid], onDelete: SetNull)
+  room    MobileChatRoom      @relation(fields: [roomUuid], references: [uuid], onDelete: Cascade)
+  sender  Participant?        @relation(fields: [senderParticipantUuid], references: [uuid], onDelete: SetNull)
+  replyTo MobileChatMessage?  @relation("MobileChatReply", fields: [replyToUuid], references: [uuid], onDelete: SetNull)
+  replies MobileChatMessage[] @relation("MobileChatReply")
 
   @@index([roomUuid, seq])
   @@map("MobileChatMessages")
