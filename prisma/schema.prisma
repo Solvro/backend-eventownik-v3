@@ -96,17 +96,18 @@ model Event {
   links            EventLink[]
   tickets          Ticket[]
 
-  mobileApp           MobileApp?
-  mobileSosContacts   MobileSosContact[]
-  mobileFaqItems      MobileFaqItem[]
-  mobileScheduleItems MobileScheduleItem[]
-  mobileNotifications MobileNotification[]
-  mobileProfiles      MobileProfile[]
-  mobileChatRooms     MobileChatRoom[]
-  mobileSwipes        MobileSwipe[]
-  mobileBingoTasks    MobileBingoTask[]
-  mobileBerealRounds  MobileBerealRound[]
-  mobilePushSubs      MobilePushSubscription[]
+  mobileApp            MobileApp?
+  mobileSosContacts    MobileSosContact[]
+  mobileFaqItems       MobileFaqItem[]
+  mobileScheduleItems  MobileScheduleItem[]
+  mobileNotifications  MobileNotification[]
+  mobileProfiles       MobileProfile[]
+  mobileChatRooms      MobileChatRoom[]
+  mobileSwipes         MobileSwipe[]
+  mobileBingoTasks     MobileBingoTask[]
+  mobileBerealRounds   MobileBerealRound[]
+  mobileSoundboardPads MobileSoundboardPad[]
+  mobilePushSubs       MobilePushSubscription[]
 
   @@map("Events")
 }
@@ -302,6 +303,7 @@ model Participant {
   mobileSwipesReceived   MobileSwipe[]            @relation("MobileSwipeTo")
   mobileBingoCompletions MobileBingoCompletion[]
   mobileBerealPosts      MobileBerealPost[]
+  mobileSoundboardPads   MobileSoundboardPad[]
   mobilePushSubs         MobilePushSubscription[]
 
   @@unique([email, eventUuid])
@@ -473,24 +475,25 @@ model AuditLog {
 // ---------------------------------------------------------------------------
 
 model MobileApp {
-  uuid            String    @id @default(uuid()) @db.Uuid
-  eventUuid       String    @unique @db.Uuid
-  isEnabled       Boolean   @default(false)
-  welcomeMessage  String?
+  uuid              String    @id @default(uuid()) @db.Uuid
+  eventUuid         String    @unique @db.Uuid
+  isEnabled         Boolean   @default(false)
+  welcomeMessage    String?
   // Hex colour (#rrggbb) of the app accent; falls back to the event primaryColor
-  accentColor     String?
-  sosEnabled      Boolean   @default(true)
-  scheduleEnabled Boolean   @default(true)
-  chatEnabled     Boolean   @default(true)
-  tinderEnabled   Boolean   @default(true)
-  bingoEnabled    Boolean   @default(true)
-  berealEnabled   Boolean   @default(true)
-  bingoSize       Int       @default(4)
+  accentColor       String?
+  sosEnabled        Boolean   @default(true)
+  scheduleEnabled   Boolean   @default(true)
+  chatEnabled       Boolean   @default(true)
+  tinderEnabled     Boolean   @default(true)
+  bingoEnabled      Boolean   @default(true)
+  berealEnabled     Boolean   @default(true)
+  soundboardEnabled Boolean   @default(true)
+  bingoSize         Int       @default(4)
   // Bingo can be played only inside this window; null = no limit on that side
-  bingoStartsAt   DateTime?
-  bingoEndsAt     DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  bingoStartsAt     DateTime?
+  bingoEndsAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   event Event @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
 
@@ -737,6 +740,31 @@ model MobileBerealPost {
   @@unique([roundUuid, participantUuid])
   @@index([participantUuid])
   @@map("MobileBerealPosts")
+}
+
+// One of the nine pads of the event's shared soundboard; anyone can record over it
+model MobileSoundboardPad {
+  uuid            String   @id @default(uuid()) @db.Uuid
+  eventUuid       String   @db.Uuid
+  // 0-8, row by row
+  slot            Int
+  caption         String
+  audioKey        String
+  audioMime       String
+  // Measured while recording; recorded WebM files carry no duration of their own
+  durationMs      Int?
+  imageKey        String?
+  // Who last recorded or edited the pad; null once they are gone
+  participantUuid String?  @db.Uuid
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  event       Event        @relation(fields: [eventUuid], references: [uuid], onDelete: Cascade)
+  participant Participant? @relation(fields: [participantUuid], references: [uuid], onDelete: SetNull)
+
+  @@unique([eventUuid, slot])
+  @@index([participantUuid])
+  @@map("MobileSoundboardPads")
 }
 
 model MobilePushSubscription {

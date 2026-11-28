@@ -10,7 +10,7 @@ import {
 import type { ParticipantContext } from "../auth/current-participant.decorator";
 
 export type MobileFeature =
-  "bereal" | "bingo" | "chat" | "schedule" | "sos" | "tinder";
+  "bereal" | "bingo" | "chat" | "schedule" | "sos" | "soundboard" | "tinder";
 
 export interface MobileEventInfo {
   uuid: string;
@@ -61,6 +61,7 @@ const FEATURE_COLUMNS = {
   chat: "chatEnabled",
   schedule: "scheduleEnabled",
   sos: "sosEnabled",
+  soundboard: "soundboardEnabled",
   tinder: "tinderEnabled",
 } as const satisfies Record<MobileFeature, keyof MobileApp>;
 

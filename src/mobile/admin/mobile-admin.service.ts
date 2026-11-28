@@ -35,6 +35,7 @@ export interface MobileAppConfigView {
   tinderEnabled: boolean;
   bingoEnabled: boolean;
   berealEnabled: boolean;
+  soundboardEnabled: boolean;
   bingoSize: number;
   bingoStartsAt: Date | null;
   bingoEndsAt: Date | null;
@@ -51,6 +52,7 @@ const CONFIG_SELECT = {
   tinderEnabled: true,
   bingoEnabled: true,
   berealEnabled: true,
+  soundboardEnabled: true,
   bingoSize: true,
   bingoStartsAt: true,
   bingoEndsAt: true,
@@ -104,6 +106,7 @@ export class MobileAdminService {
       tinderEnabled: nonNull(dto.tinderEnabled),
       bingoEnabled: nonNull(dto.bingoEnabled),
       berealEnabled: nonNull(dto.berealEnabled),
+      soundboardEnabled: nonNull(dto.soundboardEnabled),
       bingoSize: nonNull(dto.bingoSize),
       bingoStartsAt: toDate(dto.bingoStartsAt),
       bingoEndsAt: toDate(dto.bingoEndsAt),

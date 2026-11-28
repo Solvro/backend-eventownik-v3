@@ -200,3 +200,22 @@ export interface MobileTinderParticipantSwipesDto {
   /** Others' swipes on them, newest first; reciprocal = their answer */
   received: MobileTinderSwipeAdminDto[];
 }
+
+export interface MobileSoundboardPadDto {
+  uuid: string;
+  /** 0-8, row by row */
+  slot: number;
+  caption: string;
+  audioUrl: string;
+  audioMime: string;
+  durationMs: number | null;
+  imageUrl: string | null;
+  /** Who last recorded or edited it */
+  author: MobilePerson | null;
+  updatedAt: string;
+}
+
+export interface MobileSoundboardDto {
+  /** Always nine entries; null marks an empty pad */
+  pads: (MobileSoundboardPadDto | null)[];
+}

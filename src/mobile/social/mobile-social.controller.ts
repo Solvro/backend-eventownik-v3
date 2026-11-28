@@ -7,8 +7,10 @@ import {
   Get,
   HttpCode,
   Param,
+  ParseIntPipe,
   ParseUUIDPipe,
   Post,
+  Put,
   Query,
   UploadedFile,
   UploadedFiles,
@@ -30,6 +32,7 @@ import {
   ChatMessagesQueryDto,
   CreateBerealPostDto,
   GifSearchQueryDto,
+  SaveSoundboardPadDto,
   SendChatMessageDto,
   SwipeDto,
   TinderCandidatesQueryDto,
@@ -38,6 +41,7 @@ import { MobileBerealService } from "./mobile-bereal.service";
 import { MobileBingoService } from "./mobile-bingo.service";
 import { MobileChatService } from "./mobile-chat.service";
 import { MobileGifService } from "./mobile-gif.service";
+import { MobileSoundboardService } from "./mobile-soundboard.service";
 import { MobileTinderService } from "./mobile-tinder.service";
 import type {
   MobileBerealPostDto,
@@ -47,6 +51,7 @@ import type {
   MobileChatMessageDto,
   MobileChatRoomDto,
   MobileGifSearchDto,
+  MobileSoundboardDto,
   MobileSwipeResultDto,
   MobileTinderCandidateDto,
   MobileTinderMatchDto,
@@ -69,6 +74,7 @@ export class MobileSocialController {
     private readonly bingoService: MobileBingoService,
     private readonly berealService: MobileBerealService,
     private readonly gifService: MobileGifService,
+    private readonly soundboardService: MobileSoundboardService,
   ) {}
 
   // ---------------------------------------------------------------- Chat
@@ -232,5 +238,54 @@ export class MobileSocialController {
   ): Promise<MobileBerealPostDto[]> {
     await this.mobileEventService.assertFeature(me.eventUuid, "bereal");
     return this.berealService.feed(me, roundUuid);
+  }
+
+  // ---------------------------------------------------------------- Soundboard
+
+  @Get("soundboard")
+  async soundboard(
+    @CurrentParticipant() me: ParticipantContext,
+  ): Promise<MobileSoundboardDto> {
+    await this.mobileEventService.assertFeature(me.eventUuid, "soundboard");
+    return this.soundboardService.board(me.eventUuid);
+  }
+
+  @Put("soundboard/pads/:slot")
+  @ApiConsumes("multipart/form-data")
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: "audio", maxCount: 1 },
+        { name: "image", maxCount: 1 },
+      ],
+      uploadOptions,
+    ),
+  )
+  async saveSoundboardPad(
+    @CurrentParticipant() me: ParticipantContext,
+    @Param("slot", ParseIntPipe) slot: number,
+    @UploadedFiles()
+    files:
+      | { audio?: Express.Multer.File[]; image?: Express.Multer.File[] }
+      | undefined,
+    @Body() dto: SaveSoundboardPadDto,
+  ): Promise<MobileSoundboardDto> {
+    await this.mobileEventService.assertFeature(me.eventUuid, "soundboard");
+    return this.soundboardService.save(me, slot, {
+      caption: dto.caption,
+      durationMs: dto.durationMs,
+      removeImage: dto.removeImage,
+      audio: files?.audio?.[0],
+      image: files?.image?.[0],
+    });
+  }
+
+  @Delete("soundboard/pads/:slot")
+  async clearSoundboardPad(
+    @CurrentParticipant() me: ParticipantContext,
+    @Param("slot", ParseIntPipe) slot: number,
+  ): Promise<MobileSoundboardDto> {
+    await this.mobileEventService.assertFeature(me.eventUuid, "soundboard");
+    return this.soundboardService.clear(me.eventUuid, slot);
   }
 }

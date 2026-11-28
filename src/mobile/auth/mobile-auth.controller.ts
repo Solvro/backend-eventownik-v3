@@ -49,6 +49,7 @@ export class MobileAuthController {
           tinder: app.tinderEnabled,
           bingo: app.bingoEnabled,
           bereal: app.berealEnabled,
+          soundboard: app.soundboardEnabled,
         },
       },
     };

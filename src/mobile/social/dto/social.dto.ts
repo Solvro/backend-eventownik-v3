@@ -203,3 +203,28 @@ export class UpdateBingoTaskDto {
   @Min(0)
   order?: number;
 }
+
+/** Multipart fields that come with a soundboard pad's sound and picture */
+export class SaveSoundboardPadDto {
+  @Transform(trim)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  caption!: string;
+
+  /** Length of the recording, measured by the app */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(60_000)
+  durationMs?: number;
+
+  /** "true" drops the current picture when no new one is sent */
+  @IsOptional()
+  @Transform(
+    ({ value }: { value: unknown }) => value === true || value === "true",
+  )
+  @IsBoolean()
+  removeImage?: boolean;
+}

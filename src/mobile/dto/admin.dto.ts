@@ -68,6 +68,10 @@ export class MobileAppConfigDto {
   berealEnabled?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  soundboardEnabled?: boolean;
+
+  @IsOptional()
   @IsInt()
   @Min(3)
   @Max(5)

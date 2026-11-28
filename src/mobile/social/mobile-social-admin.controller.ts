@@ -11,6 +11,7 @@ import {
   Get,
   HttpCode,
   Param,
+  ParseIntPipe,
   ParseUUIDPipe,
   Patch,
   Post,
@@ -32,6 +33,7 @@ import {
 import { MobileBerealService } from "./mobile-bereal.service";
 import { MobileBingoService } from "./mobile-bingo.service";
 import { MobileChatService } from "./mobile-chat.service";
+import { MobileSoundboardService } from "./mobile-soundboard.service";
 import { MobileTinderService } from "./mobile-tinder.service";
 import type {
   MobileBerealPostDto,
@@ -39,6 +41,7 @@ import type {
   MobileBingoCompletionAdminDto,
   MobileBingoTaskAdminDto,
   MobileChatMessageDto,
+  MobileSoundboardDto,
   MobileTinderOverviewDto,
   MobileTinderParticipantSwipesDto,
 } from "./social.types";
@@ -57,6 +60,7 @@ export class MobileSocialAdminController {
     private readonly bingoService: MobileBingoService,
     private readonly berealService: MobileBerealService,
     private readonly tinderService: MobileTinderService,
+    private readonly soundboardService: MobileSoundboardService,
   ) {}
 
   // ---------------------------------------------------------------- Tinderownik
@@ -217,5 +221,22 @@ export class MobileSocialAdminController {
     @Param("uuid", ParseUUIDPipe) uuid: string,
   ): Promise<void> {
     await this.chatService.adminDeleteMessage(eventId, uuid);
+  }
+
+  // ---------------------------------------------------------------- Soundboard moderation
+
+  @Get("soundboard")
+  async soundboard(
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+  ): Promise<MobileSoundboardDto> {
+    return this.soundboardService.board(eventId);
+  }
+
+  @Delete("soundboard/pads/:slot")
+  async clearSoundboardPad(
+    @Param("eventId", ParseUUIDPipe) eventId: string,
+    @Param("slot", ParseIntPipe) slot: number,
+  ): Promise<MobileSoundboardDto> {
+    return this.soundboardService.clear(eventId, slot);
   }
 }

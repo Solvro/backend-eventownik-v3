@@ -7,6 +7,7 @@ import { MobileChatService } from "./mobile-chat.service";
 import { MobileGifService } from "./mobile-gif.service";
 import { MobileSocialAdminController } from "./mobile-social-admin.controller";
 import { MobileSocialController } from "./mobile-social.controller";
+import { MobileSoundboardService } from "./mobile-soundboard.service";
 import { MobileTinderService } from "./mobile-tinder.service";
 
 @Module({
@@ -18,6 +19,7 @@ import { MobileTinderService } from "./mobile-tinder.service";
     MobileTinderService,
     MobileBingoService,
     MobileBerealService,
+    MobileSoundboardService,
   ],
 })
 export class MobileSocialModule {}

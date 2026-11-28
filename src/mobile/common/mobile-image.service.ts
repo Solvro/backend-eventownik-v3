@@ -43,6 +43,42 @@ function detectImageType(
   return undefined;
 }
 
+export const MOBILE_AUDIO_MAX_BYTES = 3 * 1024 * 1024;
+
+/** Detects the formats browsers record or play (MP4/M4A, WebM, Ogg, WAV, MP3, AAC) by magic bytes. */
+function detectAudioType(
+  buffer: Buffer,
+): { mime: string; extension: string } | undefined {
+  if (buffer.length < 12) {
+    return undefined;
+  }
+  if (buffer.toString("latin1", 4, 8) === "ftyp") {
+    return { mime: "audio/mp4", extension: "m4a" };
+  }
+  if (buffer.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]))) {
+    return { mime: "audio/webm", extension: "webm" };
+  }
+  if (buffer.toString("latin1", 0, 4) === "OggS") {
+    return { mime: "audio/ogg", extension: "ogg" };
+  }
+  if (
+    buffer.toString("latin1", 0, 4) === "RIFF" &&
+    buffer.toString("latin1", 8, 12) === "WAVE"
+  ) {
+    return { mime: "audio/wav", extension: "wav" };
+  }
+  if (buffer[0] === 0xff && (buffer[1] & 0xf6) === 0xf0) {
+    return { mime: "audio/aac", extension: "aac" };
+  }
+  if (
+    buffer.toString("latin1", 0, 3) === "ID3" ||
+    (buffer[0] === 0xff && (buffer[1] & 0xe0) === 0xe0)
+  ) {
+    return { mime: "audio/mpeg", extension: "mp3" };
+  }
+  return undefined;
+}
+
 /** Public URL of an image stored by MobileImageService (same layout as StorageService.getUrl). */
 export function mobileImageUrl(key: string | null | undefined): string | null {
   if (key === null || key === undefined || key === "") {
@@ -91,6 +127,35 @@ export class MobileImageService {
       },
       `mobile-${randomUUID()}.${detected.extension}`,
     );
+  }
+
+  /**
+   * Like upload, for a sound: validated by magic bytes, max 3 MB. Returns the
+   * storage key and the detected type, which players need to pick a decoder.
+   */
+  async uploadAudio(
+    file: Express.Multer.File | undefined,
+  ): Promise<{ key: string; mime: string }> {
+    if (file?.buffer === undefined || file.buffer.length === 0) {
+      throw new BadRequestException("Audio file is required");
+    }
+    if (file.buffer.length > MOBILE_AUDIO_MAX_BYTES) {
+      throw new PayloadTooLargeException("Audio is larger than 3 MB");
+    }
+    const detected = detectAudioType(file.buffer);
+    if (detected === undefined) {
+      throw new BadRequestException("Unsupported audio format");
+    }
+    const key = await this.storageService.upload(
+      this.bucket,
+      {
+        ...file,
+        originalname: `mobile.${detected.extension}`,
+        mimetype: detected.mime,
+      },
+      `mobile-${randomUUID()}.${detected.extension}`,
+    );
+    return { key, mime: detected.mime };
   }
 
   url(key: string | null | undefined): string | null {
